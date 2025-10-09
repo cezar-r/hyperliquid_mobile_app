@@ -9,8 +9,7 @@ const DEFAULT_TESTNET_URL = 'https://api.hyperliquid-testnet.xyz';
 const DEFAULT_MAINNET_URL = 'https://api.hyperliquid.xyz';
 
 export function getEnvironment(): Environment {
-  const env = process.env.EXPO_PUBLIC_HL_ENV || 'testnet';
-  return env === 'mainnet' ? 'mainnet' : 'testnet';
+  return 'mainnet';
 }
 
 export function isTestnet(): boolean {

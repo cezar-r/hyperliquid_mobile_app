@@ -24,6 +24,28 @@ export const styles = StyleSheet.create({
     color: Color.FG_3,
     marginBottom: spacing.xl,
   },
+  section: {
+    marginBottom: spacing.lg,
+    backgroundColor: Color.BG_3,
+    padding: spacing.md,
+    borderRadius: 8,
+  },
+  sectionTitle: {
+    fontSize: fontSizes.sm,
+    color: Color.FG_3,
+    marginBottom: spacing.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  infoText: {
+    fontSize: fontSizes.md,
+    color: Color.FG_1,
+  },
+  infoTextSmall: {
+    fontSize: fontSizes.sm,
+    color: Color.FG_3,
+    marginTop: spacing.xs,
+  },
   placeholder: {
     backgroundColor: Color.BG_3,
     padding: spacing.lg,

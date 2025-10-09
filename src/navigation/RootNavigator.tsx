@@ -1,27 +1,32 @@
-import React, { useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useEffect } from 'react';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
+import { useAccount } from '@reown/appkit-react-native';
 import ConnectScreen from '../screens/ConnectScreen';
+import EnableSessionKeyScreen from '../screens/EnableSessionKeyScreen';
 import TabNavigator from './TabNavigator';
 
+const Stack = createNativeStackNavigator();
+
 export default function RootNavigator(): React.JSX.Element {
-  const [isConnected, setIsConnected] = useState(false);
+  const navigation = useNavigation<any>();
+  const { isConnected } = useAccount();
 
-  const handleConnect = () => {
-    setIsConnected(true);
-  };
-
-  const handleDisconnect = () => {
-    setIsConnected(false);
-  };
+  useEffect(() => {
+    if (!isConnected) {
+      navigation.reset({ index: 0, routes: [{ name: 'Connect' }] });
+    }
+  }, [isConnected, navigation]);
 
   return (
-    <NavigationContainer>
-      {isConnected ? (
-        <TabNavigator onDisconnect={handleDisconnect} />
-      ) : (
-        <ConnectScreen onConnect={handleConnect} />
-      )}
-    </NavigationContainer>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Connect" component={ConnectScreen} />
+      <Stack.Screen
+        name="EnableSessionKey"
+        component={EnableSessionKeyScreen}
+      />
+      <Stack.Screen name="Tabs" component={TabNavigator} />
+    </Stack.Navigator>
   );
 }
 

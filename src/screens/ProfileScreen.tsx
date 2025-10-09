@@ -1,14 +1,35 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useAccount, useAppKit } from '@reown/appkit-react-native';
+import { isTestnet } from '../lib/config';
 import { styles } from './styles/ProfileScreen.styles';
 
-interface ProfileScreenProps {
-  onDisconnect: () => void;
-}
+export default function ProfileScreen(): React.JSX.Element {
+  const { address } = useAccount();
+  const { disconnect } = useAppKit();
 
-export default function ProfileScreen({
-  onDisconnect,
-}: ProfileScreenProps): React.JSX.Element {
+  const handleDisconnect = () => {
+    Alert.alert(
+      'Disconnect Wallet',
+      'Are you sure you want to disconnect your wallet?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Disconnect',
+          style: 'destructive',
+          onPress: async () => {
+            await disconnect();
+          },
+        },
+      ]
+    );
+  };
+
+  const formatAddress = (addr: string | undefined) => {
+    if (!addr) return 'Not connected';
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -20,24 +41,35 @@ export default function ProfileScreen({
           Account settings and preferences
         </Text>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Wallet</Text>
+          <Text style={styles.infoText}>
+            {formatAddress(address)}
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Network</Text>
+          <Text style={styles.infoText}>
+            {isTestnet() ? 'Testnet' : 'Mainnet'}
+          </Text>
+        </View>
+
         <View style={styles.placeholder}>
           <Text style={styles.placeholderText}>
-            • Wallet address
+            • Auto-approve status (coming soon)
           </Text>
           <Text style={styles.placeholderText}>
-            • Network selection
+            • Preferences (coming soon)
           </Text>
           <Text style={styles.placeholderText}>
-            • Preferences
-          </Text>
-          <Text style={styles.placeholderText}>
-            • About & support
+            • About & support (coming soon)
           </Text>
         </View>
 
         <TouchableOpacity
           style={styles.disconnectButton}
-          onPress={onDisconnect}
+          onPress={handleDisconnect}
           activeOpacity={0.8}
         >
           <Text style={styles.disconnectButtonText}>Disconnect Wallet</Text>

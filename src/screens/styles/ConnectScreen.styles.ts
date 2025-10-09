@@ -46,5 +46,11 @@ export const styles = StyleSheet.create({
     color: Color.FG_3,
     marginTop: spacing.xxl,
   },
+  errorText: {
+    fontSize: fontSizes.sm,
+    color: '#ef4444',
+    marginTop: spacing.md,
+    textAlign: 'center',
+  },
 });
 

@@ -20,10 +20,6 @@ export type TabParamList = {
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
-interface TabNavigatorProps {
-  onDisconnect: () => void;
-}
-
 function TabIcon({
   label,
   focused,
@@ -43,9 +39,7 @@ function TabIcon({
   );
 }
 
-export default function TabNavigator({
-  onDisconnect,
-}: TabNavigatorProps): React.JSX.Element {
+export default function TabNavigator(): React.JSX.Element {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -108,14 +102,13 @@ export default function TabNavigator({
       />
       <Tab.Screen
         name="Profile"
+        component={ProfileScreen}
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon label="P" focused={focused} />
           ),
         }}
-      >
-        {() => <ProfileScreen onDisconnect={onDisconnect} />}
-      </Tab.Screen>
+      />
     </Tab.Navigator>
   );
 }

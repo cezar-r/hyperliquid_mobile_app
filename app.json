@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "hyperliquidmobile",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -14,7 +15,17 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.hyperliquid.mobile"
+      "bundleIdentifier": "com.hyperliquid.mobile",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "metamask",
+          "coinbase",
+          "cbwallet",
+          "uniswap",
+          "rainbow",
+          "trust"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
