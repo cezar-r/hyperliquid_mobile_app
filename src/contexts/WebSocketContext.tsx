@@ -27,6 +27,8 @@ import type {
   SpotMarket,
   Orderbook,
   Trade,
+  Candle,
+  CandleInterval,
 } from '../types';
 
 const MARKET_TYPE_KEY = 'hl_market_type';
@@ -35,12 +37,19 @@ const SELECTED_COIN_SPOT_KEY = 'hl_selected_coin_spot';
 
 interface WebSocketContextValue {
   state: WebSocketState;
+  infoClient: hl.InfoClient | null;
   selectCoin: (coin: string) => void;
   setMarketType: (type: MarketType) => void;
   subscribeToOrderbook: (coin: string) => void;
   unsubscribeFromOrderbook: () => void;
   subscribeToTrades: (coin: string) => void;
   unsubscribeFromTrades: () => void;
+  subscribeToCandles: (
+    coin: string,
+    interval: CandleInterval,
+    onCandle: (candle: Candle) => void
+  ) => Promise<void>;
+  unsubscribeFromCandles: () => Promise<void>;
 }
 
 const WebSocketContext = createContext<WebSocketContextValue | null>(null);
@@ -69,6 +78,7 @@ export function WebSocketProvider({
   const allMidsSubIdRef = useRef<any>(null);
   const orderbookSubIdRef = useRef<any>(null);
   const tradesSubIdRef = useRef<any>(null);
+  const candleSubIdRef = useRef<any>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -213,6 +223,7 @@ export function WebSocketProvider({
       allMidsSubIdRef.current = null;
       orderbookSubIdRef.current = null;
       tradesSubIdRef.current = null;
+      candleSubIdRef.current = null;
     };
   }, []);
 
@@ -363,14 +374,80 @@ export function WebSocketProvider({
     console.log('[Phase 4] Unsubscribed from trades');
   }, []);
 
+  const subscribeToCandles = useCallback(
+    async (
+      coin: string,
+      interval: CandleInterval,
+      onCandle: (candle: Candle) => void
+    ) => {
+      const client = subscriptionClientRef.current;
+      if (!client) return;
+
+      if (candleSubIdRef.current) {
+        await candleSubIdRef.current.unsubscribe().catch((err: any) => {
+          if (!err.message?.includes('WebSocket connection closed')) {
+            console.error('[Phase 5] Error unsubscribing candles:', err);
+          }
+        });
+        candleSubIdRef.current = null;
+      }
+
+      const subscriptionCoin = resolveSubscriptionCoin(
+        state.marketType,
+        coin,
+        state.spotMarkets
+      );
+
+      console.log('[Phase 5] Subscribing to candles:', {
+        coin: subscriptionCoin,
+        interval,
+      });
+
+      const sub = await client.candle(
+        { coin: subscriptionCoin, interval },
+        (data: any) => {
+          const candle: Candle = {
+            t: data.t,
+            T: data.T,
+            o: data.o,
+            h: data.h,
+            l: data.l,
+            c: data.c,
+            v: data.v,
+            n: data.n,
+          };
+          onCandle(candle);
+        }
+      );
+
+      candleSubIdRef.current = sub;
+    },
+    [state.marketType, state.spotMarkets]
+  );
+
+  const unsubscribeFromCandles = useCallback(async () => {
+    if (!candleSubIdRef.current) return;
+
+    await candleSubIdRef.current.unsubscribe().catch((err: any) => {
+      if (!err.message?.includes('WebSocket connection closed')) {
+        console.error('[Phase 5] Error unsubscribing candles:', err);
+      }
+    });
+    candleSubIdRef.current = null;
+    console.log('[Phase 5] Unsubscribed from candles');
+  }, []);
+
   const value: WebSocketContextValue = {
     state,
+    infoClient: infoClientRef.current,
     selectCoin,
     setMarketType,
     subscribeToOrderbook,
     unsubscribeFromOrderbook,
     subscribeToTrades,
     unsubscribeFromTrades,
+    subscribeToCandles,
+    unsubscribeFromCandles,
   };
 
   return (

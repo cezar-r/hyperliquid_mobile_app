@@ -85,6 +85,19 @@ export interface Trade {
   tid: number;
 }
 
+export interface Candle {
+  t: number;
+  T: number;
+  o: string;
+  h: string;
+  l: string;
+  c: string;
+  v: string;
+  n: number;
+}
+
+export type CandleInterval = '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
+
 export interface WebSocketState {
   isConnected: boolean;
   error: string | null;

@@ -14,5 +14,10 @@ config.resolver.sourceExts = [
   'cjs',
 ];
 
+config.transformer = {
+  ...config.transformer,
+  unstable_allowRequireContext: true,
+};
+
 module.exports = config;
 

@@ -1,3 +1,4 @@
+import 'react-native-reanimated';
 import './polyfills';
 import { registerRootComponent } from 'expo';
 
