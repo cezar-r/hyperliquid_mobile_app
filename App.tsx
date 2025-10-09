@@ -4,11 +4,13 @@ import { Buffer } from 'buffer';
 global.Buffer = Buffer;
 
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Color from './src/styles/colors';
+import RootNavigator from './src/navigation/RootNavigator';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -20,6 +22,15 @@ export default function App(): React.JSX.Element {
   });
 
   useEffect(() => {
+    if (fontError) {
+      console.error('❌ Error loading fonts:', fontError);
+    }
+    
+    if (fontsLoaded) {
+      console.log('✅ Fonts loaded successfully!');
+      console.log('Font names available: Teodor, TeodorMed, TeodorThin');
+    }
+    
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
@@ -27,37 +38,28 @@ export default function App(): React.JSX.Element {
 
   if (!fontsLoaded && !fontError) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Color.BRIGHT_ACCENT} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>Hyperliquid Mobile Companion</Text>
-      <Text style={styles.subtitle}>Phase 0: Bootstrap Complete</Text>
+    <GestureHandlerRootView style={styles.container}>
+      <RootNavigator />
       <StatusBar style="light" />
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
     backgroundColor: Color.BG_2,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  text: {
-    fontFamily: 'TeodorMed',
-    fontSize: 24,
-    color: Color.FG_1,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontFamily: 'Teodor',
-    fontSize: 16,
-    color: Color.FG_3,
   },
 });
