@@ -3,6 +3,7 @@ import React, {
   useContext,
   useState,
   useCallback,
+  useEffect,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as hl from '@nktkas/hyperliquid';
@@ -14,14 +15,21 @@ import {
   createSessionAccount,
 } from '../lib/sessionKey';
 import type { SessionKey } from '../lib/sessionKey';
-import { createHttpTransport, createExchangeClient } from '../lib/hyperliquid';
+import {
+  createHttpTransport,
+  createExchangeClient,
+  createInfoClient,
+} from '../lib/hyperliquid';
+import type { AccountData, AccountState } from '../types';
 
 const WALLET_DISCONNECTED_KEY = 'hl_wallet_disconnected';
 
 interface WalletContextValue {
+  infoClient: hl.InfoClient | null;
   mainExchangeClient: hl.ExchangeClient | null;
   exchangeClient: hl.ExchangeClient | null;
   sessionKey: SessionKey | null;
+  account: AccountState;
   setupClients: (
     address: string,
     provider: any,
@@ -30,6 +38,7 @@ interface WalletContextValue {
   clearClients: () => void;
   enableSessionKey: (address: string) => Promise<void>;
   disableSessionKey: () => Promise<void>;
+  refetchAccount: () => Promise<void>;
   hasSessionKey: boolean;
 }
 
@@ -40,11 +49,104 @@ export function WalletProvider({
 }: {
   children: React.ReactNode;
 }): React.JSX.Element {
+  const [infoClient, setInfoClient] = useState<hl.InfoClient | null>(null);
   const [mainExchangeClient, setMainExchangeClient] =
     useState<hl.ExchangeClient | null>(null);
   const [exchangeClient, setExchangeClient] =
     useState<hl.ExchangeClient | null>(null);
   const [sessionKey, setSessionKey] = useState<SessionKey | null>(null);
+  const [connectedAddress, setConnectedAddress] =
+    useState<string | null>(null);
+  const [account, setAccount] = useState<AccountState>({
+    data: null,
+    isLoading: false,
+    error: null,
+  });
+
+  useEffect(() => {
+    const transport = createHttpTransport();
+    const client = createInfoClient(transport);
+    setInfoClient(client);
+    console.log('[Phase 3] InfoClient initialized');
+  }, []);
+
+  const fetchAccountData = useCallback(
+    async (userAddress: string) => {
+      if (!infoClient) {
+        console.error('[Phase 3] InfoClient not initialized');
+        return;
+      }
+
+      console.log('[Phase 3] Fetching account data for:', userAddress);
+      setAccount((prev) => ({ ...prev, isLoading: true, error: null }));
+
+      try {
+        const [perpState, spotState, openOrders, userFills] =
+          await Promise.all([
+            infoClient
+              .clearinghouseState({ user: userAddress as `0x${string}` })
+              .catch((err) => {
+                console.warn('[Phase 3] clearinghouseState error:', err);
+                return null;
+              }),
+            infoClient
+              .spotClearinghouseState({ user: userAddress as `0x${string}` })
+              .catch((err) => {
+                console.warn('[Phase 3] spotClearinghouseState error:', err);
+                return null;
+              }),
+            infoClient
+              .frontendOpenOrders({ user: userAddress as `0x${string}` })
+              .catch((err) => {
+                console.warn('[Phase 3] frontendOpenOrders error:', err);
+                return [];
+              }),
+            infoClient
+              .userFills({ user: userAddress as `0x${string}` })
+              .catch((err) => {
+                console.warn('[Phase 3] userFills error:', err);
+                return [];
+              }),
+          ]);
+
+        console.log('[Phase 3] Perp state:', perpState);
+        console.log('[Phase 3] Spot state:', spotState);
+        console.log('[Phase 3] Open orders:', openOrders);
+        console.log('[Phase 3] User fills count:', userFills?.length || 0);
+        console.log('[Phase 3] User fills:', userFills);
+
+        const accountData: AccountData = {
+          perpPositions: perpState?.assetPositions || [],
+          perpMarginSummary: {
+            accountValue: perpState?.marginSummary?.accountValue,
+            totalMarginUsed: perpState?.marginSummary?.totalMarginUsed,
+            totalNtlPos: perpState?.marginSummary?.totalNtlPos,
+            totalRawUsd: perpState?.marginSummary?.totalRawUsd,
+            withdrawable: perpState?.withdrawable,
+          },
+          spotBalances: spotState?.balances || [],
+          openOrders: openOrders || [],
+          userFills: userFills || [],
+        };
+
+        setAccount({
+          data: accountData,
+          isLoading: false,
+          error: null,
+        });
+
+        console.log('[Phase 3] ✓ Account data fetched successfully');
+      } catch (error: any) {
+        console.error('[Phase 3] Failed to fetch account data:', error);
+        setAccount({
+          data: null,
+          isLoading: false,
+          error: error.message || 'Failed to fetch account data',
+        });
+      }
+    },
+    [infoClient]
+  );
 
   const setupClients = useCallback(
     async (
@@ -75,17 +177,32 @@ export function WalletProvider({
         setExchangeClient(mainClient);
       }
 
+      setConnectedAddress(address);
       await AsyncStorage.removeItem(WALLET_DISCONNECTED_KEY);
       console.log('[WalletContext] Clients set up for:', address);
+
+      await fetchAccountData(address);
     },
-    []
+    [fetchAccountData]
   );
 
   const clearClients = useCallback(() => {
     setMainExchangeClient(null);
     setExchangeClient(null);
     setSessionKey(null);
+    setConnectedAddress(null);
+    setAccount({
+      data: null,
+      isLoading: false,
+      error: null,
+    });
   }, []);
+
+  const refetchAccount = useCallback(async () => {
+    if (connectedAddress) {
+      await fetchAccountData(connectedAddress);
+    }
+  }, [connectedAddress, fetchAccountData]);
 
   const enableSessionKey = useCallback(async (address: string): Promise<void> => {
     if (!mainExchangeClient) {
@@ -145,13 +262,16 @@ export function WalletProvider({
   }, [mainExchangeClient]);
 
   const value: WalletContextValue = {
+    infoClient,
     mainExchangeClient,
     exchangeClient,
     sessionKey,
+    account,
     setupClients,
     clearClients,
     enableSessionKey,
     disableSessionKey,
+    refetchAccount,
     hasSessionKey: sessionKey !== null,
   };
 

@@ -16,10 +16,25 @@ export interface WalletInfo {
 
 export interface AccountData {
   perpPositions: any[];
-  spotBalances: any[];
+  perpMarginSummary: {
+    accountValue?: string;
+    totalMarginUsed?: string;
+    totalNtlPos?: string;
+    totalRawUsd?: string;
+    withdrawable?: string;
+  };
+  spotBalances: Array<{
+    coin: string;
+    hold: string;
+    token: number;
+    total: string;
+  }>;
   openOrders: any[];
   userFills: any[];
-  perpMarginSummary: any;
+}
+
+export interface AccountState {
+  data: AccountData | null;
   isLoading: boolean;
   error: string | null;
 }
