@@ -39,3 +39,62 @@ export interface AccountState {
   error: string | null;
 }
 
+export interface PerpMarket {
+  name: string;
+  szDecimals: number;
+  maxLeverage: number;
+  onlyIsolated?: boolean;
+}
+
+export interface SpotMarket {
+  name: string;
+  tokens: [number, number];
+  index: number;
+  isCanonical?: boolean;
+}
+
+export interface AssetContext {
+  dayNtlVlm: number;
+  prevDayPx: number;
+  markPx: number;
+  midPx?: number;
+  funding?: number;
+  openInterest?: number;
+  circulatingSupply?: number;
+}
+
+export interface OrderbookLevel {
+  px: string;
+  sz: string;
+  n: number;
+}
+
+export interface Orderbook {
+  coin: string;
+  time: number;
+  levels: [OrderbookLevel[], OrderbookLevel[]];
+}
+
+export interface Trade {
+  coin: string;
+  side: string;
+  px: string;
+  sz: string;
+  time: number;
+  hash: string;
+  tid: number;
+}
+
+export interface WebSocketState {
+  isConnected: boolean;
+  error: string | null;
+  perpMarkets: PerpMarket[];
+  spotMarkets: SpotMarket[];
+  marketType: MarketType;
+  selectedCoin: string | null;
+  prices: Record<string, string>;
+  assetContexts: Record<string, AssetContext>;
+  orderbook: Orderbook | null;
+  recentTrades: Trade[];
+}
+
