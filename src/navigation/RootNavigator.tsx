@@ -47,8 +47,13 @@ export default function RootNavigator(): React.JSX.Element {
       <Stack.Screen
         name="EnableSessionKey"
         component={EnableSessionKeyScreen}
+        options={{ gestureEnabled: false }}
       />
-      <Stack.Screen name="Tabs" component={TabNavigator} />
+      <Stack.Screen 
+        name="Tabs" 
+        component={TabNavigator}
+        options={{ gestureEnabled: false }}
+      />
       <Stack.Screen 
         name="ChartDetail" 
         component={ChartScreen}
