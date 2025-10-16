@@ -1,11 +1,18 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Animated, SafeAreaView } from 'react-native';
 import { useAccount } from '@reown/appkit-react-native';
+import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { formatPrice, formatSize } from '../lib/formatting';
 import { styles } from './styles/HomeScreen.styles';
-import type { PerpPosition } from '../types';
+import type { PerpPosition, SpotBalance } from '../types';
+import Color from '../styles/colors';
+
+type MarketFilter = 'Perp' | 'Spot' | 'Perp+Spot';
+
+const MARKET_FILTER_KEY = 'hl_home_market_filter';
 
 // Helper to calculate PnL for a position
 function calculatePositionPnL(position: PerpPosition, currentPrice: string | number): { pnl: number; pnlPercent: number } {
@@ -23,46 +30,65 @@ function calculatePositionPnL(position: PerpPosition, currentPrice: string | num
   return { pnl, pnlPercent };
 }
 
-// Helper to format time ago
-function formatTimeAgo(timestamp: number): string {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 10) return 'just now';
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ago`;
+// Helper to format large numbers
+function formatNumber(num: number, decimals: number = 2): string {
+  return num.toFixed(decimals);
+}
+
+// Helper to format percentage
+function formatPercent(num: number, decimals: number = 2): string {
+  const sign = num >= 0 ? '+' : '';
+  return `${sign}${(num * 100).toFixed(decimals)}%`;
 }
 
 export default function HomeScreen(): React.JSX.Element {
   const { address } = useAccount();
   const { account, exchangeClient, refetchAccount } = useWallet();
-  const { state: wsState } = useWebSocket();
+  const { state: wsState, selectCoin, setMarketType } = useWebSocket();
+  const navigation = useNavigation<any>();
   const [closingPosition, setClosingPosition] = useState<string | null>(null);
+  const [marketFilter, setMarketFilter] = useState<MarketFilter>('Perp+Spot');
+  
+  // For balance animation
+  const [previousBalance, setPreviousBalance] = useState<number | null>(null);
+  const colorAnim = useRef(new Animated.Value(0)).current;
+  const [isIncrease, setIsIncrease] = useState<boolean | null>(null);
 
-  const nonZeroSpotBalances =
-    account.data?.spotBalances.filter(
-      (b) => parseFloat(b.total) > 0
-    ).length || 0;
+  // Load saved market filter on mount
+  useEffect(() => {
+    const loadMarketFilter = async () => {
+      try {
+        const savedFilter = await AsyncStorage.getItem(MARKET_FILTER_KEY);
+        if (savedFilter && (savedFilter === 'Perp' || savedFilter === 'Spot' || savedFilter === 'Perp+Spot')) {
+          setMarketFilter(savedFilter as MarketFilter);
+        }
+      } catch (error) {
+        console.error('[HomeScreen] Error loading market filter:', error);
+      }
+    };
+    loadMarketFilter();
+  }, []);
 
-  const selectedCoinPrice = wsState.selectedCoin
-    ? wsState.prices[wsState.selectedCoin]
-    : null;
+  // Save market filter when it changes
+  const handleFilterChange = async (filter: MarketFilter) => {
+    setMarketFilter(filter);
+    try {
+      await AsyncStorage.setItem(MARKET_FILTER_KEY, filter);
+    } catch (error) {
+      console.error('[HomeScreen] Error saving market filter:', error);
+    }
+  };
 
-  const totalMarkets =
-    wsState.marketType === 'perp'
-      ? wsState.perpMarkets.length
-      : wsState.spotMarkets.length;
+  // Calculate perp account value
+  const perpAccountValue = useMemo(() => {
+    if (!account.data?.perpMarginSummary.accountValue) return 0;
+    return parseFloat(account.data.perpMarginSummary.accountValue);
+  }, [account.data?.perpMarginSummary.accountValue]);
 
-  // Calculate total portfolio value
-  const totalPortfolioValue = useMemo(() => {
-    if (!account.data) return null;
+  // Calculate total spot value
+  const spotTotalValue = useMemo(() => {
+    if (!account.data?.spotBalances) return 0;
     
-    const accountValue = account.data.perpMarginSummary.accountValue 
-      ? parseFloat(account.data.perpMarginSummary.accountValue)
-      : 0;
-    
-    // Add spot balances value
     let spotValue = 0;
     account.data.spotBalances.forEach(balance => {
       const total = parseFloat(balance.total);
@@ -71,25 +97,116 @@ export default function HomeScreen(): React.JSX.Element {
         spotValue += total * parseFloat(price);
       }
     });
-    
-    return accountValue + spotValue;
-  }, [account.data, wsState.prices]);
+    return spotValue;
+  }, [account.data?.spotBalances, wsState.prices]);
 
-  // Calculate total unrealized PnL across all positions
-  const totalUnrealizedPnL = useMemo(() => {
-    if (!account.data?.perpPositions) return null;
+  // Calculate displayed balance based on filter
+  const displayedBalance = useMemo(() => {
+    if (marketFilter === 'Perp') return perpAccountValue;
+    if (marketFilter === 'Spot') return spotTotalValue;
+    return perpAccountValue + spotTotalValue;
+  }, [marketFilter, perpAccountValue, spotTotalValue]);
+
+  // Animate balance changes - only when there's an actual change at 2 decimal places
+  useEffect(() => {
+    // Round to 2 decimals for comparison
+    const currentRounded = Math.round(displayedBalance * 100) / 100;
+    const previousRounded = previousBalance !== null ? Math.round(previousBalance * 100) / 100 : null;
     
-    let totalPnL = 0;
-    account.data.perpPositions.forEach(position => {
-      const price = wsState.prices[position.coin];
-      if (price) {
-        const { pnl } = calculatePositionPnL(position, price);
-        totalPnL += pnl;
-      }
-    });
+    if (previousRounded === null) {
+      setPreviousBalance(currentRounded);
+      return;
+    }
     
-    return totalPnL;
-  }, [account.data?.perpPositions, wsState.prices]);
+    // Only animate if there's an actual change
+    if (currentRounded !== previousRounded) {
+      setIsIncrease(currentRounded > previousRounded);
+      colorAnim.setValue(0);
+      Animated.sequence([
+        Animated.timing(colorAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: false,
+        }),
+        Animated.timing(colorAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: false,
+        })
+      ]).start();
+      setPreviousBalance(currentRounded);
+    }
+  }, [displayedBalance, colorAnim]);
+
+  const textColor = colorAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [Color.FG_1, isIncrease ? Color.BRIGHT_ACCENT : Color.RED]
+  });
+
+  // Get withdrawable USDC (perp tradeable balance)
+  const withdrawableUsdc = useMemo(() => {
+    const withdrawable = account.data?.perpMarginSummary?.withdrawable;
+    if (!withdrawable) return 0;
+    const amount = parseFloat(withdrawable);
+    // Trim to 2 decimal places without rounding
+    return Math.floor(amount * 100) / 100;
+  }, [account.data?.perpMarginSummary?.withdrawable]);
+
+  // Prepare sorted perp positions with USD values
+  const sortedPerpPositions = useMemo(() => {
+    if (!account.data?.perpPositions) return [];
+    
+    return account.data.perpPositions
+      .map(position => {
+        const price = wsState.prices[position.coin];
+        const marginUsed = position.marginUsed 
+          ? parseFloat(position.marginUsed)
+          : parseFloat(position.positionValue || '0') / (position.leverage?.value || 1);
+        
+        return {
+          position,
+          price,
+          marginUsed,
+          pnl: price ? calculatePositionPnL(position, price) : { pnl: 0, pnlPercent: 0 },
+          assetContext: wsState.assetContexts[position.coin],
+        };
+      })
+      .sort((a, b) => b.marginUsed - a.marginUsed);
+  }, [account.data?.perpPositions, wsState.prices, wsState.assetContexts]);
+
+  // Prepare sorted spot balances with USD values
+  const sortedSpotBalances = useMemo(() => {
+    if (!account.data?.spotBalances) return [];
+    
+    return account.data.spotBalances
+      .filter(balance => parseFloat(balance.total) > 0)
+      .map(balance => {
+        const price = wsState.prices[balance.coin];
+        const total = parseFloat(balance.total);
+        const usdValue = price ? total * parseFloat(price) : 0;
+        
+        return {
+          balance,
+          price,
+          total,
+          usdValue,
+          assetContext: wsState.assetContexts[balance.coin],
+        };
+      })
+      .sort((a, b) => b.usdValue - a.usdValue);
+  }, [account.data?.spotBalances, wsState.prices, wsState.assetContexts]);
+
+  // Navigate to chart detail - Set coin/market first, then navigate (like SearchScreen does)
+  const handleNavigateToChart = (coin: string, market: 'perp' | 'spot') => {
+    // Set market type first if different
+    if (market !== wsState.marketType) {
+      setMarketType(market);
+    }
+    // Then select coin
+    selectCoin(coin);
+    // Finally navigate without params
+    navigation.navigate('ChartDetail');
+  };
 
   // Handle close position
   const handleClosePosition = async (coin: string, size: number) => {
@@ -98,7 +215,6 @@ export default function HomeScreen(): React.JSX.Element {
       return;
     }
 
-    // Get market info for asset index and szDecimals
     const market = wsState.perpMarkets.find(m => m.name === coin);
     if (!market) {
       Alert.alert('Error', `Asset ${coin} not found in markets`);
@@ -107,25 +223,20 @@ export default function HomeScreen(): React.JSX.Element {
     
     const assetIndex = market.index;
     const szDecimals = market.szDecimals || 4;
-
-    // Get current price
     const currentPrice = parseFloat(wsState.prices[coin] || '0');
+    
     if (!currentPrice) {
       Alert.alert('Error', `No price available for ${coin}`);
       return;
     }
 
-    // Calculate execution price with 0.1% slippage
     let executionPrice: number;
     if (size > 0) {
-      // Closing long: SELL at lower price
       executionPrice = currentPrice * 0.999;
     } else {
-      // Closing short: BUY at higher price
       executionPrice = currentPrice * 1.001;
     }
 
-    // Show confirmation
     Alert.alert(
       `Close ${coin} Position?`,
       `Size: ${Math.abs(size).toFixed(szDecimals)}\n` +
@@ -151,10 +262,10 @@ export default function HomeScreen(): React.JSX.Element {
               const orderPayload = {
                 orders: [{
                   a: assetIndex,
-                  b: size < 0, // If short, buy to close; if long, sell to close
+                  b: size < 0,
                   p: formattedPrice,
                   s: formattedSize,
-                  r: true, // Reduce only
+                  r: true,
                   t: {
                     limit: { tif: 'Ioc' as const },
                   },
@@ -163,14 +274,10 @@ export default function HomeScreen(): React.JSX.Element {
               };
 
               console.log('[HomeScreen] Closing position:', coin);
-              console.log('[HomeScreen] Order payload:', JSON.stringify(orderPayload, null, 2));
-
               const result = await exchangeClient.order(orderPayload);
-
               console.log('[HomeScreen] ✓ Close order placed:', result);
               Alert.alert('Success', 'Position closing order submitted!');
               
-              // Refetch account data
               setTimeout(() => refetchAccount(), 2000);
             } catch (err: any) {
               console.error('[HomeScreen] Failed to close position:', err);
@@ -185,57 +292,72 @@ export default function HomeScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-      >
-        <Text style={styles.title}>Home</Text>
-
-        {wsState.isConnected && (
-          <View style={styles.wsStatusContainer}>
-            <View style={styles.wsStatusDot} />
-            <Text style={styles.wsStatusText}>Live Data Connected</Text>
-          </View>
-        )}
-
-        {!wsState.isConnected && wsState.error && (
-          <View style={styles.wsErrorContainer}>
-            <Text style={styles.wsErrorText}>⚠️ {wsState.error}</Text>
-          </View>
-        )}
-
-        {address && (
-          <View style={styles.addressContainer}>
-            <Text style={styles.addressLabel}>Connected Wallet</Text>
-            <Text style={styles.addressText}>
-              {`${address.slice(0, 6)}...${address.slice(-4)}`}
-            </Text>
-          </View>
-        )}
-
-        {wsState.selectedCoin && (
-          <View style={styles.priceCard}>
-            <View style={styles.priceHeader}>
-              <Text style={styles.coinName}>{wsState.selectedCoin}</Text>
-              <Text style={styles.marketTypeBadge}>
-                {wsState.marketType.toUpperCase()}
+    <SafeAreaView style={styles.container}>
+      <View style={styles.contentContainer}>
+        <ScrollView style={styles.scrollView}>
+          {/* Market Filter Dropdown */}
+          <View style={styles.filterContainer}>
+          <View style={styles.panelSelector}>
+            <TouchableOpacity
+              style={styles.panelButton}
+              onPress={() => handleFilterChange('Perp')}
+            >
+              <Text style={[
+                styles.panelText,
+                marketFilter === 'Perp' && styles.panelTextActive
+              ]}>
+                Perp
               </Text>
-            </View>
-            {selectedCoinPrice ? (
-              <Text style={styles.priceValue}>${selectedCoinPrice}</Text>
-            ) : (
-              <Text style={styles.priceLoading}>Loading price...</Text>
-            )}
-            <Text style={styles.priceSubtext}>
-              {totalMarkets} {wsState.marketType} markets available
-            </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.panelButton}
+              onPress={() => handleFilterChange('Spot')}
+            >
+              <Text style={[
+                styles.panelText,
+                marketFilter === 'Spot' && styles.panelTextActive
+              ]}>
+                Spot
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.panelButton}
+              onPress={() => handleFilterChange('Perp+Spot')}
+            >
+              <Text style={[
+                styles.panelText,
+                marketFilter === 'Perp+Spot' && styles.panelTextActive
+              ]}>
+                Perp+Spot
+              </Text>
+            </TouchableOpacity>
           </View>
-        )}
+          <View style={styles.separatorContainer}>
+            <View style={[
+              styles.separatorSegment,
+              marketFilter === 'Perp' && styles.separatorActive
+            ]} />
+            <View style={[
+              styles.separatorSegment,
+              marketFilter === 'Spot' && styles.separatorActive
+            ]} />
+            <View style={[
+              styles.separatorSegment,
+              marketFilter === 'Perp+Spot' && styles.separatorActive
+            ]} />
+          </View>
+        </View>
+
+        {/* Large Balance Display */}
+        <View style={styles.balanceContainer}>
+          <Animated.Text style={[styles.balanceAmount, { color: textColor }]}>
+            ${formatNumber(displayedBalance, 2)}
+          </Animated.Text>
+        </View>
 
         {account.isLoading && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#00FF94" />
+            <ActivityIndicator size="large" color={Color.BRIGHT_ACCENT} />
             <Text style={styles.loadingText}>Loading account data...</Text>
           </View>
         )}
@@ -247,180 +369,118 @@ export default function HomeScreen(): React.JSX.Element {
         )}
 
         {!account.isLoading && !account.error && account.data && (
-          <View style={styles.summaryContainer}>
-            <View style={styles.headerRow}>
-              <Text style={styles.sectionTitle}>Account Summary</Text>
-              {account.data.lastUpdated && (
-                <Text style={styles.lastUpdated}>
-                  {formatTimeAgo(account.data.lastUpdated)}
-                </Text>
-              )}
-            </View>
-
-            {/* Total Portfolio Value */}
-            {totalPortfolioValue !== null && totalPortfolioValue > 0 && (
-              <View style={styles.portfolioValueCard}>
-                <Text style={styles.portfolioLabel}>Total Portfolio Value</Text>
-                <Text style={styles.portfolioValue}>${totalPortfolioValue.toFixed(2)}</Text>
-                {totalUnrealizedPnL !== null && totalUnrealizedPnL !== 0 && (
-                  <Text style={[
-                    styles.portfolioPnL,
-                    totalUnrealizedPnL >= 0 ? styles.pnlPositive : styles.pnlNegative
-                  ]}>
-                    {totalUnrealizedPnL >= 0 ? '+' : ''}${totalUnrealizedPnL.toFixed(2)} uPnL
-                  </Text>
+          <View style={styles.positionsContainer}>
+            {/* Perp Positions */}
+            {(marketFilter === 'Perp' || marketFilter === 'Perp+Spot') && sortedPerpPositions.length > 0 && (
+              <View>
+                {marketFilter === 'Perp+Spot' && (
+                  <Text style={styles.sectionLabel}>Perps</Text>
                 )}
-              </View>
-            )}
-
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Perp Positions</Text>
-                <Text style={styles.summaryValue}>
-                  {account.data.perpPositions.length}
-                </Text>
-              </View>
-
-              <View style={styles.summaryDivider} />
-
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Spot Balances</Text>
-                <Text style={styles.summaryValue}>
-                  {nonZeroSpotBalances}
-                </Text>
-              </View>
-
-              <View style={styles.summaryDivider} />
-
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Open Orders</Text>
-                <Text style={styles.summaryValue}>
-                  {account.data.openOrders.length}
-                </Text>
-              </View>
-            </View>
-
-            {/* Perp Positions Detail */}
-            {account.data.perpPositions.length > 0 && (
-              <View style={styles.summaryCard}>
-                <Text style={styles.cardTitle}>Open Positions</Text>
-                {account.data.perpPositions.map((position, idx) => {
-                  const positionSize = parseFloat(position.szi);
+                {sortedPerpPositions.map((item, idx) => {
+                  const positionSize = parseFloat(item.position.szi);
                   const isLong = positionSize > 0;
-                  const currentPrice = wsState.prices[position.coin];
-                  const { pnl, pnlPercent } = currentPrice 
-                    ? calculatePositionPnL(position, currentPrice)
-                    : { pnl: 0, pnlPercent: 0 };
+                  const leverage = item.position.leverage?.value || 1;
+                  const price = item.price ? parseFloat(item.price) : 0;
+                  
+                  // Calculate 24h change
+                  const prevDayPx = item.assetContext?.prevDayPx || price;
+                  const priceChange = price - prevDayPx;
+                  const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
                   
                   return (
-                    <View key={`position-${idx}`}>
-                      {idx > 0 && <View style={styles.summaryDivider} />}
-                      <View style={styles.positionItem}>
-                        <View style={styles.positionHeader}>
-                          <Text style={styles.positionCoin}>{position.coin}</Text>
+                    <TouchableOpacity
+                      key={`perp-${item.position.coin}`}
+                      style={styles.positionCell}
+                      onPress={() => handleNavigateToChart(item.position.coin, 'perp')}
+                    >
+                      <View style={styles.leftSide}>
+                        <View style={styles.tickerContainer}>
+                          <Text style={styles.ticker}>{item.position.coin}</Text>
                           <Text style={[
-                            styles.positionDirection,
-                            isLong ? styles.directionLong : styles.directionShort
+                            styles.leverage,
+                            { color: isLong ? Color.BRIGHT_ACCENT : Color.RED }
                           ]}>
-                            {isLong ? 'LONG' : 'SHORT'}
+                            {leverage}x
                           </Text>
                         </View>
-                        <View style={styles.positionDetails}>
-                          <Text style={styles.positionDetailText}>
-                            Size: {Math.abs(positionSize).toFixed(4)}
-                          </Text>
-                          <Text style={styles.positionDetailText}>
-                            Entry: ${parseFloat(position.entryPx).toFixed(2)}
+                        <View style={styles.priceContainer}>
+                          <Text style={styles.size}>${formatNumber(price)}</Text>
+                          <Text style={[
+                            styles.priceChange,
+                            { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
+                          ]}>
+                            {formatPercent(priceChangePct)}
                           </Text>
                         </View>
-                        {currentPrice && (
-                          <View style={styles.positionPnLRow}>
-                            <Text style={styles.positionDetailText}>
-                              Mark: ${parseFloat(currentPrice).toFixed(2)}
-                            </Text>
-                            <Text style={[
-                              styles.positionPnL,
-                              pnl >= 0 ? styles.pnlPositive : styles.pnlNegative
-                            ]}>
-                              {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} ({pnlPercent >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%)
-                            </Text>
-                          </View>
-                        )}
-                        <TouchableOpacity
-                          style={[
-                            styles.closeButton,
-                            closingPosition === position.coin && styles.closeButtonDisabled
-                          ]}
-                          onPress={() => handleClosePosition(position.coin, positionSize)}
-                          disabled={closingPosition === position.coin}
-                        >
-                          <Text style={styles.closeButtonText}>
-                            {closingPosition === position.coin ? 'Closing...' : 'Close Position'}
-                          </Text>
-                        </TouchableOpacity>
                       </View>
-                    </View>
+                      <View style={styles.rightSide}>
+                        <Text style={styles.price}>${formatNumber(item.marginUsed, 2)}</Text>
+                        <Text style={[
+                          styles.pnl,
+                          { color: item.pnl.pnl >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
+                        ]}>
+                          {item.pnl.pnl >= 0 ? '+' : '-'}${formatNumber(Math.abs(item.pnl.pnl), 2)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
                   );
                 })}
               </View>
             )}
 
-            {/* Spot Balances Detail */}
-            {nonZeroSpotBalances > 0 && (
-              <View style={styles.summaryCard}>
-                <Text style={styles.cardTitle}>Spot Balances</Text>
-                {account.data.spotBalances
-                  .filter(b => parseFloat(b.total) > 0)
-                  .map((balance, idx) => {
-                    const total = parseFloat(balance.total);
-                    const price = wsState.prices[balance.coin];
-                    const usdValue = price ? total * parseFloat(price) : null;
-                    
-                    return (
-                      <View key={`balance-${idx}`}>
-                        {idx > 0 && <View style={styles.summaryDivider} />}
-                        <View style={styles.balanceItem}>
-                          <Text style={styles.balanceCoin}>{balance.coin}</Text>
-                          <View style={styles.balanceAmounts}>
-                            <Text style={styles.balanceAmount}>{total.toFixed(6)}</Text>
-                            {usdValue && (
-                              <Text style={styles.balanceUsd}>${usdValue.toFixed(2)}</Text>
-                            )}
-                          </View>
+            {/* Spot Balances */}
+            {(marketFilter === 'Spot' || marketFilter === 'Perp+Spot') && sortedSpotBalances.length > 0 && (
+              <View style={marketFilter === 'Perp+Spot' ? styles.spotSection : undefined}>
+                {marketFilter === 'Perp+Spot' && (
+                  <Text style={styles.sectionLabel}>Balances</Text>
+                )}
+                {sortedSpotBalances.map((item) => {
+                  const price = item.price ? parseFloat(item.price) : 0;
+                  
+                  // Calculate 24h change
+                  const prevDayPx = item.assetContext?.prevDayPx || price;
+                  const priceChange = price - prevDayPx;
+                  const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={`spot-${item.balance.coin}`}
+                      style={styles.positionCell}
+                      onPress={() => handleNavigateToChart(item.balance.coin, 'spot')}
+                    >
+                      <View style={styles.leftSide}>
+                        <View style={styles.tickerContainer}>
+                          <Text style={styles.ticker}>{item.balance.coin}</Text>
+                        </View>
+                        <View style={styles.priceContainer}>
+                          <Text style={styles.size}>${formatNumber(price)}</Text>
+                          <Text style={[
+                            styles.priceChange,
+                            { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
+                          ]}>
+                            {formatPercent(priceChangePct)}
+                          </Text>
                         </View>
                       </View>
-                    );
-                  })
-                }
+                      <View style={styles.rightSide}>
+                        <Text style={styles.price}>${formatNumber(item.usdValue, 2)}</Text>
+                        <Text style={[styles.pnl, { color: Color.FG_3 }]}>
+                          {formatNumber(item.total, 4)} {item.balance.coin}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
 
-            {account.data.perpMarginSummary.accountValue && (
-              <View style={styles.summaryCard}>
-                <Text style={styles.cardTitle}>Margin Summary</Text>
-
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Account Value</Text>
-                  <Text style={styles.summaryValueHighlight}>
-                    ${parseFloat(
-                      account.data.perpMarginSummary.accountValue
-                    ).toFixed(2)}
-                  </Text>
-                </View>
-
-                {account.data.perpMarginSummary.withdrawable && (
-                  <>
-                    <View style={styles.summaryDivider} />
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Withdrawable</Text>
-                      <Text style={styles.summaryValue}>
-                        ${parseFloat(
-                          account.data.perpMarginSummary.withdrawable
-                        ).toFixed(2)}
-                      </Text>
-                    </View>
-                  </>
-                )}
+            {/* Empty State */}
+            {sortedPerpPositions.length === 0 && sortedSpotBalances.length === 0 && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No positions or balances</Text>
+                <Text style={styles.emptySubtext}>
+                  Your positions and balances will appear here
+                </Text>
               </View>
             )}
           </View>
@@ -428,16 +488,15 @@ export default function HomeScreen(): React.JSX.Element {
 
         {!account.isLoading && !account.error && !account.data && address && (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>
-              No account data available yet.
-            </Text>
+            <Text style={styles.emptyText}>No account data available yet.</Text>
             <Text style={styles.emptySubtext}>
               Data will appear after connecting your wallet.
             </Text>
           </View>
         )}
-      </ScrollView>
-    </View>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 }
 

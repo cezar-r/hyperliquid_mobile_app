@@ -6,39 +6,151 @@ import { spacing } from '../../theme/spacing';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Color.BG_2,
+    backgroundColor: '#0b0f13',
+  },
+  contentContainer: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
   },
-  content: {
-    padding: spacing.lg,
+
+  // Market Filter Dropdown
+  filterContainer: {
+    paddingTop: spacing.md,
   },
-  title: {
-    fontSize: fontSizes.xl,
-    color: Color.FG_1,
-    marginBottom: spacing.lg,
+  panelSelector: {
+    flexDirection: 'row',
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
-  addressContainer: {
-    backgroundColor: Color.BG_3,
-    padding: spacing.md,
-    borderRadius: 8,
-    marginBottom: spacing.lg,
+  panelButton: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
   },
-  addressLabel: {
+  panelText: {
     fontSize: fontSizes.sm,
     color: Color.FG_3,
-    marginBottom: spacing.xs,
+    fontWeight: '500',
   },
-  addressText: {
-    fontSize: fontSizes.md,
-    color: Color.ACCENT,
+  panelTextActive: {
+    color: Color.FG_1,
+    fontWeight: 'bold',
+  },
+  separatorContainer: {
+    flexDirection: 'row',
+    height: 1,
+    paddingHorizontal: spacing.md,
+  },
+  separatorSegment: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Color.BG_1,
+  },
+  separatorActive: {
+    backgroundColor: Color.BRIGHT_ACCENT,
+  },
+
+  // Balance Display
+  balanceContainer: {
+    alignItems: 'center',
+    paddingTop: 20,
+    paddingBottom: 30,
+  },
+  balanceAmount: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+
+  // Positions Container
+  positionsContainer: {
+    paddingBottom: 10,
+    paddingHorizontal: 10,
+  },
+  
+  // Section Label
+  sectionLabel: {
+    fontSize: 15,
+    color: Color.FG_3,
     fontWeight: '600',
+    marginBottom: 10,
+    // marginTop: 8,
   },
+  
+  // Spot Section Spacing
+  spotSection: {
+    marginTop: 20,
+  },
+
+  // Position Cell (for both perp and spot)
+  positionCell: {
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 8,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderWidth: 2,
+    borderColor: Color.BG_1,
+  },
+  leftSide: {
+    justifyContent: 'space-between',
+  },
+  rightSide: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  tickerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 5,
+  },
+  ticker: {
+    color: Color.FG_1,
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+  leverage: {
+    fontSize: 16,
+    marginBottom: 0,
+    fontWeight: 'bold',
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 0,
+  },
+  size: {
+    color: Color.FG_3,
+    fontSize: 12,
+  },
+  priceChange: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  price: {
+    color: Color.FG_1,
+    fontSize: 16,
+    marginBottom: 0,
+    fontWeight: 'bold'
+  },
+  pnl: {
+    fontSize: 12,
+  },
+
+  // Loading & Error States
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
+    marginTop: 40,
   },
   loadingText: {
     fontSize: fontSizes.md,
@@ -46,282 +158,35 @@ export const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   errorContainer: {
-    backgroundColor: Color.BG_3,
+    backgroundColor: Color.BG_1,
     padding: spacing.lg,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FF6B6B',
+    borderColor: Color.RED,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
   },
   errorText: {
     fontSize: fontSizes.md,
-    color: '#FF6B6B',
+    color: Color.RED,
   },
-  summaryContainer: {
-    gap: spacing.md,
-  },
-  sectionTitle: {
-    fontSize: fontSizes.lg,
-    color: Color.FG_1,
-    marginBottom: spacing.sm,
-    fontWeight: '600',
-  },
-  summaryCard: {
-    backgroundColor: Color.BG_3,
-    padding: spacing.lg,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Color.ACCENT,
-  },
-  cardTitle: {
-    fontSize: fontSizes.md,
-    color: Color.FG_1,
-    marginBottom: spacing.md,
-    fontWeight: '600',
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  summaryLabel: {
-    fontSize: fontSizes.md,
-    color: Color.FG_3,
-  },
-  summaryValue: {
-    fontSize: fontSizes.md,
-    color: Color.FG_1,
-    fontWeight: '600',
-  },
-  summaryValueHighlight: {
-    fontSize: fontSizes.md,
-    color: Color.ACCENT,
-    fontWeight: '700',
-  },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: Color.FG_3,
-    opacity: 0.1,
-    marginVertical: spacing.xs,
-  },
+
+  // Empty State
   emptyState: {
     alignItems: 'center',
     padding: spacing.xl,
+    marginTop: 40,
   },
   emptyText: {
     fontSize: fontSizes.md,
     color: Color.FG_2,
     marginBottom: spacing.sm,
+    fontWeight: '600',
   },
   emptySubtext: {
     fontSize: fontSizes.sm,
     color: Color.FG_3,
     textAlign: 'center',
-  },
-  wsStatusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Color.BG_3,
-    padding: spacing.sm,
-    borderRadius: 8,
-    marginBottom: spacing.md,
-  },
-  wsStatusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Color.ACCENT,
-    marginRight: spacing.sm,
-  },
-  wsStatusText: {
-    fontSize: fontSizes.sm,
-    color: Color.FG_2,
-  },
-  wsErrorContainer: {
-    backgroundColor: Color.BG_3,
-    padding: spacing.md,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FF6B6B',
-    marginBottom: spacing.md,
-  },
-  wsErrorText: {
-    fontSize: fontSizes.sm,
-    color: '#FF6B6B',
-  },
-  priceCard: {
-    backgroundColor: Color.BG_3,
-    padding: spacing.lg,
-    borderRadius: 12,
-    marginBottom: spacing.lg,
-    borderWidth: 2,
-    borderColor: Color.ACCENT,
-  },
-  priceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  coinName: {
-    fontSize: fontSizes.xl,
-    color: Color.FG_1,
-    fontWeight: '700',
-  },
-  marketTypeBadge: {
-    fontSize: fontSizes.xs,
-    color: Color.ACCENT,
-    backgroundColor: Color.BG_2,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 4,
-    fontWeight: '600',
-  },
-  priceValue: {
-    fontSize: 32,
-    color: Color.ACCENT,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  priceLoading: {
-    fontSize: fontSizes.lg,
-    color: Color.FG_3,
-    fontStyle: 'italic',
-    marginBottom: spacing.xs,
-  },
-  priceSubtext: {
-    fontSize: fontSizes.sm,
-    color: Color.FG_3,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  lastUpdated: {
-    fontSize: fontSizes.xs,
-    color: Color.FG_3,
-    fontStyle: 'italic',
-  },
-  portfolioValueCard: {
-    backgroundColor: Color.BG_3,
-    padding: spacing.lg,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: Color.BRIGHT_ACCENT,
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  portfolioLabel: {
-    fontSize: fontSizes.sm,
-    color: Color.FG_3,
-    marginBottom: spacing.xs,
-  },
-  portfolioValue: {
-    fontSize: 32,
-    color: Color.FG_1,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  portfolioPnL: {
-    fontSize: fontSizes.md,
-    fontWeight: '600',
-  },
-  pnlPositive: {
-    color: Color.BRIGHT_ACCENT,
-  },
-  pnlNegative: {
-    color: Color.RED,
-  },
-  positionItem: {
-    paddingVertical: spacing.sm,
-  },
-  positionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  positionCoin: {
-    fontSize: fontSizes.md,
-    color: Color.FG_1,
-    fontWeight: '600',
-  },
-  positionDirection: {
-    fontSize: fontSizes.xs,
-    fontWeight: '700',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  directionLong: {
-    color: Color.BRIGHT_ACCENT,
-    backgroundColor: Color.BG_2,
-  },
-  directionShort: {
-    color: Color.RED,
-    backgroundColor: Color.BG_2,
-  },
-  positionDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.xs,
-  },
-  positionDetailText: {
-    fontSize: fontSizes.sm,
-    color: Color.FG_3,
-  },
-  positionPnLRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.xs,
-  },
-  positionPnL: {
-    fontSize: fontSizes.sm,
-    fontWeight: '600',
-  },
-  balanceItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  balanceCoin: {
-    fontSize: fontSizes.md,
-    color: Color.FG_1,
-    fontWeight: '600',
-  },
-  balanceAmounts: {
-    alignItems: 'flex-end',
-  },
-  balanceAmount: {
-    fontSize: fontSizes.md,
-    color: Color.FG_1,
-    fontWeight: '500',
-  },
-  balanceUsd: {
-    fontSize: fontSizes.sm,
-    color: Color.FG_3,
-    marginTop: 2,
-  },
-  closeButton: {
-    backgroundColor: Color.RED,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: spacing.md,
-  },
-  closeButtonText: {
-    color: Color.FG_1,
-    fontSize: fontSizes.sm,
-    fontWeight: '600',
-  },
-  closeButtonDisabled: {
-    backgroundColor: Color.FG_3,
-    opacity: 0.5,
   },
 });
 

@@ -75,6 +75,7 @@ export default function TabNavigator(): React.JSX.Element {
         name="Home"
         component={HomeScreen}
         options={{
+          headerShown: false,
           tabBarIcon: ({ focused }) => (
             <TabIcon iconType="MaterialCommunityIcons" iconName="home" focused={focused} />
           ),
