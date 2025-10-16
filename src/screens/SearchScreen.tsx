@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,12 @@ import {
   ScrollView,
   SafeAreaView,
   Keyboard,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import type { PerpMarket, SpotMarket } from '../types';
 import { styles } from './styles/SearchScreen.styles';
@@ -75,6 +78,9 @@ export default function SearchScreen(): React.JSX.Element {
   const [spotSort, setSpotSort] = useState<SortType>(SortType.VOLUME);
   const [perpAscending, setPerpAscending] = useState(false);
   const [spotAscending, setSpotAscending] = useState(false);
+  
+  // For swipe animation
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   // Restore sort when market type changes
   React.useEffect(() => {
@@ -244,11 +250,32 @@ export default function SearchScreen(): React.JSX.Element {
   }, [selectCoin, navigation]);
 
   const handleMarketTypeToggle = useCallback(
-    (type: 'perp' | 'spot'): void => {
+    (type: 'perp' | 'spot', animated: boolean = false, direction?: 'left' | 'right'): void => {
+      if (animated && direction) {
+        // Start slide animation
+        const slideDistance = direction === 'left' ? -50 : 50;
+        slideAnim.setValue(slideDistance);
+        
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+      }
+      
       setMarketType(type);
     },
-    [setMarketType]
+    [setMarketType, slideAnim]
   );
+
+  const handleMarketSwipe = useCallback((direction: 'left' | 'right') => {
+    // Swipe left: perp -> spot
+    // Swipe right: spot -> perp
+    const nextType = direction === 'left' 
+      ? (wsState.marketType === 'perp' ? 'spot' : 'perp')
+      : (wsState.marketType === 'spot' ? 'perp' : 'spot');
+    handleMarketTypeToggle(nextType, true, direction);
+  }, [wsState.marketType, handleMarketTypeToggle]);
 
   const handleClearSearch = useCallback(() => {
     setSearchQuery('');
@@ -422,6 +449,25 @@ export default function SearchScreen(): React.JSX.Element {
     ]
   );
 
+  // Pan gesture for horizontal swipe (market type)
+  const panGesture = Gesture.Pan()
+    .onEnd((event) => {
+      const { velocityX, translationX } = event;
+      
+      // Check if gesture is predominantly horizontal and fast enough
+      if (Math.abs(velocityX) > 500 || Math.abs(translationX) > 100) {
+        if (translationX < -50) {
+          // Swipe left
+          runOnJS(handleMarketSwipe)('left');
+        } else if (translationX > 50) {
+          // Swipe right
+          runOnJS(handleMarketSwipe)('right');
+        }
+      }
+    })
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-20, 20]);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.contentContainer}>
@@ -476,6 +522,10 @@ export default function SearchScreen(): React.JSX.Element {
             />
           </View>
         </View>
+
+        {/* Entire content wrapped with Swipe Gesture */}
+        <GestureDetector gesture={panGesture}>
+          <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
 
         {/* Search Bar */}
         <View style={styles.searchBarContainer}>
@@ -566,6 +616,8 @@ export default function SearchScreen(): React.JSX.Element {
             isAscending,
           }}
         />
+          </Animated.View>
+        </GestureDetector>
       </View>
     </SafeAreaView>
   );

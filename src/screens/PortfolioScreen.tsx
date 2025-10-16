@@ -1,8 +1,10 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, SafeAreaView, Alert, Animated } from 'react-native';
 import { useAccount } from '@reown/appkit-react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { styles } from './styles/PortfolioScreen.styles';
@@ -10,6 +12,7 @@ import type { PerpPosition, UserFill } from '../types';
 import Color from '../styles/colors';
 import DepositModal from '../components/DepositModal';
 import WithdrawModal from '../components/WithdrawModal';
+import PerpSpotTransferModal from '../components/PerpSpotTransferModal';
 import TransferToStakingModal from '../components/TransferToStakingModal';
 import TransferFromStakingModal from '../components/TransferFromStakingModal';
 import DelegateModal from '../components/DelegateModal';
@@ -74,6 +77,7 @@ export default function PortfolioScreen(): React.JSX.Element {
   // Modal states
   const [depositModalVisible, setDepositModalVisible] = useState(false);
   const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
+  const [perpSpotTransferVisible, setPerpSpotTransferVisible] = useState(false);
   const [transferToStakingVisible, setTransferToStakingVisible] = useState(false);
   const [transferFromStakingVisible, setTransferFromStakingVisible] = useState(false);
   const [delegateModalVisible, setDelegateModalVisible] = useState(false);
@@ -85,6 +89,9 @@ export default function PortfolioScreen(): React.JSX.Element {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24h');
   const [tradesDisplayLimit, setTradesDisplayLimit] = useState(10);
   const [marketDropdownVisible, setMarketDropdownVisible] = useState(false);
+  
+  // For swipe animation
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   // Load saved filters on mount
   useEffect(() => {
@@ -117,8 +124,34 @@ export default function PortfolioScreen(): React.JSX.Element {
     }
   };
 
-  // Save time filter when it changes
-  const handleTimeFilterChange = async (filter: TimeFilter) => {
+  // Helper to get next/previous time filter (circular navigation)
+  const getNextTimeFilter = (current: TimeFilter, direction: 'left' | 'right'): TimeFilter => {
+    const filters: TimeFilter[] = ['24h', '7d', '30d', 'All Time'];
+    const currentIndex = filters.indexOf(current);
+    
+    if (direction === 'left') {
+      // Swipe left: move to next
+      return filters[(currentIndex + 1) % filters.length];
+    } else {
+      // Swipe right: move to previous
+      return filters[(currentIndex - 1 + filters.length) % filters.length];
+    }
+  };
+
+  // Save time filter when it changes with animation
+  const handleTimeFilterChange = async (filter: TimeFilter, animated: boolean = false, direction?: 'left' | 'right') => {
+    if (animated && direction) {
+      // Start slide animation
+      const slideDistance = direction === 'left' ? -50 : 50;
+      slideAnim.setValue(slideDistance);
+      
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    }
+    
     setTimeFilter(filter);
     setTradesDisplayLimit(10); // Reset display limit when changing time filter
     try {
@@ -126,6 +159,12 @@ export default function PortfolioScreen(): React.JSX.Element {
     } catch (error) {
       console.error('[PortfolioScreen] Error saving time filter:', error);
     }
+  };
+  
+  // Handle swipe gesture for time filter
+  const handleTimeSwipe = (direction: 'left' | 'right') => {
+    const nextFilter = getNextTimeFilter(timeFilter, direction);
+    handleTimeFilterChange(nextFilter, true, direction);
   };
 
   // Filter fills by time period and market type
@@ -184,9 +223,14 @@ export default function PortfolioScreen(): React.JSX.Element {
     let spotValue = 0;
     account.data.spotBalances.forEach(balance => {
       const total = parseFloat(balance.total);
-      const price = wsState.prices[balance.coin];
-      if (price) {
-        spotValue += total * parseFloat(price);
+      // USDC is always $1
+      if (balance.coin === 'USDC') {
+        spotValue += total;
+      } else {
+        const price = wsState.prices[balance.coin];
+        if (price) {
+          spotValue += total * parseFloat(price);
+        }
       }
     });
     return spotValue;
@@ -300,9 +344,16 @@ export default function PortfolioScreen(): React.JSX.Element {
     return account.data.spotBalances
       .filter(balance => parseFloat(balance.total) > 0)
       .map(balance => {
-        const price = wsState.prices[balance.coin];
         const total = parseFloat(balance.total);
-        const usdValue = price ? total * parseFloat(price) : 0;
+        // USDC is always $1
+        let price, usdValue;
+        if (balance.coin === 'USDC') {
+          price = '1';
+          usdValue = total;
+        } else {
+          price = wsState.prices[balance.coin];
+          usdValue = price ? total * parseFloat(price) : 0;
+        }
         
         return {
           balance,
@@ -330,11 +381,29 @@ export default function PortfolioScreen(): React.JSX.Element {
   const showStaking = ['Staking', 'All'].includes(marketFilter);
   const showEquityBreakdown = ['Perp+Spot', 'All', 'Staking'].includes(marketFilter);
 
+  // Pan gesture for horizontal swipe (timeframes)
+  const panGesture = Gesture.Pan()
+    .onEnd((event) => {
+      const { velocityX, translationX } = event;
+      
+      // Check if gesture is predominantly horizontal and fast enough
+      if (Math.abs(velocityX) > 500 || Math.abs(translationX) > 100) {
+        if (translationX < -50) {
+          // Swipe left
+          runOnJS(handleTimeSwipe)('left');
+        } else if (translationX > 50) {
+          // Swipe right
+          runOnJS(handleTimeSwipe)('right');
+        }
+      }
+    })
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-20, 20]);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.contentContainer}>
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-          {/* Time Period Filter */}
+        {/* Time Period Filter */}
           <View style={styles.timeFilterContainer}>
             <View style={styles.timeFilterSelector}>
               <TouchableOpacity
@@ -401,6 +470,11 @@ export default function PortfolioScreen(): React.JSX.Element {
               ]} />
             </View>
           </View>
+
+        {/* Entire content wrapped with Swipe Gesture */}
+        <GestureDetector gesture={panGesture}>
+          <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
+            <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
 
           {/* Market Filter Dropdown */}
           <View style={styles.marketDropdownContainer}>
@@ -583,6 +657,16 @@ export default function PortfolioScreen(): React.JSX.Element {
                             onPress={() => setWithdrawModalVisible(true)}
                           >
                             <Text style={styles.withdrawButtonText}>Withdraw</Text>
+                          </TouchableOpacity>
+                        </View>
+                        
+                        {/* Perp <-> Spot Transfer Button */}
+                        <View style={styles.transferContainer}>
+                          <TouchableOpacity 
+                            style={styles.transferButton}
+                            onPress={() => setPerpSpotTransferVisible(true)}
+                          >
+                            <Text style={styles.transferButtonText}>Perp ↔ Spot Transfer</Text>
                           </TouchableOpacity>
                         </View>
                         
@@ -921,7 +1005,9 @@ export default function PortfolioScreen(): React.JSX.Element {
               )}
             </>
           )}
-        </ScrollView>
+            </ScrollView>
+          </Animated.View>
+        </GestureDetector>
       </View>
       
       {/* Modals */}
@@ -932,6 +1018,17 @@ export default function PortfolioScreen(): React.JSX.Element {
       <WithdrawModal 
         visible={withdrawModalVisible}
         onClose={() => setWithdrawModalVisible(false)}
+      />
+      <PerpSpotTransferModal 
+        visible={perpSpotTransferVisible}
+        onClose={() => setPerpSpotTransferVisible(false)}
+        perpBalance={account.data?.perpMarginSummary?.withdrawable 
+          ? parseFloat(account.data.perpMarginSummary.withdrawable) 
+          : 0}
+        spotBalance={(() => {
+          const usdcBalance = account.data?.spotBalances.find(b => b.coin === 'USDC');
+          return usdcBalance ? parseFloat(usdcBalance.total) : 0;
+        })()}
       />
       <TransferToStakingModal 
         visible={transferToStakingVisible}

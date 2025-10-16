@@ -3,6 +3,8 @@ import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Ani
 import { useAccount } from '@reown/appkit-react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { formatPrice, formatSize } from '../lib/formatting';
@@ -53,6 +55,9 @@ export default function HomeScreen(): React.JSX.Element {
   const [previousBalance, setPreviousBalance] = useState<number | null>(null);
   const colorAnim = useRef(new Animated.Value(0)).current;
   const [isIncrease, setIsIncrease] = useState<boolean | null>(null);
+  
+  // For swipe animation
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   // Load saved market filter on mount
   useEffect(() => {
@@ -69,14 +74,46 @@ export default function HomeScreen(): React.JSX.Element {
     loadMarketFilter();
   }, []);
 
-  // Save market filter when it changes
-  const handleFilterChange = async (filter: MarketFilter) => {
+  // Helper to get next/previous filter (circular navigation)
+  const getNextFilter = (current: MarketFilter, direction: 'left' | 'right'): MarketFilter => {
+    const filters: MarketFilter[] = ['Perp', 'Spot', 'Perp+Spot'];
+    const currentIndex = filters.indexOf(current);
+    
+    if (direction === 'left') {
+      // Swipe left: move to next
+      return filters[(currentIndex + 1) % filters.length];
+    } else {
+      // Swipe right: move to previous
+      return filters[(currentIndex - 1 + filters.length) % filters.length];
+    }
+  };
+
+  // Save market filter when it changes with animation
+  const handleFilterChange = async (filter: MarketFilter, animated: boolean = false, direction?: 'left' | 'right') => {
+    if (animated && direction) {
+      // Start slide animation
+      const slideDistance = direction === 'left' ? -50 : 50;
+      slideAnim.setValue(slideDistance);
+      
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    }
+    
     setMarketFilter(filter);
     try {
       await AsyncStorage.setItem(MARKET_FILTER_KEY, filter);
     } catch (error) {
       console.error('[HomeScreen] Error saving market filter:', error);
     }
+  };
+  
+  // Handle swipe gesture
+  const handleSwipe = (direction: 'left' | 'right') => {
+    const nextFilter = getNextFilter(marketFilter, direction);
+    handleFilterChange(nextFilter, true, direction);
   };
 
   // Calculate perp account value
@@ -92,9 +129,14 @@ export default function HomeScreen(): React.JSX.Element {
     let spotValue = 0;
     account.data.spotBalances.forEach(balance => {
       const total = parseFloat(balance.total);
-      const price = wsState.prices[balance.coin];
-      if (price) {
-        spotValue += total * parseFloat(price);
+      // USDC is always $1
+      if (balance.coin === 'USDC') {
+        spotValue += total;
+      } else {
+        const price = wsState.prices[balance.coin];
+        if (price) {
+          spotValue += total * parseFloat(price);
+        }
       }
     });
     return spotValue;
@@ -181,9 +223,16 @@ export default function HomeScreen(): React.JSX.Element {
     return account.data.spotBalances
       .filter(balance => parseFloat(balance.total) > 0)
       .map(balance => {
-        const price = wsState.prices[balance.coin];
         const total = parseFloat(balance.total);
-        const usdValue = price ? total * parseFloat(price) : 0;
+        // USDC is always $1
+        let price, usdValue;
+        if (balance.coin === 'USDC') {
+          price = '1';
+          usdValue = total;
+        } else {
+          price = wsState.prices[balance.coin];
+          usdValue = price ? total * parseFloat(price) : 0;
+        }
         
         return {
           balance,
@@ -291,12 +340,30 @@ export default function HomeScreen(): React.JSX.Element {
     );
   };
 
+  // Pan gesture for horizontal swipe
+  const panGesture = Gesture.Pan()
+    .onEnd((event) => {
+      const { velocityX, translationX } = event;
+      
+      // Check if gesture is predominantly horizontal and fast enough
+      if (Math.abs(velocityX) > 500 || Math.abs(translationX) > 100) {
+        if (translationX < -50) {
+          // Swipe left
+          runOnJS(handleSwipe)('left');
+        } else if (translationX > 50) {
+          // Swipe right
+          runOnJS(handleSwipe)('right');
+        }
+      }
+    })
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-20, 20]);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.contentContainer}>
-        <ScrollView style={styles.scrollView}>
-          {/* Market Filter Dropdown */}
-          <View style={styles.filterContainer}>
+        {/* Market Filter Dropdown */}
+        <View style={styles.filterContainer}>
           <View style={styles.panelSelector}>
             <TouchableOpacity
               style={styles.panelButton}
@@ -348,12 +415,15 @@ export default function HomeScreen(): React.JSX.Element {
           </View>
         </View>
 
-        {/* Large Balance Display */}
-        <View style={styles.balanceContainer}>
-          <Animated.Text style={[styles.balanceAmount, { color: textColor }]}>
-            ${formatNumber(displayedBalance, 2)}
-          </Animated.Text>
-        </View>
+        {/* Entire page wrapped with Swipe Gesture */}
+        <GestureDetector gesture={panGesture}>
+          <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
+            <ScrollView style={styles.scrollView}>
+            <View style={styles.balanceContainer}>
+              <Animated.Text style={[styles.balanceAmount, { color: textColor }]}>
+                ${formatNumber(displayedBalance, 2)}
+              </Animated.Text>
+            </View>
 
         {account.isLoading && (
           <View style={styles.loadingContainer}>
@@ -494,7 +564,9 @@ export default function HomeScreen(): React.JSX.Element {
             </Text>
           </View>
         )}
-        </ScrollView>
+            </ScrollView>
+          </Animated.View>
+        </GestureDetector>
       </View>
     </SafeAreaView>
   );

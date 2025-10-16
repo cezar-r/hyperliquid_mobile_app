@@ -180,7 +180,7 @@ export const styles = StyleSheet.create({
   // Account Details (simplified)
   accountDetailsContainer: {
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
+    paddingTop: spacing.lg,
   },
   accountDetailsTitle: {
     fontSize: fontSizes.md,
@@ -209,7 +209,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
     marginTop: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   depositButton: {
     flex: 1,
@@ -238,9 +238,28 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  // Transfer Button (Perp <-> Spot)
+  transferContainer: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  transferButton: {
+    backgroundColor: Color.BG_3,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Color.ACCENT,
+  },
+  transferButtonText: {
+    fontSize: fontSizes.md,
+    color: Color.BRIGHT_ACCENT,
+    fontWeight: '600',
+  },
+
   // Positions Container (from HomeScreen)
   positionsContainer: {
-    paddingTop: spacing.md,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
     paddingHorizontal: spacing.md,
   },
