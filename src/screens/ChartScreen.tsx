@@ -9,6 +9,7 @@ import {
   Linking,
   Animated,
   Alert,
+  Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import LightweightChartBridge, { LWCandle } from '../components/chart/LightweightChartBridge';
@@ -572,8 +573,10 @@ export default function ChartScreen(): React.JSX.Element {
 
         {isLoading && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#00FF00" />
-            <Text style={styles.loadingText}>Loading chart data...</Text>
+            <Image 
+              source={require('../../assets/blob_green.gif')} 
+              style={styles.loadingGif}
+            />
           </View>
         )}
 
@@ -728,7 +731,12 @@ export default function ChartScreen(): React.JSX.Element {
                 })()}
               </View>
             ) : (
-              <Text style={styles.subtitle}>Loading orderbook...</Text>
+              <View style={styles.orderbookLoadingContainer}>
+                <Image 
+                  source={require('../../assets/blob_green.gif')} 
+                  style={styles.loadingGif}
+                />
+              </View>
             )}
           </View>
         )}

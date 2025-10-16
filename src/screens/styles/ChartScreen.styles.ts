@@ -263,17 +263,20 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   loadingContainer: {
-    backgroundColor: Color.BG_3,
+    backgroundColor: '#0b0f13',
     borderRadius: 12,
-    padding: spacing.xxl,
+    height: 400,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: spacing.xl,
   },
-  loadingText: {
-    fontSize: fontSizes.md,
-    color: Color.FG_3,
-    marginTop: spacing.md,
+  loadingGif: {
+    width: 100,
+    height: 100,
+  },
+  orderbookLoadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xxl,
   },
   errorContainer: {
     backgroundColor: Color.BG_3,
