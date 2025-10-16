@@ -21,6 +21,7 @@ import {
   createInfoClient,
 } from '../lib/hyperliquid';
 import type { AccountData, AccountState } from '../types';
+import { createWalletClient, custom } from 'viem';
 
 const WALLET_DISCONNECTED_KEY = 'hl_wallet_disconnected';
 
@@ -71,14 +72,16 @@ export function WalletProvider({
   }, []);
 
   const fetchAccountData = useCallback(
-    async (userAddress: string) => {
+    async (userAddress: string, silent: boolean = false) => {
       if (!infoClient) {
         console.error('[Phase 3] InfoClient not initialized');
         return;
       }
 
-      console.log('[Phase 3] Fetching account data for:', userAddress);
-      setAccount((prev) => ({ ...prev, isLoading: true, error: null }));
+      if (!silent) {
+        console.log('[Phase 3] Fetching account data for:', userAddress);
+        setAccount((prev) => ({ ...prev, isLoading: true, error: null }));
+      }
 
       try {
         const [perpState, spotState, openOrders, userFills] =
@@ -86,37 +89,55 @@ export function WalletProvider({
             infoClient
               .clearinghouseState({ user: userAddress as `0x${string}` })
               .catch((err) => {
-                console.warn('[Phase 3] clearinghouseState error:', err);
+                if (!silent) console.warn('[Phase 3] clearinghouseState error:', err);
                 return null;
               }),
             infoClient
               .spotClearinghouseState({ user: userAddress as `0x${string}` })
               .catch((err) => {
-                console.warn('[Phase 3] spotClearinghouseState error:', err);
+                if (!silent) console.warn('[Phase 3] spotClearinghouseState error:', err);
                 return null;
               }),
             infoClient
               .frontendOpenOrders({ user: userAddress as `0x${string}` })
               .catch((err) => {
-                console.warn('[Phase 3] frontendOpenOrders error:', err);
+                if (!silent) console.warn('[Phase 3] frontendOpenOrders error:', err);
                 return [];
               }),
             infoClient
               .userFills({ user: userAddress as `0x${string}` })
               .catch((err) => {
-                console.warn('[Phase 3] userFills error:', err);
+                if (!silent) console.warn('[Phase 3] userFills error:', err);
                 return [];
               }),
           ]);
 
-        console.log('[Phase 3] Perp state:', perpState);
-        console.log('[Phase 3] Spot state:', spotState);
-        console.log('[Phase 3] Open orders:', openOrders);
-        console.log('[Phase 3] User fills count:', userFills?.length || 0);
-        console.log('[Phase 3] User fills:', userFills);
+        if (!silent) {
+          console.log('[Phase 3] Perp state:', perpState);
+          console.log('[Phase 3] Spot state:', spotState);
+          console.log('[Phase 3] Open orders:', openOrders);
+          console.log('[Phase 3] User fills count:', userFills?.length || 0);
+        }
+
+        // Map perpPositions from API response structure
+        const perpPositions = (perpState?.assetPositions || []).map((item: any) => {
+          // API returns { type: "oneWay", position: {...} }
+          const pos = item.position || item;
+          return {
+            coin: pos.coin,
+            szi: pos.szi,
+            entryPx: pos.entryPx,
+            positionValue: pos.positionValue,
+            unrealizedPnl: pos.unrealizedPnl,
+            returnOnEquity: pos.returnOnEquity,
+            leverage: pos.leverage,
+            liquidationPx: pos.liquidationPx,
+            marginUsed: pos.marginUsed,
+          };
+        });
 
         const accountData: AccountData = {
-          perpPositions: perpState?.assetPositions || [],
+          perpPositions,
           perpMarginSummary: {
             accountValue: perpState?.marginSummary?.accountValue,
             totalMarginUsed: perpState?.marginSummary?.totalMarginUsed,
@@ -127,6 +148,7 @@ export function WalletProvider({
           spotBalances: spotState?.balances || [],
           openOrders: openOrders || [],
           userFills: userFills || [],
+          lastUpdated: Date.now(),
         };
 
         setAccount({
@@ -135,14 +157,21 @@ export function WalletProvider({
           error: null,
         });
 
-        console.log('[Phase 3] ✓ Account data fetched successfully');
+        if (!silent) {
+          console.log('[Phase 3] ✓ Account data fetched successfully');
+        }
       } catch (error: any) {
-        console.error('[Phase 3] Failed to fetch account data:', error);
-        setAccount({
-          data: null,
-          isLoading: false,
-          error: error.message || 'Failed to fetch account data',
-        });
+        if (!silent) {
+          console.error('[Phase 3] Failed to fetch account data:', error);
+        }
+        // On silent refresh errors, don't update the error state - keep existing data
+        if (!silent) {
+          setAccount({
+            data: null,
+            isLoading: false,
+            error: error.message || 'Failed to fetch account data',
+          });
+        }
       }
     },
     [infoClient]
@@ -155,7 +184,12 @@ export function WalletProvider({
       existingSessionKey?: SessionKey | null
     ) => {
       const transport = createHttpTransport();
-      const mainClient = createExchangeClient(provider, transport);
+      // Wrap the provider with a viem WalletClient to ensure typed data signing support
+      const walletClient = createWalletClient({
+        account: address as `0x${string}`,
+        transport: custom(provider as any),
+      } as any);
+      const mainClient = createExchangeClient(walletClient as any, transport);
       setMainExchangeClient(mainClient);
 
       if (existingSessionKey) {
@@ -202,6 +236,23 @@ export function WalletProvider({
     if (connectedAddress) {
       await fetchAccountData(connectedAddress);
     }
+  }, [connectedAddress, fetchAccountData]);
+
+  // Auto-refresh account data every 5 seconds when connected
+  useEffect(() => {
+    if (!connectedAddress) return;
+
+    console.log('[WalletContext] Starting 5-second account polling');
+    
+    const intervalId = setInterval(() => {
+      console.log('[WalletContext] Polling account data...');
+      fetchAccountData(connectedAddress, true); // silent refresh
+    }, 5000);
+
+    return () => {
+      console.log('[WalletContext] Stopping account polling');
+      clearInterval(intervalId);
+    };
   }, [connectedAddress, fetchAccountData]);
 
   const enableSessionKey = useCallback(async (address: string): Promise<void> => {

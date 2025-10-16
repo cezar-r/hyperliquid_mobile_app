@@ -67,7 +67,7 @@ export const styles = StyleSheet.create({
     opacity: 0.6,
   },
   enableButtonText: {
-    color: Color.BG_1,
+    color: Color.FG_1,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -94,10 +94,18 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
   },
+  errorContainer: {
+    width: '100%',
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: Color.BG_2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Color.RED,
+  },
   errorText: {
     color: Color.RED,
     fontSize: 14,
-    marginTop: 16,
     textAlign: 'center',
   },
 });

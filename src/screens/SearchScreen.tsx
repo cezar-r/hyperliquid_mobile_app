@@ -6,11 +6,13 @@ import {
   TouchableOpacity,
   TextInput,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import type { PerpMarket, SpotMarket } from '../types';
 import { styles } from './styles/SearchScreen.styles';
 
 export default function SearchScreen(): React.JSX.Element {
+  const navigation = useNavigation<any>();
   const { state: wsState, selectCoin, setMarketType } = useWebSocket();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -39,7 +41,8 @@ export default function SearchScreen(): React.JSX.Element {
 
   const handleMarketSelect = useCallback((marketName: string): void => {
     selectCoin(marketName);
-  }, [selectCoin]);
+    navigation.navigate('ChartDetail');
+  }, [selectCoin, navigation]);
 
   const handleMarketTypeToggle = useCallback(
     (type: 'perp' | 'spot'): void => {

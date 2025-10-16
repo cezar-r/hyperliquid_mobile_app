@@ -2,7 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text } from 'react-native';
 import HomeScreen from '../screens/HomeScreen';
-import ChartScreen from '../screens/ChartScreen';
+import PortfolioScreen from '../screens/PortfolioScreen';
 import SearchScreen from '../screens/SearchScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -12,7 +12,7 @@ import { styles } from './TabNavigator.styles';
 
 export type TabParamList = {
   Home: undefined;
-  Chart: undefined;
+  Portfolio: undefined;
   Search: undefined;
   History: undefined;
   Profile: undefined;
@@ -74,11 +74,11 @@ export default function TabNavigator(): React.JSX.Element {
         }}
       />
       <Tab.Screen
-        name="Chart"
-        component={ChartScreen}
+        name="Portfolio"
+        component={PortfolioScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon label="C" focused={focused} />
+            <TabIcon label="P" focused={focused} />
           ),
         }}
       />
@@ -105,7 +105,7 @@ export default function TabNavigator(): React.JSX.Element {
         component={ProfileScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon label="P" focused={focused} />
+            <TabIcon label="A" focused={focused} />
           ),
         }}
       />

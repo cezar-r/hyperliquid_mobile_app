@@ -193,5 +193,135 @@ export const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     color: Color.FG_3,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  lastUpdated: {
+    fontSize: fontSizes.xs,
+    color: Color.FG_3,
+    fontStyle: 'italic',
+  },
+  portfolioValueCard: {
+    backgroundColor: Color.BG_3,
+    padding: spacing.lg,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Color.BRIGHT_ACCENT,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  portfolioLabel: {
+    fontSize: fontSizes.sm,
+    color: Color.FG_3,
+    marginBottom: spacing.xs,
+  },
+  portfolioValue: {
+    fontSize: 32,
+    color: Color.FG_1,
+    fontWeight: '700',
+    marginBottom: spacing.xs,
+  },
+  portfolioPnL: {
+    fontSize: fontSizes.md,
+    fontWeight: '600',
+  },
+  pnlPositive: {
+    color: Color.BRIGHT_ACCENT,
+  },
+  pnlNegative: {
+    color: Color.RED,
+  },
+  positionItem: {
+    paddingVertical: spacing.sm,
+  },
+  positionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  positionCoin: {
+    fontSize: fontSizes.md,
+    color: Color.FG_1,
+    fontWeight: '600',
+  },
+  positionDirection: {
+    fontSize: fontSizes.xs,
+    fontWeight: '700',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  directionLong: {
+    color: Color.BRIGHT_ACCENT,
+    backgroundColor: Color.BG_2,
+  },
+  directionShort: {
+    color: Color.RED,
+    backgroundColor: Color.BG_2,
+  },
+  positionDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+  },
+  positionDetailText: {
+    fontSize: fontSizes.sm,
+    color: Color.FG_3,
+  },
+  positionPnLRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  positionPnL: {
+    fontSize: fontSizes.sm,
+    fontWeight: '600',
+  },
+  balanceItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  balanceCoin: {
+    fontSize: fontSizes.md,
+    color: Color.FG_1,
+    fontWeight: '600',
+  },
+  balanceAmounts: {
+    alignItems: 'flex-end',
+  },
+  balanceAmount: {
+    fontSize: fontSizes.md,
+    color: Color.FG_1,
+    fontWeight: '500',
+  },
+  balanceUsd: {
+    fontSize: fontSizes.sm,
+    color: Color.FG_3,
+    marginTop: 2,
+  },
+  closeButton: {
+    backgroundColor: Color.RED,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  closeButtonText: {
+    color: Color.FG_1,
+    fontSize: fontSizes.sm,
+    fontWeight: '600',
+  },
+  closeButtonDisabled: {
+    backgroundColor: Color.FG_3,
+    opacity: 0.5,
+  },
 });
 

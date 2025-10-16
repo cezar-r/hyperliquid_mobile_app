@@ -40,7 +40,10 @@ interface WebSocketContextValue {
   infoClient: hl.InfoClient | null;
   selectCoin: (coin: string) => void;
   setMarketType: (type: MarketType) => void;
-  subscribeToOrderbook: (coin: string) => void;
+  subscribeToOrderbook: (
+    coin: string,
+    opts?: { nSigFigs?: number; mantissa?: number }
+  ) => void;
   unsubscribeFromOrderbook: () => void;
   subscribeToTrades: (coin: string) => void;
   unsubscribeFromTrades: () => void;
@@ -50,6 +53,12 @@ interface WebSocketContextValue {
     onCandle: (candle: Candle) => void
   ) => Promise<void>;
   unsubscribeFromCandles: () => Promise<void>;
+  subscribeToUserEvents: (userAddress: string, onEvent: (event: any) => void) => Promise<void>;
+  unsubscribeFromUserEvents: () => Promise<void>;
+  subscribeToUserFills: (userAddress: string, onFill: (fills: any) => void) => Promise<void>;
+  unsubscribeFromUserFills: () => Promise<void>;
+  subscribeToUserFundings: (userAddress: string, onFunding: (funding: any) => void) => Promise<void>;
+  unsubscribeFromUserFundings: () => Promise<void>;
 }
 
 const WebSocketContext = createContext<WebSocketContextValue | null>(null);
@@ -79,6 +88,11 @@ export function WebSocketProvider({
   const orderbookSubIdRef = useRef<any>(null);
   const tradesSubIdRef = useRef<any>(null);
   const candleSubIdRef = useRef<any>(null);
+  const userEventsSubIdRef = useRef<any>(null);
+  const userFillsSubIdRef = useRef<any>(null);
+  const userFundingsSubIdRef = useRef<any>(null);
+  const activeOrderbookCoinRef = useRef<string | null>(null);
+  const activeTradesCoinRef = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -224,12 +238,20 @@ export function WebSocketProvider({
       orderbookSubIdRef.current = null;
       tradesSubIdRef.current = null;
       candleSubIdRef.current = null;
+      userEventsSubIdRef.current = null;
+      userFillsSubIdRef.current = null;
+      userFundingsSubIdRef.current = null;
     };
   }, []);
 
   const selectCoin = useCallback(
     async (coin: string) => {
-      setState((prev) => ({ ...prev, selectedCoin: coin }));
+      setState((prev) => ({ 
+        ...prev, 
+        selectedCoin: coin,
+        orderbook: null,
+        recentTrades: [],
+      }));
 
       const storageKey =
         state.marketType === 'perp'
@@ -266,7 +288,7 @@ export function WebSocketProvider({
   );
 
   const subscribeToOrderbook = useCallback(
-    async (coin: string) => {
+    async (coin: string, opts?: { nSigFigs?: number; mantissa?: number }) => {
       const client = subscriptionClientRef.current;
       if (!client) return;
 
@@ -285,11 +307,24 @@ export function WebSocketProvider({
         state.spotMarkets
       );
 
-      console.log('[Phase 4] Subscribing to orderbook:', subscriptionCoin);
+      console.log('[Phase 4] Subscribing to orderbook:', subscriptionCoin, 'opts:', opts);
+
+      const params: any = { coin: subscriptionCoin };
+      // if (opts?.nSigFigs !== undefined) params.nSigFigs = opts.nSigFigs;
+      // if (opts?.mantissa !== undefined) params.mantissa = opts.mantissa;
+      console.log('[Phase 4] l2Book params:', params);
+
+      activeOrderbookCoinRef.current = subscriptionCoin;
 
       const sub = await client.l2Book(
-        { coin: subscriptionCoin },
+        params,
         (data: any) => {
+          // Validate that the incoming data matches the currently active subscription
+          if (data.coin !== activeOrderbookCoinRef.current) {
+            console.log('[Phase 4] Ignoring stale orderbook data for:', data.coin);
+            return;
+          }
+
           const orderbook: Orderbook = {
             coin: data.coin,
             time: data.time,
@@ -313,6 +348,7 @@ export function WebSocketProvider({
       }
     });
     orderbookSubIdRef.current = null;
+    // Don't clear activeOrderbookCoinRef here - it tracks the CURRENTLY ACTIVE subscription
     setState((prev) => ({ ...prev, orderbook: null }));
     console.log('[Phase 4] Unsubscribed from orderbook');
   }, []);
@@ -339,6 +375,8 @@ export function WebSocketProvider({
 
       console.log('[Phase 4] Subscribing to trades:', subscriptionCoin);
 
+      activeTradesCoinRef.current = subscriptionCoin;
+
       const sub = await client.trades({ coin: subscriptionCoin }, (trades: any) => {
         setState((prev) => {
           const newTrades: Trade[] = trades.map((t: any) => ({
@@ -351,7 +389,18 @@ export function WebSocketProvider({
             tid: t.tid,
           }));
 
-          const combined = [...newTrades, ...prev.recentTrades].slice(0, 50);
+          // Validate that all incoming trades match the currently active subscription
+          const validTrades = newTrades.filter(t => t.coin === activeTradesCoinRef.current);
+          
+          if (validTrades.length !== newTrades.length) {
+            console.log('[Phase 4] Ignoring', newTrades.length - validTrades.length, 'stale trades');
+          }
+
+          if (validTrades.length === 0) {
+            return prev;
+          }
+
+          const combined = [...validTrades, ...prev.recentTrades].slice(0, 50);
           return { ...prev, recentTrades: combined };
         });
       });
@@ -370,6 +419,7 @@ export function WebSocketProvider({
       }
     });
     tradesSubIdRef.current = null;
+    // Don't clear activeTradesCoinRef here - it tracks the CURRENTLY ACTIVE subscription
     setState((prev) => ({ ...prev, recentTrades: [] }));
     console.log('[Phase 4] Unsubscribed from trades');
   }, []);
@@ -437,6 +487,120 @@ export function WebSocketProvider({
     console.log('[Phase 5] Unsubscribed from candles');
   }, []);
 
+  const subscribeToUserEvents = useCallback(
+    async (userAddress: string, onEvent: (event: any) => void) => {
+      const client = subscriptionClientRef.current;
+      if (!client) return;
+
+      if (userEventsSubIdRef.current) {
+        await userEventsSubIdRef.current.unsubscribe().catch((err: any) => {
+          if (!err.message?.includes('WebSocket connection closed')) {
+            console.error('[UserAccount] Error unsubscribing userEvents:', err);
+          }
+        });
+        userEventsSubIdRef.current = null;
+      }
+
+      console.log('[UserAccount] Subscribing to userEvents:', userAddress);
+
+      const sub = await (client as any).user({ user: userAddress as `0x${string}` }, (data: any) => {
+        console.log('[UserAccount] User event received:', data);
+        onEvent(data);
+      });
+
+      userEventsSubIdRef.current = sub;
+    },
+    []
+  );
+
+  const unsubscribeFromUserEvents = useCallback(async () => {
+    if (!userEventsSubIdRef.current) return;
+
+    await userEventsSubIdRef.current.unsubscribe().catch((err: any) => {
+      if (!err.message?.includes('WebSocket connection closed')) {
+        console.error('[UserAccount] Error unsubscribing userEvents:', err);
+      }
+    });
+    userEventsSubIdRef.current = null;
+    console.log('[UserAccount] Unsubscribed from userEvents');
+  }, []);
+
+  const subscribeToUserFills = useCallback(
+    async (userAddress: string, onFill: (fills: any) => void) => {
+      const client = subscriptionClientRef.current;
+      if (!client) return;
+
+      if (userFillsSubIdRef.current) {
+        await userFillsSubIdRef.current.unsubscribe().catch((err: any) => {
+          if (!err.message?.includes('WebSocket connection closed')) {
+            console.error('[UserAccount] Error unsubscribing userFills:', err);
+          }
+        });
+        userFillsSubIdRef.current = null;
+      }
+
+      console.log('[UserAccount] Subscribing to userFills:', userAddress);
+
+      const sub = await client.userFills({ user: userAddress as `0x${string}` }, (data: any) => {
+        console.log('[UserAccount] User fill received:', data);
+        onFill(data);
+      });
+
+      userFillsSubIdRef.current = sub;
+    },
+    []
+  );
+
+  const unsubscribeFromUserFills = useCallback(async () => {
+    if (!userFillsSubIdRef.current) return;
+
+    await userFillsSubIdRef.current.unsubscribe().catch((err: any) => {
+      if (!err.message?.includes('WebSocket connection closed')) {
+        console.error('[UserAccount] Error unsubscribing userFills:', err);
+      }
+    });
+    userFillsSubIdRef.current = null;
+    console.log('[UserAccount] Unsubscribed from userFills');
+  }, []);
+
+  const subscribeToUserFundings = useCallback(
+    async (userAddress: string, onFunding: (funding: any) => void) => {
+      const client = subscriptionClientRef.current;
+      if (!client) return;
+
+      if (userFundingsSubIdRef.current) {
+        await userFundingsSubIdRef.current.unsubscribe().catch((err: any) => {
+          if (!err.message?.includes('WebSocket connection closed')) {
+            console.error('[UserAccount] Error unsubscribing userFundings:', err);
+          }
+        });
+        userFundingsSubIdRef.current = null;
+      }
+
+      console.log('[UserAccount] Subscribing to userFundings:', userAddress);
+
+      const sub = await client.userFundings({ user: userAddress as `0x${string}` }, (data: any) => {
+        console.log('[UserAccount] User funding received:', data);
+        onFunding(data);
+      });
+
+      userFundingsSubIdRef.current = sub;
+    },
+    []
+  );
+
+  const unsubscribeFromUserFundings = useCallback(async () => {
+    if (!userFundingsSubIdRef.current) return;
+
+    await userFundingsSubIdRef.current.unsubscribe().catch((err: any) => {
+      if (!err.message?.includes('WebSocket connection closed')) {
+        console.error('[UserAccount] Error unsubscribing userFundings:', err);
+      }
+    });
+    userFundingsSubIdRef.current = null;
+    console.log('[UserAccount] Unsubscribed from userFundings');
+  }, []);
+
   const value: WebSocketContextValue = {
     state,
     infoClient: infoClientRef.current,
@@ -448,6 +612,12 @@ export function WebSocketProvider({
     unsubscribeFromTrades,
     subscribeToCandles,
     unsubscribeFromCandles,
+    subscribeToUserEvents,
+    unsubscribeFromUserEvents,
+    subscribeToUserFills,
+    unsubscribeFromUserFills,
+    subscribeToUserFundings,
+    unsubscribeFromUserFundings,
   };
 
   return (

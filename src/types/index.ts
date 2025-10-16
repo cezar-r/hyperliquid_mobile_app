@@ -14,8 +14,58 @@ export interface WalletInfo {
   error: string | null;
 }
 
+export interface PerpPosition {
+  coin: string;
+  szi: string; // position size (signed, negative for short)
+  entryPx: string;
+  positionValue?: string;
+  unrealizedPnl?: string;
+  returnOnEquity?: string;
+  leverage?: {
+    type: string;
+    value: number;
+    rawUsd?: string;
+  };
+  liquidationPx?: string | null;
+  marginUsed?: string;
+}
+
+export interface SpotBalance {
+  coin: string;
+  hold: string;
+  token: number;
+  total: string;
+}
+
+export interface UserFill {
+  coin: string;
+  px: string;
+  sz: string;
+  side: string;
+  time: number;
+  startPosition?: string;
+  dir?: string;
+  closedPnl?: string;
+  hash?: string;
+  oid?: number;
+  crossed?: boolean;
+  fee?: string;
+  tid?: number;
+  feeToken?: string;
+}
+
+export interface OpenOrder {
+  coin: string;
+  side: string;
+  limitPx: string;
+  sz: string;
+  oid: number;
+  timestamp: number;
+  origSz: string;
+}
+
 export interface AccountData {
-  perpPositions: any[];
+  perpPositions: PerpPosition[];
   perpMarginSummary: {
     accountValue?: string;
     totalMarginUsed?: string;
@@ -23,14 +73,10 @@ export interface AccountData {
     totalRawUsd?: string;
     withdrawable?: string;
   };
-  spotBalances: Array<{
-    coin: string;
-    hold: string;
-    token: number;
-    total: string;
-  }>;
-  openOrders: any[];
-  userFills: any[];
+  spotBalances: SpotBalance[];
+  openOrders: OpenOrder[];
+  userFills: UserFill[];
+  lastUpdated?: number;
 }
 
 export interface AccountState {
@@ -41,6 +87,7 @@ export interface AccountState {
 
 export interface PerpMarket {
   name: string;
+  index: number;
   szDecimals: number;
   maxLeverage: number;
   onlyIsolated?: boolean;
@@ -50,6 +97,7 @@ export interface SpotMarket {
   name: string;
   tokens: [number, number];
   index: number;
+  szDecimals: number;
   isCanonical?: boolean;
 }
 

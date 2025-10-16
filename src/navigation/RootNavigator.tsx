@@ -6,6 +6,7 @@ import { useWallet } from '../contexts/WalletContext';
 import { loadSessionKey } from '../lib/sessionKey';
 import ConnectScreen from '../screens/ConnectScreen';
 import EnableSessionKeyScreen from '../screens/EnableSessionKeyScreen';
+import ChartScreen from '../screens/ChartScreen';
 import TabNavigator from './TabNavigator';
 
 const Stack = createNativeStackNavigator();
@@ -48,6 +49,11 @@ export default function RootNavigator(): React.JSX.Element {
         component={EnableSessionKeyScreen}
       />
       <Stack.Screen name="Tabs" component={TabNavigator} />
+      <Stack.Screen 
+        name="ChartDetail" 
+        component={ChartScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }

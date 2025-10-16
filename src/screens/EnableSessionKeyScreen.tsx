@@ -1,20 +1,43 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useAccount } from '@reown/appkit-react-native';
+import { useWallet } from '../contexts/WalletContext';
 import { styles } from './styles/EnableSessionKeyScreen.styles';
 
 type NavigationProp = NativeStackNavigationProp<any>;
 
 export default function EnableSessionKeyScreen(): React.JSX.Element {
   const navigation = useNavigation<NavigationProp>();
+  const { enableSessionKey } = useWallet();
+  const { address } = useAccount();
+  const [isEnabling, setIsEnabling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleEnable = async () => {
-    console.log('[EnableSessionKey] Enable clicked (not yet implemented)');
-    navigation.replace('Tabs');
+    if (!address) {
+      setError('No wallet address found');
+      return;
+    }
+
+    setIsEnabling(true);
+    setError(null);
+
+    try {
+      console.log('[EnableSessionKey] Enabling session key for:', address);
+      await enableSessionKey(address);
+      console.log('[EnableSessionKey] ✓ Session key enabled successfully');
+      navigation.replace('Tabs');
+    } catch (err: any) {
+      console.error('[EnableSessionKey] Failed to enable session key:', err);
+      setError(err.message || 'Failed to enable auto-approve. Please try again.');
+      setIsEnabling(false);
+    }
   };
 
   const handleSkip = () => {
+    console.log('[EnableSessionKey] User skipped session key setup');
     navigation.replace('Tabs');
   };
 
@@ -61,19 +84,31 @@ export default function EnableSessionKeyScreen(): React.JSX.Element {
           </View>
         </View>
 
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
         <View style={styles.buttonContainer}>
           <TouchableOpacity
-            style={styles.enableButton}
+            style={[styles.enableButton, isEnabling && styles.enableButtonDisabled]}
             onPress={handleEnable}
+            disabled={isEnabling}
           >
-            <Text style={styles.enableButtonText}>
-              Enable Auto-Approve
-            </Text>
+            {isEnabling ? (
+              <ActivityIndicator color="#000000" />
+            ) : (
+              <Text style={styles.enableButtonText}>
+                Enable Auto-Approve
+              </Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.skipButton}
             onPress={handleSkip}
+            disabled={isEnabling}
           >
             <Text style={styles.skipButtonText}>Skip for Now</Text>
           </TouchableOpacity>

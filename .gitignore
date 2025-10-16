@@ -42,5 +42,6 @@ yarn-error.*
 /ios
 /android
 
-# cursor
-.cursor/
+# IDE
+.cursor
+.vscode

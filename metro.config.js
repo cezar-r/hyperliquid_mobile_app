@@ -19,5 +19,10 @@ config.transformer = {
   unstable_allowRequireContext: true,
 };
 
+// Ensure html files can be required as assets for WebView local loading
+if (config.resolver && config.resolver.assetExts && !config.resolver.assetExts.includes('html')) {
+  config.resolver.assetExts.push('html');
+}
+
 module.exports = config;
 

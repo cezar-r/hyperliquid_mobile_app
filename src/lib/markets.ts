@@ -12,8 +12,9 @@ export async function fetchPerpMarkets(
   try {
     const [meta, assetCtxs] = await infoClient.metaAndAssetCtxs();
     
-    const markets = meta.universe.map((market: any) => ({
+    const markets = meta.universe.map((market: any, index: number) => ({
       name: market.name,
+      index: index, // Asset index for order placement
       szDecimals: market.szDecimals,
       maxLeverage: market.maxLeverage || 50,
       onlyIsolated: market.onlyIsolated || false,
@@ -58,6 +59,7 @@ export async function fetchSpotMarkets(
         name: displayName,
         tokens: market.tokens,
         index: market.index,
+        szDecimals: market.szDecimals || 8,
         isCanonical: market.isCanonical || false,
         baseToken: market?.name,
       };

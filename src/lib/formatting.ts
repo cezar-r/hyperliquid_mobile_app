@@ -1,0 +1,112 @@
+/**
+ * Formatting utilities for Hyperliquid orders
+ * Based on SDK test utilities
+ */
+
+/**
+ * Round to N significant figures
+ */
+function toSignificantFigures(num: number, sigFigs: number): number {
+  if (num === 0) return 0;
+  
+  const magnitude = Math.floor(Math.log10(Math.abs(num)));
+  const scale = Math.pow(10, sigFigs - magnitude - 1);
+  return Math.round(num * scale) / scale;
+}
+
+/**
+ * Convert float to wire format for Hyperliquid
+ * Rounds to 5 significant figures and removes trailing zeros
+ */
+export function floatToWire(x: number): string {
+  // Round to 5 significant figures (Hyperliquid standard)
+  const rounded = toSignificantFigures(x, 5);
+  
+  // Convert to string with enough decimals
+  const str = rounded.toFixed(8);
+  
+  // Remove trailing zeros
+  let normalized = str.replace(/\.?0+$/, '');
+  if (normalized === '-0') normalized = '0';
+  
+  return normalized;
+}
+
+/**
+ * Format price for Hyperliquid orders
+ * Rounds to 5 sig figs, then to max allowed decimals based on szDecimals
+ * Special case: if price < $1, use max 6 decimals regardless of szDecimals
+ * For perps: maxPriceDecimals = max(6 - szDecimals, 0)
+ * For spot: maxPriceDecimals = max(8 - szDecimals, 0)
+ */
+export function formatPrice(price: number, szDecimals: number, isPerp: boolean = true): string {
+  // First round to 5 significant figures
+  const rounded = toSignificantFigures(price, 5);
+  
+  // Special case: if price < $1, use max 6 decimals (not szDecimals formula)
+  // This prevents over-rounding on low-price coins after slippage
+  let maxAllowedDecimals: number;
+  if (price < 1) {
+    maxAllowedDecimals = 6;
+    console.log('[formatPrice] Price < $1, using 6 decimals max');
+  } else {
+    // Calculate max allowed decimals based on szDecimals
+    const maxDecimals = isPerp ? 6 : 8;
+    maxAllowedDecimals = Math.max(maxDecimals - szDecimals, 0);
+  }
+  
+  // Round to max allowed decimals
+  const fixedToDecimals = rounded.toFixed(maxAllowedDecimals);
+  
+  // Remove trailing zeros
+  let normalized = fixedToDecimals.replace(/\.?0+$/, '');
+  if (normalized === '-0') normalized = '0';
+  
+  console.log('[formatPrice]', { price, szDecimals, maxAllowedDecimals, rounded, fixedToDecimals, normalized });
+  
+  return normalized;
+}
+
+/**
+ * Format size for Hyperliquid orders  
+ * Rounds to szDecimals, then normalizes (removes trailing zeros)
+ * Based on Python SDK's float_to_wire implementation
+ * Special rule: if price < $1, use whole numbers only (no decimals)
+ */
+export function formatSize(size: number, szDecimals: number, price?: number): string {
+  console.log('[formatSize] Input:', { size, szDecimals, price });
+  
+  // If price < $1, use whole numbers only (no decimals)
+  if (price !== undefined && price < 1) {
+    console.log('[formatSize] Price < $1, rounding to whole number');
+    const rounded = Math.round(size).toString();
+    console.log('[formatSize] Final result:', rounded);
+    return rounded;
+  }
+  
+  // First round to szDecimals
+  const rounded = size.toFixed(szDecimals);
+  console.log('[formatSize] Rounded to', szDecimals, 'decimals:', rounded);
+  
+  // Handle -0 edge case
+  if (rounded === '-0' || rounded.startsWith('-0.0000')) {
+    console.log('[formatSize] Detected -0, returning 0');
+    return '0';
+  }
+  
+  // Remove trailing zeros (normalize)
+  let normalized = rounded.replace(/\.?0+$/, '');
+  console.log('[formatSize] After removing trailing zeros:', normalized);
+  
+  console.log('[formatSize] Final result:', normalized);
+  return normalized;
+}
+
+/**
+ * Remove trailing zeros from a number string
+ */
+export function removeTrailingZeros(value: string): string {
+  if (!value.includes('.')) return value;
+  return value.replace(/\.?0+$/, '');
+}
+

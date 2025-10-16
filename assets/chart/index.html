@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lightweight Charts Bridge</title>
+    <style>
+      html, body, #app { margin: 0; padding: 0; height: 100%; background: #0b0f13; }
+      #container { width: 100%; height: 100%; }
+    </style>
+    <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <div id="container"></div>
+    </div>
+    <script>
+      (function () {
+        const emitter = window.ReactNativeWebView ? {
+          post: (msg) => window.ReactNativeWebView.postMessage(JSON.stringify(msg)),
+        } : {
+          post: (msg) => console.log('bridge->rn', msg),
+        };
+
+        let chart, candleSeries, smaSeries;
+        let lastBarTime = null;
+
+        function computeSMA(data, period) {
+          const result = [];
+          let sum = 0;
+          for (let i = 0; i < data.length; i++) {
+            const close = data[i].close;
+            sum += close;
+            if (i >= period) {
+              sum -= data[i - period].close;
+            }
+            if (i >= period - 1) {
+              result.push({ time: data[i].time, value: sum / period });
+            }
+          }
+          return result;
+        }
+
+        function ensureChart(opts) {
+          const el = document.getElementById('container');
+          if (!chart) {
+            chart = LightweightCharts.createChart(el, {
+              width: opts.width || el.clientWidth,
+              height: opts.height || el.clientHeight,
+              layout: {
+                background: { color: (opts.theme && opts.theme.bg) || '#0b0f13' },
+                textColor: (opts.theme && opts.theme.fg) || '#c5ced9',
+              },
+              rightPriceScale: { borderVisible: false },
+              timeScale: { borderVisible: false },
+              grid: { vertLines: { color: '#161b22' }, horzLines: { color: '#161b22' } },
+            });
+            candleSeries = chart.addCandlestickSeries({
+              upColor: '#00ff94', downColor: '#ff3b3b', borderVisible: false,
+              wickUpColor: '#00ff94', wickDownColor: '#ff3b3b',
+            });
+          } else {
+            chart.applyOptions({ width: opts.width, height: opts.height });
+          }
+        }
+
+        function handleMessage(event) {
+          let data;
+          try { data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data; }
+          catch (e) { return; }
+          const { type, payload } = data || {};
+          if (!type) return;
+
+          if (type === 'init') {
+            ensureChart(payload || {});
+            emitter.post({ type: 'ready' });
+          }
+
+          if (type === 'setData') {
+            if (!chart) ensureChart({});
+            candleSeries.setData(payload.candles || []);
+            if (payload.candles && payload.candles.length) {
+              lastBarTime = payload.candles[payload.candles.length - 1].time;
+            }
+          }
+
+          if (type === 'updateBar') {
+            if (!candleSeries) return;
+            const bar = payload.bar;
+            if (lastBarTime === bar.time) {
+              candleSeries.update(bar);
+            } else {
+              candleSeries.update(bar);
+              lastBarTime = bar.time;
+            }
+          }
+
+          if (type === 'setSMA') {
+            if (!chart) return;
+            const period = payload.period || 20;
+            const range = candleSeries.dataByIndex ? null : null;
+            // We need the full current data; WebView can't read it from series.
+            // Expect RN to send both setData before setSMA, so we recompute over last setData cache if needed.
+            // For simplicity, RN will send candles again with setSMA if desired in future.
+            if (payload.candles) {
+              const sma = computeSMA(payload.candles, period);
+              if (!smaSeries) smaSeries = chart.addLineSeries({ color: '#5ab0ff', lineWidth: 2 });
+              smaSeries.setData(sma);
+            }
+          }
+
+          if (type === 'resize') {
+            if (chart) chart.applyOptions({ width: payload.width, height: payload.height });
+          }
+        }
+
+        document.addEventListener('message', handleMessage);
+        window.addEventListener('message', handleMessage);
+      })();
+    </script>
+  </body>
+  </html>
+
+

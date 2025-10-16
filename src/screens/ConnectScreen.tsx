@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppKit, useAccount } from '@reown/appkit-react-native';
 import { styles } from './styles/ConnectScreen.styles';
 import { isTestnet } from '../lib/config';
+import { loadSessionKey } from '../lib/sessionKey';
 
 type NavigationProp = NativeStackNavigationProp<any>;
 
@@ -14,10 +15,24 @@ export default function ConnectScreen(): React.JSX.Element {
   const { address, isConnected } = useAccount();
 
   useEffect(() => {
-    if (isConnected && address) {
-      console.log('[ConnectScreen] Connected:', address);
-      navigation.navigate('EnableSessionKey');
-    }
+    const checkSessionAndNavigate = async () => {
+      if (isConnected && address) {
+        console.log('[ConnectScreen] Connected:', address);
+        
+        // Check if user already has a valid session key
+        const existingSessionKey = await loadSessionKey();
+        
+        if (existingSessionKey) {
+          console.log('[ConnectScreen] Found existing session key, skipping setup screen');
+          navigation.navigate('Tabs');
+        } else {
+          console.log('[ConnectScreen] No session key found, showing setup screen');
+          navigation.navigate('EnableSessionKey');
+        }
+      }
+    };
+
+    checkSessionAndNavigate();
   }, [isConnected, address, navigation]);
 
   const handleConnect = async () => {
