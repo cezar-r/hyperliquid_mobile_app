@@ -1,13 +1,13 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
+import { View } from 'react-native';
+import { MaterialCommunityIcons, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
 import PortfolioScreen from '../screens/PortfolioScreen';
 import SearchScreen from '../screens/SearchScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import Color from '../styles/colors';
-import { fontSizes } from '../theme/typography';
 import { styles } from './TabNavigator.styles';
 
 export type TabParamList = {
@@ -20,22 +20,32 @@ export type TabParamList = {
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
+const ICON_SIZE = 27;
+
 function TabIcon({
-  label,
+  iconType,
+  iconName,
   focused,
 }: {
-  label: string;
+  iconType: 'MaterialCommunityIcons' | 'MaterialIcons' | 'Ionicons';
+  iconName: string;
   focused: boolean;
 }): React.JSX.Element {
+  const iconColor = focused ? Color.BRIGHT_ACCENT : Color.FG_3;
+  
   return (
-    <Text
-      style={[
-        styles.iconText,
-        { color: focused ? Color.BRIGHT_ACCENT : Color.FG_3 },
-      ]}
-    >
-      {label.charAt(0)}
-    </Text>
+    <View style={styles.iconContainer}>
+      {focused && <View style={styles.activeLine} />}
+      {iconType === 'MaterialCommunityIcons' && (
+        <MaterialCommunityIcons name={iconName as any} size={ICON_SIZE} color={iconColor} />
+      )}
+      {iconType === 'MaterialIcons' && (
+        <MaterialIcons name={iconName as any} size={ICON_SIZE} color={iconColor} />
+      )}
+      {iconType === 'Ionicons' && (
+        <Ionicons name={iconName as any} size={ICON_SIZE} color={iconColor} />
+      )}
+    </View>
   );
 }
 
@@ -49,19 +59,16 @@ export default function TabNavigator(): React.JSX.Element {
           borderBottomColor: Color.ACCENT,
         },
         headerTitleStyle: {
-          fontSize: fontSizes.lg,
           color: Color.FG_1,
         },
         tabBarStyle: {
-          backgroundColor: Color.BG_1,
+          backgroundColor: Color.BG_2,
           borderTopWidth: 1,
-          borderTopColor: Color.ACCENT,
+          borderTopColor: Color.BG_1,
         },
+        tabBarShowLabel: false,
         tabBarActiveTintColor: Color.BRIGHT_ACCENT,
         tabBarInactiveTintColor: Color.FG_3,
-        tabBarLabelStyle: {
-          fontSize: fontSizes.xs,
-        },
       }}
     >
       <Tab.Screen
@@ -69,7 +76,7 @@ export default function TabNavigator(): React.JSX.Element {
         component={HomeScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon label="H" focused={focused} />
+            <TabIcon iconType="MaterialCommunityIcons" iconName="home" focused={focused} />
           ),
         }}
       />
@@ -78,7 +85,7 @@ export default function TabNavigator(): React.JSX.Element {
         component={PortfolioScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon label="P" focused={focused} />
+            <TabIcon iconType="MaterialIcons" iconName="account-balance-wallet" focused={focused} />
           ),
         }}
       />
@@ -87,7 +94,7 @@ export default function TabNavigator(): React.JSX.Element {
         component={SearchScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon label="S" focused={focused} />
+            <TabIcon iconType="Ionicons" iconName="search" focused={focused} />
           ),
         }}
       />
@@ -96,7 +103,7 @@ export default function TabNavigator(): React.JSX.Element {
         component={HistoryScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon label="I" focused={focused} />
+            <TabIcon iconType="MaterialCommunityIcons" iconName="history" focused={focused} />
           ),
         }}
       />
@@ -105,7 +112,7 @@ export default function TabNavigator(): React.JSX.Element {
         component={ProfileScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon label="A" focused={focused} />
+            <TabIcon iconType="MaterialCommunityIcons" iconName="account" focused={focused} />
           ),
         }}
       />
