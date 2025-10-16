@@ -85,6 +85,7 @@ export default function TabNavigator(): React.JSX.Element {
         name="Portfolio"
         component={PortfolioScreen}
         options={{
+          headerShown: false,
           tabBarIcon: ({ focused }) => (
             <TabIcon iconType="MaterialIcons" iconName="account-balance-wallet" focused={focused} />
           ),

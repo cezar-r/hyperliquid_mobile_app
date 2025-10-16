@@ -13,6 +13,9 @@ import {
   ScrollView,
   Linking,
   Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { createPublicClient, http, parseUnits, formatUnits } from 'viem';
 import { useAccount, useProvider } from '@reown/appkit-react-native';
@@ -59,6 +62,7 @@ export default function DepositModal({ visible, onClose }: DepositModalProps): R
   const [isCorrectChain, setIsCorrectChain] = useState(false);
   const [currentChainId, setCurrentChainId] = useState<number | null>(null);
   const [walletClient, setWalletClient] = useState<any>(null);
+  const [slideAnim] = useState(new Animated.Value(1000));
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -68,8 +72,20 @@ export default function DepositModal({ visible, onClose }: DepositModalProps): R
       setError(null);
       setTxHash(null);
       checkChainAndBalance();
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        speed: 20,
+        bounciness: 0,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: 1000,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     }
-  }, [visible]);
+  }, [visible, slideAnim]);
 
   // Create wallet client from Reown provider
   useEffect(() => {
@@ -258,18 +274,23 @@ export default function DepositModal({ visible, onClose }: DepositModalProps): R
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="none"
       onRequestClose={handleClose}
     >
-      <TouchableOpacity
+      <KeyboardAvoidingView
         style={styles.modalOverlay}
-        activeOpacity={1}
-        onPress={handleClose}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <TouchableOpacity
-          style={styles.modalContent}
+          style={styles.backdrop}
           activeOpacity={1}
-          onPress={(e) => e.stopPropagation()}
+          onPress={handleClose}
+        />
+        <Animated.View
+          style={[
+            styles.modalContent,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
         >
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Deposit USDC</Text>
@@ -336,6 +357,7 @@ export default function DepositModal({ visible, onClose }: DepositModalProps): R
                         placeholder="0.00"
                         placeholderTextColor={Color.FG_3}
                         keyboardType="decimal-pad"
+                        autoFocus
                       />
                       <TouchableOpacity style={styles.maxButton} onPress={handleMaxClick}>
                         <Text style={styles.maxButtonText}>Max</Text>
@@ -346,7 +368,7 @@ export default function DepositModal({ visible, onClose }: DepositModalProps): R
                   <View style={styles.warningBox}>
                     <Text style={styles.warningText}>
                       <Text style={styles.warningBold}>⚠️ Important:</Text> Minimum deposit is 5 USDC. 
-                      Amounts less than 5 USDC will not be credited and will be lost forever.
+                      Amounts less than 5 USDC will not be credited and lost forever.
                     </Text>
                   </View>
 
@@ -477,8 +499,8 @@ export default function DepositModal({ visible, onClose }: DepositModalProps): R
               )}
             </View>
           </ScrollView>
-        </TouchableOpacity>
-      </TouchableOpacity>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

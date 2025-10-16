@@ -12,6 +12,9 @@ import {
   ActivityIndicator,
   ScrollView,
   Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useAccount } from '@reown/appkit-react-native';
 import { useWallet } from '../contexts/WalletContext';
@@ -42,6 +45,7 @@ export default function WithdrawModal({ visible, onClose }: WithdrawModalProps):
   const [destination, setDestination] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [withdrawable, setWithdrawable] = useState<string>('0.00');
+  const [slideAnim] = useState(new Animated.Value(1000));
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -55,8 +59,21 @@ export default function WithdrawModal({ visible, onClose }: WithdrawModalProps):
       if (account.data?.perpMarginSummary?.withdrawable) {
         setWithdrawable(account.data.perpMarginSummary.withdrawable);
       }
+      
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        speed: 20,
+        bounciness: 0,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: 1000,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     }
-  }, [visible, address, account.data]);
+  }, [visible, address, account.data, slideAnim]);
 
   // Validate amount
   const validateAmount = useCallback((): string | null => {
@@ -151,18 +168,23 @@ export default function WithdrawModal({ visible, onClose }: WithdrawModalProps):
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="none"
       onRequestClose={handleClose}
     >
-      <TouchableOpacity
+      <KeyboardAvoidingView
         style={styles.modalOverlay}
-        activeOpacity={1}
-        onPress={handleClose}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <TouchableOpacity
-          style={styles.modalContent}
+          style={styles.backdrop}
           activeOpacity={1}
-          onPress={(e) => e.stopPropagation()}
+          onPress={handleClose}
+        />
+        <Animated.View
+          style={[
+            styles.modalContent,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
         >
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Withdraw USDC</Text>
@@ -199,6 +221,7 @@ export default function WithdrawModal({ visible, onClose }: WithdrawModalProps):
                         placeholder="0.00"
                         placeholderTextColor={Color.FG_3}
                         keyboardType="decimal-pad"
+                        autoFocus
                       />
                       <TouchableOpacity style={styles.maxButton} onPress={handleMaxClick}>
                         <Text style={styles.maxButtonText}>Max</Text>
@@ -207,19 +230,16 @@ export default function WithdrawModal({ visible, onClose }: WithdrawModalProps):
                   </View>
 
                   <View style={styles.infoBox}>
-                    <Text style={styles.infoBoxTitle}>⏱️ Processing Time:</Text>
                     <Text style={styles.infoBoxText}>
-                      Withdrawals are processed by Hyperliquid validators and typically arrive in 3-4 minutes.
+                      Withdrawals are processed by Hyperliquid validators and typically arrive in 6-7 minutes.
                     </Text>
                   </View>
 
                   <View style={styles.feeBox}>
-                    <Text style={styles.feeBoxTitle}>💰 Network Fee:</Text>
                     <Text style={styles.feeBoxText}>
                       A 1 USDC fee is deducted by the Hyperliquid chain for processing withdrawals.
                     </Text>
                   </View>
-
                   {error && (
                     <View style={styles.errorMessage}>
                       <Text style={styles.errorText}>{error}</Text>
@@ -262,7 +282,7 @@ export default function WithdrawModal({ visible, onClose }: WithdrawModalProps):
                     </View>
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Est. Time:</Text>
-                      <Text style={styles.detailValue}>3-4 minutes</Text>
+                      <Text style={styles.detailValue}>6-7 minutes</Text>
                     </View>
                     <View style={[styles.detailRow, { marginBottom: 0 }]}>
                       <Text style={styles.detailLabel}>Network Fee:</Text>
@@ -299,7 +319,7 @@ export default function WithdrawModal({ visible, onClose }: WithdrawModalProps):
                     <Text style={styles.infoBoxText}>
                       Validators will process your withdrawal and send {amount} USDC to {arbitrumChain.name}.
                       {'\n\n'}
-                      This typically takes 3-4 minutes.
+                      This typically takes 6-7 minutes.
                     </Text>
                   </View>
                   <Text style={styles.helpText}>You can close this modal. Your withdrawal is being processed.</Text>
@@ -327,7 +347,7 @@ export default function WithdrawModal({ visible, onClose }: WithdrawModalProps):
                   <View style={styles.infoBox}>
                     <Text style={styles.infoBoxTitle}>⏱️ Processing by Validators</Text>
                     <Text style={styles.infoBoxText}>
-                      Your USDC will arrive on {arbitrumChain.name} in approximately 3-4 minutes.
+                      Your USDC will arrive on {arbitrumChain.name} in approximately 6-7 minutes.
                       {'\n\n'}
                       You can check your balance on {arbitrumChain.blockExplorers[0]}
                     </Text>
@@ -362,8 +382,8 @@ export default function WithdrawModal({ visible, onClose }: WithdrawModalProps):
               )}
             </View>
           </ScrollView>
-        </TouchableOpacity>
-      </TouchableOpacity>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
