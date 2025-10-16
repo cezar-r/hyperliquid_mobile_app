@@ -487,7 +487,7 @@ export default function SearchScreen(): React.JSX.Element {
                   wsState.marketType === 'perp' && styles.panelTextActive,
                 ]}
               >
-                PERP
+                Perp
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -503,7 +503,7 @@ export default function SearchScreen(): React.JSX.Element {
                   wsState.marketType === 'spot' && styles.panelTextActive,
                 ]}
               >
-                SPOT
+                Spot
               </Text>
             </TouchableOpacity>
           </View>

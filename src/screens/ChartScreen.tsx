@@ -81,6 +81,11 @@ function formatPercentage(value: number | string, decimals: number = 2): string 
   return `${sign}${num.toFixed(decimals)}%`;
 }
 
+// Helper function to format numbers
+function formatNumber(num: number, decimals: number = 2): string {
+  return num.toFixed(decimals);
+}
+
 // Helper function to calculate unrealized PnL
 function calculateUnrealizedPnL(position: any, currentPrice: number | string): { pnl: number; pnlPercent: number } {
   const positionSize = parseFloat(position.szi);
@@ -783,64 +788,74 @@ export default function ChartScreen(): React.JSX.Element {
 
 
         {/* Position / Balances */}
-        <View style={styles.chartContainer}>
-          <Text style={styles.title}>Position / Balances</Text>
+        <View style={styles.positionsContainer}>
+          <Text style={styles.sectionLabel}>
+            {marketType === 'perp' ? 'Open Position' : 'Spot Balances'}
+          </Text>
           {marketType === 'perp' ? (
             perpPosition ? (
               (() => {
                 const positionSize = parseFloat(perpPosition.szi);
                 const isLong = positionSize > 0;
+                const leverage = perpPosition.leverage?.value || 1;
+                const price = currentPrice ? (typeof currentPrice === 'string' ? parseFloat(currentPrice) : currentPrice) : 0;
                 const { pnl, pnlPercent } = currentPrice != null 
                   ? calculateUnrealizedPnL(perpPosition, currentPrice)
                   : { pnl: 0, pnlPercent: 0 };
                 
+                // Calculate 24h change
+                const prevDayPx = assetCtx?.prevDayPx || price;
+                const priceChange = price - prevDayPx;
+                const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
+                
+                // Calculate margin used
+                const marginUsed = perpPosition.marginUsed 
+                  ? parseFloat(perpPosition.marginUsed)
+                  : parseFloat(perpPosition.positionValue || '0') / leverage;
+                
                 return (
-                  <View>
-                    <View style={styles.positionHeader}>
-                      <Text style={[styles.positionDirection, isLong ? styles.positionLong : styles.positionShort]}>
-                        {isLong ? 'LONG' : 'SHORT'}
-                      </Text>
-                      <Text style={styles.positionSize}>{Math.abs(positionSize).toFixed(4)}</Text>
-                    </View>
-                    <View style={styles.positionRow}>
-                      <Text style={styles.positionLabel}>Entry Price:</Text>
-                      <Text style={styles.positionValue}>${formatPrice(perpPosition.entryPx)}</Text>
-                    </View>
-                    <View style={styles.positionRow}>
-                      <Text style={styles.positionLabel}>Mark Price:</Text>
-                      <Text style={styles.positionValue}>${formatPrice(currentPrice || 0)}</Text>
-                    </View>
-                    <View style={styles.positionRow}>
-                      <Text style={styles.positionLabel}>Unrealized PnL:</Text>
-                      <Text style={[styles.positionPnl, pnl >= 0 ? styles.positionPnlPositive : styles.positionPnlNegative]}>
-                        ${pnl.toFixed(2)} ({formatPercentage(pnlPercent)})
-                      </Text>
-                    </View>
-                    {perpPosition.leverage?.value && (
-                      <View style={styles.positionRow}>
-                        <Text style={styles.positionLabel}>Leverage:</Text>
-                        <Text style={styles.positionValue}>{perpPosition.leverage.value}x</Text>
+                  <>
+                    <View style={styles.positionCell}>
+                      <View style={styles.leftSide}>
+                        <View style={styles.tickerContainer}>
+                          <Text style={styles.ticker}>{selectedCoin}</Text>
+                          <Text style={[
+                            styles.leverage,
+                            { color: isLong ? Color.BRIGHT_ACCENT : Color.RED }
+                          ]}>
+                            {leverage}x
+                          </Text>
+                        </View>
+                        <View style={styles.priceContainer}>
+                          <Text style={styles.size}>${formatPrice(price)}</Text>
+                          <Text style={[
+                            styles.priceChange,
+                            { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
+                          ]}>
+                            {formatPercentage(priceChangePct * 100)}
+                          </Text>
+                        </View>
                       </View>
-                    )}
-                    {perpPosition.liquidationPx && perpPosition.liquidationPx !== null && (
-                      <View style={styles.positionRow}>
-                        <Text style={styles.positionLabel}>Liq. Price:</Text>
-                        <Text style={[styles.positionValue, styles.positionLiqPrice]}>${formatPrice(perpPosition.liquidationPx)}</Text>
+                      <View style={styles.rightSide}>
+                        <Text style={styles.price}>${formatNumber(marginUsed, 2)}</Text>
+                        <Text style={[
+                          styles.pnl,
+                          { color: pnl >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
+                        ]}>
+                          {pnl >= 0 ? '+' : '-'}${formatNumber(Math.abs(pnl), 2)}
+                        </Text>
                       </View>
-                    )}
+                    </View>
                     <TouchableOpacity
-                      style={[
-                        styles.closeButton,
-                        closingPosition && styles.closeButtonDisabled
-                      ]}
                       onPress={handleClosePosition}
                       disabled={closingPosition}
+                      style={styles.marketCloseButton}
                     >
-                      <Text style={styles.closeButtonText}>
-                        {closingPosition ? 'Closing...' : 'Close Position'}
+                      <Text style={styles.marketCloseText}>
+                        {closingPosition ? 'Closing...' : 'Market Close'}
                       </Text>
                     </TouchableOpacity>
-                  </View>
+                  </>
                 );
               })()
             ) : (
@@ -850,21 +865,47 @@ export default function ChartScreen(): React.JSX.Element {
             <>
               {spotBalances.length > 0 ? (
                 spotBalances
-                  .filter((b: any) => b.total !== '0')
+                  .filter((b: any) => parseFloat(b.total) > 0)
                   .slice(0, 4)
                   .map((b: any, idx: number) => {
                     const balance = parseFloat(b.total);
-                    const coinPrice = state.prices[b.coin];
-                    const usdValue = coinPrice ? balance * parseFloat(coinPrice) : null;
+                    let coinPrice, usdValue;
+                    if (b.coin === 'USDC') {
+                      coinPrice = 1;
+                      usdValue = balance;
+                    } else {
+                      const price = state.prices[b.coin];
+                      coinPrice = price ? parseFloat(price) : 0;
+                      usdValue = price ? balance * parseFloat(price) : 0;
+                    }
+                    
+                    // Calculate 24h change
+                    const assetContext = state.assetContexts[b.coin];
+                    const prevDayPx = assetContext?.prevDayPx || coinPrice;
+                    const priceChange = coinPrice - prevDayPx;
+                    const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
                     
                     return (
-                      <View key={`bal-${idx}`} style={styles.balanceRow}>
-                        <Text style={styles.balanceCoin}>{b.coin}:</Text>
-                        <View style={styles.balanceValues}>
-                          <Text style={styles.balanceAmount}>{balance.toFixed(6)}</Text>
-                          {usdValue && (
-                            <Text style={styles.balanceUsd}>${usdValue.toFixed(2)}</Text>
-                          )}
+                      <View key={`bal-${idx}`} style={styles.positionCell}>
+                        <View style={styles.leftSide}>
+                          <View style={styles.tickerContainer}>
+                            <Text style={styles.ticker}>{b.coin}</Text>
+                          </View>
+                          <View style={styles.priceContainer}>
+                            <Text style={styles.size}>${formatNumber(coinPrice)}</Text>
+                            <Text style={[
+                              styles.priceChange,
+                              { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
+                            ]}>
+                              {formatPercentage(priceChangePct * 100)}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.rightSide}>
+                          <Text style={styles.price}>${formatNumber(usdValue, 2)}</Text>
+                          <Text style={[styles.pnl, { color: Color.FG_3 }]}>
+                            {formatNumber(balance, 4)} {b.coin}
+                          </Text>
                         </View>
                       </View>
                     );
@@ -876,18 +917,64 @@ export default function ChartScreen(): React.JSX.Element {
           )}
         </View>
 
-        {/* Trade history (per ticker) */}
-        <View style={styles.chartContainer}>
-          <Text style={styles.title}>Your Trades ({selectedCoin})</Text>
-          {userFills.length > 0 ? (
-            userFills.slice(0, 20).map((f: any, idx: number) => (
-              <Text key={`fill-${idx}`} style={styles.infoText}>
-                {f.side} {f.sz} @ {formatPrice(f.px)}
-              </Text>
-            ))
-          ) : (
-            <Text style={styles.subtitle}>No fills for this market</Text>
-          )}
+        {/* Trade history (per ticker, filtered by market type) */}
+        <View style={styles.recentTradesContainer}>
+          <Text style={styles.sectionTitle}>Recent Trades</Text>
+          {(() => {
+            // Filter trades by market type
+            const perpCoins = new Set(state.perpMarkets.map(m => m.name));
+            const spotCoins = new Set(state.spotMarkets.map(m => m.name.split('/')[0]));
+            
+            const filteredTrades = userFills.filter(fill => {
+              if (marketType === 'perp') {
+                return perpCoins.has(fill.coin);
+              } else {
+                return spotCoins.has(fill.coin);
+              }
+            });
+            
+            return filteredTrades.length > 0 ? (
+              filteredTrades.slice(0, 10).map((fill: any, idx: number) => (
+                <View key={`fill-${idx}`} style={styles.tradeCard}>
+                  <View style={styles.tradeLeftSide}>
+                    <View style={styles.tradeTopRow}>
+                      <Text style={styles.tradeCoin}>{fill.coin}</Text>
+                      <Text style={[
+                        styles.tradeSide,
+                        fill.side === 'B' ? styles.sideBuy : styles.sideSell
+                      ]}>
+                        {fill.side === 'B' ? 'BUY' : 'SELL'}
+                      </Text>
+                      {fill.closedPnl && parseFloat(fill.closedPnl) !== 0 && (
+                        <Text style={[
+                          styles.tradePnl,
+                          parseFloat(fill.closedPnl) >= 0 ? styles.pnlPositive : styles.pnlNegative
+                        ]}>
+                          {parseFloat(fill.closedPnl) >= 0 ? '+' : ''}${parseFloat(fill.closedPnl).toFixed(2)}
+                        </Text>
+                      )}
+                    </View>
+                    {fill.time && (
+                      <Text style={styles.tradeCardTime}>
+                        {new Date(fill.time).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.tradeRightSide}>
+                    <Text style={styles.tradeCardPrice}>${formatNumber(parseFloat(fill.px), 2)}</Text>
+                    <Text style={styles.tradeCardSize}>{fill.sz}</Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.subtitle}>No trades for this market type</Text>
+            );
+          })()}
         </View>
       </ScrollView>
 

@@ -12,7 +12,7 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    // padding: spacing.lg,
+    paddingBottom: 120, // Add padding to prevent buy/sell buttons from covering content
   },
   header: {
     flexDirection: 'row',
@@ -335,7 +335,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingTop: spacing.xs,
+    paddingTop: spacing.sm,
     paddingRight: spacing.md,
   },
   backButtonText: {
@@ -624,6 +624,171 @@ export const styles = StyleSheet.create({
   closeButtonDisabled: {
     backgroundColor: Color.FG_3,
     opacity: 0.5,
+  },
+  
+  // Position Cell Styles (from HomeScreen/PortfolioScreen)
+  positionsContainer: {
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  sectionLabel: {
+    fontSize: 15,
+    color: Color.FG_3,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  positionCell: {
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 8,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderWidth: 2,
+    borderColor: Color.BG_1,
+  },
+  leftSide: {
+    justifyContent: 'space-between',
+  },
+  rightSide: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  tickerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 5,
+  },
+  ticker: {
+    color: Color.FG_1,
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+  leverage: {
+    fontSize: 16,
+    marginBottom: 0,
+    fontWeight: 'bold',
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 0,
+  },
+  size: {
+    color: Color.FG_3,
+    fontSize: 12,
+  },
+  priceChange: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  price: {
+    color: Color.FG_1,
+    fontSize: 16,
+    marginBottom: 0,
+    fontWeight: 'bold',
+  },
+  pnl: {
+    fontSize: 12,
+  },
+  
+  // Recent Trades Section (from PortfolioScreen)
+  recentTradesContainer: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  sectionTitle: {
+    fontSize: fontSizes.lg,
+    fontWeight: '600',
+    color: Color.FG_1,
+    marginBottom: spacing.md,
+  },
+  tradeCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xs,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: Color.BG_1,
+  },
+  tradeLeftSide: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  tradeTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+    flexWrap: 'wrap',
+  },
+  tradeCoin: {
+    fontSize: fontSizes.md,
+    color: Color.FG_1,
+    fontWeight: 'bold',
+  },
+  tradeSide: {
+    fontSize: fontSizes.xs,
+    fontWeight: 'bold',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  sideBuy: {
+    color: Color.BRIGHT_ACCENT,
+    backgroundColor: Color.BG_2,
+  },
+  sideSell: {
+    color: Color.RED,
+    backgroundColor: Color.BG_2,
+  },
+  tradePnl: {
+    fontSize: fontSizes.xs,
+    fontWeight: '600',
+  },
+  pnlPositive: {
+    color: Color.BRIGHT_ACCENT,
+  },
+  pnlNegative: {
+    color: Color.RED,
+  },
+  tradeRightSide: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  tradeCardTime: {
+    fontSize: fontSizes.xs,
+    color: Color.FG_3,
+  },
+  tradeCardPrice: {
+    fontSize: fontSizes.md,
+    color: Color.FG_1,
+    fontWeight: 'bold',
+    marginBottom: spacing.xs,
+  },
+  tradeCardSize: {
+    fontSize: fontSizes.sm,
+    color: Color.FG_3,
+  },
+  
+  // Market Close Button
+  marketCloseButton: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  marketCloseText: {
+    fontSize: fontSizes.sm,
+    color: Color.RED,
+    fontWeight: '600',
   },
 });
 

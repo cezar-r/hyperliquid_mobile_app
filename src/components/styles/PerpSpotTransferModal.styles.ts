@@ -55,7 +55,7 @@ export const styles = StyleSheet.create({
   },
   description: {
     fontSize: 14,
-    color: Color.FG_2,
+    color: Color.FG_3,
     marginBottom: 20,
     lineHeight: 20,
   },
@@ -80,7 +80,7 @@ export const styles = StyleSheet.create({
   directionButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Color.FG_2,
+    color: Color.FG_3,
   },
   directionButtonTextActive: {
     color: Color.BG_1,
@@ -99,12 +99,12 @@ export const styles = StyleSheet.create({
   },
   balanceLabel: {
     fontSize: 14,
-    color: Color.FG_3,
+    color: Color.FG_1,
   },
   balanceValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: Color.FG_2,
+    color: Color.FG_3,
   },
   balanceValueHighlight: {
     fontSize: 14,
@@ -117,7 +117,7 @@ export const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: Color.FG_2,
+    color: Color.FG_3,
     marginBottom: 8,
   },
   inputWrapper: {
@@ -126,7 +126,7 @@ export const styles = StyleSheet.create({
     backgroundColor: Color.BG_3,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Color.BG_4,
+    // borderColor: Color.BG_4,
   },
   input: {
     flex: 1,
@@ -139,7 +139,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     marginRight: 8,
-    backgroundColor: Color.BG_4,
+    // backgroundColor: Color.BG_4,
     borderRadius: 6,
   },
   maxButtonText: {
@@ -180,7 +180,7 @@ export const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: Color.FG_2,
+    color: Color.FG_3,
   },
   confirmButton: {
     flex: 1,

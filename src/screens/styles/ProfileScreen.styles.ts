@@ -6,23 +6,17 @@ import { spacing } from '../../theme/spacing';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Color.BG_2,
+    backgroundColor: '#0b0f13',
+  },
+  contentContainer: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
   },
   content: {
     padding: spacing.lg,
-  },
-  title: {
-    fontSize: fontSizes.xl,
-    color: Color.FG_1,
-    marginBottom: spacing.sm,
-  },
-  subtitle: {
-    fontSize: fontSizes.md,
-    color: Color.FG_3,
-    marginBottom: spacing.xl,
+    paddingBottom: 100, // Extra padding to avoid content being hidden behind sticky button
   },
   section: {
     marginBottom: spacing.lg,
@@ -37,9 +31,23 @@ export const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  walletInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   infoText: {
     fontSize: fontSizes.md,
     color: Color.FG_1,
+    flex: 1,
+  },
+  copyButton: {
+    padding: spacing.sm,
+    marginLeft: spacing.sm,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Color.ACCENT,
+    backgroundColor: Color.BG_3,
   },
   infoTextSmall: {
     fontSize: fontSizes.sm,
@@ -59,16 +67,25 @@ export const styles = StyleSheet.create({
     color: Color.FG_3,
     marginBottom: spacing.sm,
   },
+  stickyButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#0b0f13',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
   disconnectButton: {
     backgroundColor: Color.RED,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
-    borderRadius: 12,
+    borderRadius: 6,
     alignItems: 'center',
   },
   disconnectButtonText: {
     fontSize: fontSizes.md,
     color: Color.FG_1,
+    fontWeight: '600',
   },
 });
-

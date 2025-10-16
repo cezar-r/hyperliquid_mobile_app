@@ -105,6 +105,7 @@ export default function TabNavigator(): React.JSX.Element {
         name="History"
         component={HistoryScreen}
         options={{
+          headerShown: false,
           tabBarIcon: ({ focused }) => (
             <TabIcon iconType="MaterialCommunityIcons" iconName="history" focused={focused} />
           ),
@@ -114,6 +115,7 @@ export default function TabNavigator(): React.JSX.Element {
         name="Profile"
         component={ProfileScreen}
         options={{
+          headerShown: false,
           tabBarIcon: ({ focused }) => (
             <TabIcon iconType="MaterialCommunityIcons" iconName="account" focused={focused} />
           ),
