@@ -6,130 +6,170 @@ import { spacing } from '../../theme/spacing';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Color.BG_2,
+    backgroundColor: '#0b0f13',
   },
-  scrollView: {
+  contentContainer: {
     flex: 1,
   },
-  content: {
-    padding: spacing.lg,
+  
+  // Market Type Toggle (Perp/Spot)
+  marketTypeSection: {
+    paddingTop: spacing.md,
   },
-  title: {
-    fontSize: fontSizes.xl,
-    color: Color.FG_1,
-    marginBottom: spacing.lg,
-  },
-  toggleContainer: {
+  panelSelector: {
     flexDirection: 'row',
-    backgroundColor: Color.BG_3,
-    borderRadius: 8,
-    padding: 4,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
-  toggleButton: {
+  panelButton: {
     flex: 1,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: 6,
     alignItems: 'center',
   },
-  toggleButtonActive: {
-    backgroundColor: Color.ACCENT,
+  panelButtonActive: {
+    // Active state is handled by the separator
   },
-  toggleButtonText: {
-    fontSize: fontSizes.md,
-    color: Color.FG_3,
-    fontWeight: '600',
-  },
-  toggleButtonTextActive: {
-    color: Color.BG_2,
-  },
-  searchInput: {
-    backgroundColor: Color.BG_3,
-    borderRadius: 8,
-    padding: spacing.md,
-    fontSize: fontSizes.md,
-    color: Color.FG_1,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: Color.FG_3,
-  },
-  resultsCount: {
+  panelText: {
     fontSize: fontSizes.sm,
     color: Color.FG_3,
+    fontWeight: '500',
+  },
+  panelTextActive: {
+    color: Color.FG_1,
+    fontWeight: 'bold',
+  },
+  separatorContainer: {
+    flexDirection: 'row',
+    height: 1,
+  },
+  separatorSegment: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Color.BG_3,
+  },
+  separatorActive: {
+    backgroundColor: Color.BRIGHT_ACCENT,
+  },
+
+  // Search Bar
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Color.DARK_ACCENT,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: 5,
+  },
+  searchIcon: {
+    marginRight: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    color: Color.FG_1,
+    fontSize: 16,
+    paddingVertical: 16,
+  },
+  clearButton: {
+    padding: spacing.xs,
+  },
+
+  // Sort Header
+  sortHeaderContainer: {
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  sortScrollContent: {
+    flexDirection: 'row',
+  },
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 32,
+    marginRight: spacing.xs,
+    borderRadius: 5,
+    paddingHorizontal: 12,
+    backgroundColor: Color.BG_1,
     marginBottom: spacing.md,
   },
-  marketList: {
-    gap: spacing.sm,
+  sortButtonActive: {
+    backgroundColor: Color.BRIGHT_ACCENT,
   },
-  marketItem: {
-    backgroundColor: Color.BG_3,
-    borderRadius: 8,
-    padding: spacing.md,
+  sortButtonText: {
+    color: Color.FG_1,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  sortButtonTextActive: {
+    color: Color.BG_2,
+    fontWeight: '600',
+  },
+  sortIcon: {
+    marginLeft: 4,
+  },
+
+  // Market List
+  marketList: {
+    flex: 1,
+    paddingHorizontal: spacing.md,
+  },
+  tickerCell: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Color.BG_3,
+    paddingVertical: 12,
+    backgroundColor: '#0b0f13',
   },
-  marketItemSelected: {
-    borderColor: Color.ACCENT,
-    borderWidth: 2,
+  separator: {
+    borderBottomColor: Color.BG_1,
+    borderBottomWidth: 1,
+    width: '100%',
   },
-  marketItemLeft: {
+  
+  // Ticker Left Side
+  tickerLeftContainer: {
     flex: 1,
-    gap: spacing.xs,
+    gap: 4,
   },
-  marketName: {
-    fontSize: fontSizes.md,
-    color: Color.FG_1,
-    fontWeight: '600',
-  },
-  marketBadges: {
+  tickerNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 6,
   },
-  marketLeverage: {
-    fontSize: fontSizes.xs,
-    color: Color.ACCENT,
-    backgroundColor: Color.BG_2,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  marketChange: {
-    fontSize: fontSizes.xs,
-    fontWeight: '600',
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  marketChangePositive: {
-    color: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-  },
-  marketChangeNegative: {
-    color: '#EF4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-  },
-  marketItemRight: {
-    alignItems: 'flex-end',
-  },
-  marketPrice: {
-    fontSize: fontSizes.md,
+  tickerSymbol: {
     color: Color.FG_1,
+    fontSize: 15,
     fontWeight: '600',
   },
-  marketVolume: {
-    fontSize: fontSizes.xs,
-    color: Color.FG_3,
+  leverage: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: Color.BRIGHT_ACCENT,
+  },
+  tickerMetricBelow: {
+    fontSize: 12,
     marginTop: 2,
   },
-  marketPriceLoading: {
-    fontSize: fontSizes.md,
-    color: Color.FG_3,
+  
+  // Ticker Right Side
+  tickerRightContainer: {
+    alignItems: 'flex-end',
+    gap: 4,
   },
+  tickerPrice: {
+    color: Color.FG_1,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  tickerMetric: {
+    fontSize: 12,
+  },
+
+  // Empty State
   emptyState: {
     alignItems: 'center',
     padding: spacing.xl,
@@ -145,4 +185,3 @@ export const styles = StyleSheet.create({
     color: Color.FG_3,
   },
 });
-

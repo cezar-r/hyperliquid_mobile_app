@@ -59,23 +59,24 @@ export async function fetchSpotMarkets(
         name: displayName,
         tokens: market.tokens,
         index: market.index,
-        szDecimals: baseToken?.szDecimals || 0, // Get from base token (reference: web app line 126)
+        szDecimals: baseToken?.szDecimals || 0,
         isCanonical: market.isCanonical || false,
         baseToken: baseToken?.name,
+        baseTokenIndex: baseTokenId,
       };
     });
 
+    // Map contexts by market display name
+    // assetCtxs is an array indexed by token index
     const contexts: Record<string, any> = {};
     markets.forEach((market: any) => {
-      if (market.baseToken) {
-        console.log('market.baseToken', market.baseToken);
-        const ctx = assetCtxs.find((c: any) => c.coin === market.baseToken);
-        console.log('ctx', ctx);
-        if (ctx) {
-          contexts[market.name] = ctx;
-        }
+      const ctx = assetCtxs[market.baseTokenIndex];
+      if (ctx) {
+        contexts[market.name] = ctx;
       }
     });
+    
+    console.log('[Markets] Spot contexts mapped:', Object.keys(contexts).length, '/', markets.length);
 
     return { markets, contexts };
   } catch (error) {

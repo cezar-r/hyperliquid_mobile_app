@@ -93,6 +93,7 @@ export default function TabNavigator(): React.JSX.Element {
         name="Search"
         component={SearchScreen}
         options={{
+          headerShown: false,
           tabBarIcon: ({ focused }) => (
             <TabIcon iconType="Ionicons" iconName="search" focused={focused} />
           ),

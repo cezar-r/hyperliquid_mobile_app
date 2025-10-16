@@ -93,10 +93,107 @@ export function WebSocketProvider({
   const userFundingsSubIdRef = useRef<any>(null);
   const activeOrderbookCoinRef = useRef<string | null>(null);
   const activeTradesCoinRef = useRef<string | null>(null);
+  const allPerpAssetCtxSubsRef = useRef<any[]>([]);
+  const allSpotAssetCtxSubsRef = useRef<any[]>([]);
 
   useEffect(() => {
     let mounted = true;
     const cleanup: Array<() => void> = [];
+
+    async function subscribeToAllAssetContexts(
+      client: hl.SubscriptionClient,
+      perpMarkets: PerpMarket[],
+      spotMarkets: SpotMarket[],
+      isMounted: boolean
+    ): Promise<void> {
+      try {
+        console.log('[Phase 4] Subscribing to asset contexts...', {
+          perpCount: perpMarkets.length,
+          spotCount: spotMarkets.length,
+        });
+
+        // Subscribe to perp asset contexts
+        const perpSubs = await Promise.all(
+          perpMarkets.map(async (market) => {
+            try {
+              const sub = await client.activeAssetCtx(
+                { coin: market.name },
+                (data: any) => {
+                  if (!isMounted) return;
+
+                  // Convert API string values to numbers for app compatibility
+                  const ctx = {
+                    dayNtlVlm: parseFloat(data.ctx.dayNtlVlm),
+                    prevDayPx: parseFloat(data.ctx.prevDayPx),
+                    markPx: parseFloat(data.ctx.markPx),
+                    midPx: data.ctx.midPx ? parseFloat(data.ctx.midPx) : undefined,
+                    funding: parseFloat(data.ctx.funding),
+                    openInterest: parseFloat(data.ctx.openInterest),
+                  };
+
+                  setState((prev) => ({
+                    ...prev,
+                    assetContexts: {
+                      ...prev.assetContexts,
+                      [market.name]: ctx,
+                    },
+                  }));
+                }
+              );
+              return sub;
+            } catch (error) {
+              console.error(`[Phase 4] Error subscribing to perp ${market.name}:`, error);
+              return null;
+            }
+          })
+        );
+
+        allPerpAssetCtxSubsRef.current = perpSubs.filter((sub) => sub !== null);
+        console.log('[Phase 4] ✓ Subscribed to', allPerpAssetCtxSubsRef.current.length, 'perp asset contexts');
+
+        // Subscribe to spot asset contexts
+        const spotSubs = await Promise.all(
+          spotMarkets.map(async (market) => {
+            try {
+              const subscriptionCoin = `@${market.index}`;
+              const sub = await client.activeSpotAssetCtx(
+                { coin: subscriptionCoin },
+                (data: any) => {
+                  if (!isMounted) return;
+
+                  // Convert API string values to numbers for app compatibility
+                  const ctx = {
+                    dayNtlVlm: parseFloat(data.ctx.dayNtlVlm),
+                    prevDayPx: parseFloat(data.ctx.prevDayPx),
+                    markPx: parseFloat(data.ctx.markPx),
+                    midPx: data.ctx.midPx ? parseFloat(data.ctx.midPx) : undefined,
+                    circulatingSupply: parseFloat(data.ctx.circulatingSupply),
+                  };
+
+                  // Map from @{index} to display name (e.g., "PURR/USDC")
+                  setState((prev) => ({
+                    ...prev,
+                    assetContexts: {
+                      ...prev.assetContexts,
+                      [market.name]: ctx,
+                    },
+                  }));
+                }
+              );
+              return sub;
+            } catch (error) {
+              console.error(`[Phase 4] Error subscribing to spot ${market.name}:`, error);
+              return null;
+            }
+          })
+        );
+
+        allSpotAssetCtxSubsRef.current = spotSubs.filter((sub) => sub !== null);
+        console.log('[Phase 4] ✓ Subscribed to', allSpotAssetCtxSubsRef.current.length, 'spot asset contexts');
+      } catch (error) {
+        console.error('[Phase 4] Error subscribing to asset contexts:', error);
+      }
+    }
 
     async function initialize(): Promise<void> {
       try {
@@ -202,6 +299,36 @@ export function WebSocketProvider({
               });
             allMidsSubIdRef.current = null;
           }
+        });
+
+        // Subscribe to asset contexts for all markets
+        await subscribeToAllAssetContexts(
+          client,
+          perpResult.markets,
+          spotResult.markets,
+          mounted
+        );
+
+        cleanup.push(() => {
+          // Cleanup perp asset context subscriptions
+          allPerpAssetCtxSubsRef.current.forEach((sub) => {
+            sub?.unsubscribe().catch((err: any) => {
+              if (!err.message?.includes('WebSocket connection closed')) {
+                console.error('[Phase 4] Error unsubscribing perp asset ctx:', err);
+              }
+            });
+          });
+          allPerpAssetCtxSubsRef.current = [];
+
+          // Cleanup spot asset context subscriptions
+          allSpotAssetCtxSubsRef.current.forEach((sub) => {
+            sub?.unsubscribe().catch((err: any) => {
+              if (!err.message?.includes('WebSocket connection closed')) {
+                console.error('[Phase 4] Error unsubscribing spot asset ctx:', err);
+              }
+            });
+          });
+          allSpotAssetCtxSubsRef.current = [];
         });
 
         console.log('[Phase 4] ✓ WebSocket initialized');
