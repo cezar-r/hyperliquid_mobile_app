@@ -59,9 +59,9 @@ export async function fetchSpotMarkets(
         name: displayName,
         tokens: market.tokens,
         index: market.index,
-        szDecimals: market.szDecimals || 8,
+        szDecimals: baseToken?.szDecimals || 0, // Get from base token (reference: web app line 126)
         isCanonical: market.isCanonical || false,
-        baseToken: market?.name,
+        baseToken: baseToken?.name,
       };
     });
 

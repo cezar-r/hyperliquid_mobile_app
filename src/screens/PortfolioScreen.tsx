@@ -1,10 +1,16 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useAccount } from '@reown/appkit-react-native';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { styles } from './styles/PortfolioScreen.styles';
 import type { PerpPosition, UserFill } from '../types';
+import DepositModal from '../components/DepositModal';
+import WithdrawModal from '../components/WithdrawModal';
+import TransferToStakingModal from '../components/TransferToStakingModal';
+import TransferFromStakingModal from '../components/TransferFromStakingModal';
+import DelegateModal from '../components/DelegateModal';
+import UndelegateModal from '../components/UndelegateModal';
 
 // Helper to calculate PnL for a position
 function calculatePositionPnL(position: PerpPosition, currentPrice: string | number): { pnl: number; pnlPercent: number } {
@@ -32,6 +38,15 @@ export default function PortfolioScreen(): React.JSX.Element {
   const { address } = useAccount();
   const { account } = useWallet();
   const { state: wsState } = useWebSocket();
+  
+  // Modal states
+  const [depositModalVisible, setDepositModalVisible] = useState(false);
+  const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
+  const [transferToStakingVisible, setTransferToStakingVisible] = useState(false);
+  const [transferFromStakingVisible, setTransferFromStakingVisible] = useState(false);
+  const [delegateModalVisible, setDelegateModalVisible] = useState(false);
+  const [undelegateModalVisible, setUndelegateModalVisible] = useState(false);
+  const [selectedDelegation, setSelectedDelegation] = useState<{ validator: `0x${string}`; amount: string } | null>(null);
 
   const formatAddress = (addr: string | undefined) => {
     if (!addr) return 'Not connected';
@@ -152,6 +167,144 @@ export default function PortfolioScreen(): React.JSX.Element {
                       </Text>
                     </View>
                   )}
+                  
+                  {/* Deposit and Withdraw Buttons */}
+                  <View style={styles.actionButtonsContainer}>
+                    <TouchableOpacity 
+                      style={styles.depositButton}
+                      onPress={() => setDepositModalVisible(true)}
+                    >
+                      <Text style={styles.depositButtonText}>Deposit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.withdrawButton}
+                      onPress={() => setWithdrawModalVisible(true)}
+                    >
+                      <Text style={styles.withdrawButtonText}>Withdraw</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Staking Section */}
+                <View style={styles.stakingSection}>
+                  <Text style={styles.sectionTitle}>Staking</Text>
+                  
+                  <View style={styles.stakingCard}>
+                    {/* Staking Summary */}
+                    <View style={styles.stakingSummaryRow}>
+                      <View style={styles.stakingSummaryItem}>
+                        <Text style={styles.stakingLabel}>Total Staked</Text>
+                        <Text style={styles.stakingValue}>
+                          {account.data.stakingSummary 
+                            ? (parseFloat(account.data.stakingSummary.delegated || '0') + 
+                               parseFloat(account.data.stakingSummary.undelegated || '0')).toFixed(2)
+                            : '0.00'} HYPE
+                        </Text>
+                        {account.data.stakingSummary && (
+                          <Text style={styles.stakingSubtext}>
+                            Delegated: {parseFloat(account.data.stakingSummary.delegated || '0').toFixed(2)} HYPE
+                          </Text>
+                        )}
+                      </View>
+                      
+                      <View style={styles.stakingSummaryItem}>
+                        <Text style={styles.stakingLabel}>Spot Balance</Text>
+                        <Text style={styles.stakingValue}>
+                          {(() => {
+                            const hypeBalance = account.data.spotBalances.find(b => b.coin === 'HYPE');
+                            return hypeBalance ? parseFloat(hypeBalance.total).toFixed(2) : '0.00';
+                          })()} HYPE
+                        </Text>
+                        <Text style={styles.stakingSubtext}>Available to stake</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.stakingSummaryRow}>
+                      <View style={styles.stakingSummaryItem}>
+                        <Text style={styles.stakingLabel}>Available to Delegate</Text>
+                        <Text style={styles.stakingValue}>
+                          {account.data.stakingSummary 
+                            ? parseFloat(account.data.stakingSummary.undelegated || '0').toFixed(2)
+                            : '0.00'} HYPE
+                        </Text>
+                        <Text style={styles.stakingSubtext}>In staking balance</Text>
+                      </View>
+
+                      <View style={styles.stakingSummaryItem}>
+                        <Text style={styles.stakingLabel}>Pending Transfers</Text>
+                        <Text style={styles.stakingValue}>
+                          {account.data.stakingSummary 
+                            ? parseFloat(account.data.stakingSummary.totalPendingWithdrawal || '0').toFixed(2)
+                            : '0.00'} HYPE
+                        </Text>
+                        <Text style={styles.stakingSubtext}>
+                          {account.data.stakingSummary?.nPendingWithdrawals || 0} pending
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Transfer Buttons */}
+                    <View style={styles.stakingButtons}>
+                      <TouchableOpacity 
+                        style={styles.stakingButton}
+                        onPress={() => setTransferToStakingVisible(true)}
+                        disabled={!account.data.spotBalances.find(b => b.coin === 'HYPE') || 
+                                  parseFloat(account.data.spotBalances.find(b => b.coin === 'HYPE')?.total || '0') <= 0}
+                      >
+                        <Text style={styles.stakingButtonText}>Transfer to Staking</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.stakingButton}
+                        onPress={() => setTransferFromStakingVisible(true)}
+                        disabled={!account.data.stakingSummary || 
+                                  parseFloat(account.data.stakingSummary.undelegated || '0') <= 0}
+                      >
+                        <Text style={styles.stakingButtonText}>Transfer to Spot</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Delegate Button */}
+                    {account.data.stakingSummary && parseFloat(account.data.stakingSummary.undelegated || '0') > 0 && (
+                      <TouchableOpacity 
+                        style={styles.delegateButton}
+                        onPress={() => setDelegateModalVisible(true)}
+                      >
+                        <Text style={styles.delegateButtonText}>Delegate to Validator</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Delegations List */}
+                    {account.data.stakingDelegations.length > 0 && (
+                      <View style={styles.delegationsContainer}>
+                        <Text style={styles.delegationsTitle}>Active Delegations</Text>
+                        {account.data.stakingDelegations.map((delegation, idx) => (
+                          <View key={`delegation-${idx}`} style={styles.delegationCard}>
+                            <View style={styles.delegationHeader}>
+                              <Text style={styles.delegationValidator}>HYPE Foundation 1</Text>
+                              <Text style={styles.delegationAmount}>
+                                {parseFloat(delegation.amount).toFixed(2)} HYPE
+                              </Text>
+                            </View>
+                            <Text style={styles.delegationAddress}>
+                              {delegation.validator.slice(0, 10)}...{delegation.validator.slice(-8)}
+                            </Text>
+                            <TouchableOpacity 
+                              style={styles.undelegateButton}
+                              onPress={() => {
+                                setSelectedDelegation({
+                                  validator: delegation.validator,
+                                  amount: delegation.amount,
+                                });
+                                setUndelegateModalVisible(true);
+                              }}
+                            >
+                              <Text style={styles.undelegateButtonText}>Undelegate</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
                 </View>
 
                 {/* Positions */}
@@ -319,6 +472,49 @@ export default function PortfolioScreen(): React.JSX.Element {
           </>
         )}
       </ScrollView>
+      
+      {/* Modals */}
+      <DepositModal 
+        visible={depositModalVisible}
+        onClose={() => setDepositModalVisible(false)}
+      />
+      <WithdrawModal 
+        visible={withdrawModalVisible}
+        onClose={() => setWithdrawModalVisible(false)}
+      />
+      <TransferToStakingModal 
+        visible={transferToStakingVisible}
+        onClose={() => setTransferToStakingVisible(false)}
+        maxAmount={(() => {
+          const hypeBalance = account.data?.spotBalances.find(b => b.coin === 'HYPE');
+          return hypeBalance ? parseFloat(hypeBalance.total) : 0;
+        })()}
+      />
+      <TransferFromStakingModal 
+        visible={transferFromStakingVisible}
+        onClose={() => setTransferFromStakingVisible(false)}
+        maxAmount={account.data?.stakingSummary 
+          ? parseFloat(account.data.stakingSummary.undelegated || '0')
+          : 0}
+      />
+      <DelegateModal 
+        visible={delegateModalVisible}
+        onClose={() => setDelegateModalVisible(false)}
+        maxAmount={account.data?.stakingSummary 
+          ? parseFloat(account.data.stakingSummary.undelegated || '0')
+          : 0}
+      />
+      {selectedDelegation && (
+        <UndelegateModal 
+          visible={undelegateModalVisible}
+          onClose={() => {
+            setUndelegateModalVisible(false);
+            setSelectedDelegation(null);
+          }}
+          validator={selectedDelegation.validator}
+          maxAmount={parseFloat(selectedDelegation.amount)}
+        />
+      )}
     </View>
   );
 }

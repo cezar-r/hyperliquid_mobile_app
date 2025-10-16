@@ -54,15 +54,15 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
       console.log('[SpotOrderTicket] ✓ Market name:', market.name);
       console.log('[SpotOrderTicket] ✓ Universe Index (for orders):', market.index);
       console.log('[SpotOrderTicket] ✓ Base/Quote Tokens:', market.tokens);
-      console.log('[SpotOrderTicket] ✓ Size Decimals:', (market as any).szDecimals);
+      console.log('[SpotOrderTicket] ✓ Size Decimals:', market.szDecimals);
     } else {
       console.error('[SpotOrderTicket] ❌ MARKET NOT FOUND!');
     }
     console.log('[SpotOrderTicket] =============================================');
     
     return {
-      index: market?.index || 0,
-      szDecimals: (market as any)?.szDecimals || 0,
+      index: market?.index ?? 0,
+      szDecimals: market?.szDecimals ?? 0,
     };
   }, [coin, spotMarkets]);
   
@@ -229,6 +229,8 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
     if (side === 'buy') {
       const p = parseFloat(price || currentPrice || '0');
       if (p > 0) {
+        // For spot, don't format the price since it comes directly from orderbook
+        // Just use the raw price value for calculation
         const usdToSpend = usdcBalance * (percent / 100);
         const tokenAmount = usdToSpend / p;
         setSize(tokenAmount.toFixed(assetInfo.szDecimals));
@@ -293,9 +295,9 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
       console.log('[SpotOrderTicket] TIF:', tif);
       console.log('[SpotOrderTicket] ================================================');
 
-      // For spot, use price AS-IS from orderbook or input (don't format with formatPrice)
-      // Use floatToWire for proper Hyperliquid formatting
-      const formattedPrice = floatToWire(priceValue);
+      // For spot, use price AS-IS from input/orderbook (NO formatting!)
+      // Reference web app line 225: const formattedPrice = price;
+      const formattedPrice = price; // Use exact price string, don't format
       const formattedSize = formatSize(sizeValue, assetInfo.szDecimals, priceValue);
 
       console.log('[SpotOrderTicket] ========== POST-FORMAT DEBUG ==========');

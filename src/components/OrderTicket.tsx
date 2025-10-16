@@ -127,8 +127,8 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
     
     return {
       index: market?.index ?? 0,
-      maxLeverage: market?.maxLeverage || 5,
-      szDecimals: market?.szDecimals || 4,
+      maxLeverage: market?.maxLeverage ?? 5,
+      szDecimals: market?.szDecimals ?? 4, // CRITICAL: Use ?? not || to handle szDecimals: 0
     };
   }, [coin, perpMarkets]);
 
@@ -484,6 +484,7 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
   };
 
   // Calculate size from margin required and leverage
+  // CRITICAL: Use FORMATTED price for size calculation to match what's sent to API
   const orderStats = useMemo(() => {
     const p = parseFloat(price) || 0;
     
@@ -496,8 +497,13 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
       };
     }
     
+    // Format the price first (same formatting that will be used in the API call)
+    const formattedPrice = formatPrice(p, assetInfo.szDecimals);
+    const formattedPriceNum = parseFloat(formattedPrice);
+    
+    // Calculate size using the FORMATTED price to ensure consistency
     const orderSizeUSD = marginRequired * leverage;
-    const tokenSize = orderSizeUSD / p;
+    const tokenSize = orderSizeUSD / formattedPriceNum;
     
     return {
       size: tokenSize,

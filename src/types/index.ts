@@ -64,6 +64,25 @@ export interface OpenOrder {
   origSz: string;
 }
 
+export interface StakingSummary {
+  delegated: string;
+  undelegated: string;
+  totalPendingWithdrawal: string;
+  nPendingWithdrawals: number;
+}
+
+export interface StakingDelegation {
+  validator: `0x${string}`;
+  amount: string;
+  lockedUntilTimestamp: number;
+}
+
+export interface StakingReward {
+  time: number;
+  source: 'delegation' | 'commission';
+  totalAmount: string;
+}
+
 export interface AccountData {
   perpPositions: PerpPosition[];
   perpMarginSummary: {
@@ -76,6 +95,9 @@ export interface AccountData {
   spotBalances: SpotBalance[];
   openOrders: OpenOrder[];
   userFills: UserFill[];
+  stakingDelegations: StakingDelegation[];
+  stakingSummary: StakingSummary | null;
+  stakingRewards: StakingReward[];
   lastUpdated?: number;
 }
 

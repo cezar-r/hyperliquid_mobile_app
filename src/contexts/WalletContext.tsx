@@ -84,7 +84,7 @@ export function WalletProvider({
       }
 
       try {
-        const [perpState, spotState, openOrders, userFills] =
+        const [perpState, spotState, openOrders, userFills, stakingDelegations, stakingSummary, stakingRewards] =
           await Promise.all([
             infoClient
               .clearinghouseState({ user: userAddress as `0x${string}` })
@@ -108,6 +108,24 @@ export function WalletProvider({
               .userFills({ user: userAddress as `0x${string}` })
               .catch((err) => {
                 if (!silent) console.warn('[Phase 3] userFills error:', err);
+                return [];
+              }),
+            infoClient
+              .delegations({ user: userAddress as `0x${string}` })
+              .catch((err) => {
+                if (!silent) console.warn('[Staking] delegations error:', err);
+                return [];
+              }),
+            infoClient
+              .delegatorSummary({ user: userAddress as `0x${string}` })
+              .catch((err) => {
+                if (!silent) console.warn('[Staking] delegatorSummary error:', err);
+                return null;
+              }),
+            infoClient
+              .delegatorRewards({ user: userAddress as `0x${string}` })
+              .catch((err) => {
+                if (!silent) console.warn('[Staking] delegatorRewards error:', err);
                 return [];
               }),
           ]);
@@ -148,6 +166,9 @@ export function WalletProvider({
           spotBalances: spotState?.balances || [],
           openOrders: openOrders || [],
           userFills: userFills || [],
+          stakingDelegations: stakingDelegations || [],
+          stakingSummary: stakingSummary || null,
+          stakingRewards: stakingRewards || [],
           lastUpdated: Date.now(),
         };
 

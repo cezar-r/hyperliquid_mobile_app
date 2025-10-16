@@ -161,6 +161,39 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
   },
   
+  // Action Buttons (Deposit/Withdraw)
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  depositButton: {
+    flex: 1,
+    backgroundColor: Color.BRIGHT_ACCENT,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  depositButtonText: {
+    fontSize: fontSizes.md,
+    color: Color.BG_2,
+    fontWeight: '600',
+  },
+  withdrawButton: {
+    flex: 1,
+    backgroundColor: Color.BG_3,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Color.ACCENT,
+  },
+  withdrawButtonText: {
+    fontSize: fontSizes.md,
+    color: Color.FG_1,
+    fontWeight: '600',
+  },
+  
   // Position Card
   positionCard: {
     backgroundColor: Color.BG_3,
@@ -341,5 +374,125 @@ export const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     fontWeight: '600',
     marginTop: spacing.xs,
+  },
+  
+  // Staking Section
+  stakingSection: {
+    marginBottom: spacing.lg,
+  },
+  stakingCard: {
+    backgroundColor: Color.BG_3,
+    padding: spacing.lg,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Color.ACCENT,
+  },
+  stakingSummaryRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  stakingSummaryItem: {
+    flex: 1,
+    backgroundColor: Color.BG_2,
+    padding: spacing.md,
+    borderRadius: 8,
+  },
+  stakingLabel: {
+    fontSize: fontSizes.xs,
+    color: Color.FG_3,
+    marginBottom: spacing.xs,
+  },
+  stakingValue: {
+    fontSize: fontSizes.md,
+    color: Color.BRIGHT_ACCENT,
+    fontWeight: '700',
+    marginBottom: spacing.xs,
+  },
+  stakingSubtext: {
+    fontSize: fontSizes.xs,
+    color: Color.FG_3,
+  },
+  stakingButtons: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  stakingButton: {
+    flex: 1,
+    backgroundColor: Color.ACCENT,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  stakingButtonText: {
+    fontSize: fontSizes.sm,
+    color: Color.FG_1,
+    fontWeight: '600',
+  },
+  delegateButton: {
+    backgroundColor: Color.BRIGHT_ACCENT,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  delegateButtonText: {
+    fontSize: fontSizes.md,
+    color: Color.BG_2,
+    fontWeight: '700',
+  },
+  delegationsContainer: {
+    marginTop: spacing.lg,
+  },
+  delegationsTitle: {
+    fontSize: fontSizes.sm,
+    color: Color.FG_2,
+    marginBottom: spacing.md,
+    fontWeight: '600',
+  },
+  delegationCard: {
+    backgroundColor: Color.BG_2,
+    padding: spacing.md,
+    borderRadius: 8,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: Color.BRIGHT_ACCENT,
+  },
+  delegationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  delegationValidator: {
+    fontSize: fontSizes.md,
+    color: Color.BRIGHT_ACCENT,
+    fontWeight: '700',
+  },
+  delegationAmount: {
+    fontSize: fontSizes.md,
+    color: Color.FG_1,
+    fontWeight: '600',
+  },
+  delegationAddress: {
+    fontSize: fontSizes.xs,
+    color: Color.FG_3,
+    fontFamily: 'monospace',
+    marginBottom: spacing.sm,
+  },
+  undelegateButton: {
+    backgroundColor: Color.BG_3,
+    paddingVertical: spacing.sm,
+    borderRadius: 6,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Color.RED,
+  },
+  undelegateButtonText: {
+    fontSize: fontSizes.sm,
+    color: Color.RED,
+    fontWeight: '600',
   },
 });
