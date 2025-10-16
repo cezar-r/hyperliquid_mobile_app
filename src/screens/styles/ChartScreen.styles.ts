@@ -790,5 +790,77 @@ export const styles = StyleSheet.create({
     color: Color.RED,
     fontWeight: '600',
   },
+  
+  // Open Orders Section
+  openOrdersContainer: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  orderCard: {
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 8,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Color.BG_1,
+  },
+  orderLeftSide: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  orderRightSide: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  orderCoinContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 5,
+  },
+  orderCoin: {
+    color: Color.FG_1,
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+  orderSide: {
+    fontSize: fontSizes.xs,
+    fontWeight: 'bold',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  orderDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  orderPrice: {
+    color: Color.FG_3,
+    fontSize: 12,
+  },
+  orderSize: {
+    color: Color.FG_3,
+    fontSize: 12,
+  },
+  cancelOrderButton: {
+    backgroundColor: Color.BG_2,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: Color.RED,
+  },
+  cancelOrderButtonText: {
+    color: Color.RED,
+    fontSize: fontSizes.xs,
+    fontWeight: '600',
+  },
 });
 

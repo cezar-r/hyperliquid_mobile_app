@@ -70,7 +70,7 @@ function getTimeFilterCutoff(filter: TimeFilter): number | null {
 
 export default function PortfolioScreen(): React.JSX.Element {
   const { address } = useAccount();
-  const { account } = useWallet();
+  const { account, exchangeClient, refetchAccount } = useWallet();
   const { state: wsState, selectCoin, setMarketType } = useWebSocket();
   const navigation = useNavigation<any>();
   
@@ -679,7 +679,7 @@ export default function PortfolioScreen(): React.JSX.Element {
                   {showPerps && sortedPerpPositions.length > 0 && (
                     <View style={styles.positionsContainer}>
                       <Text style={styles.sectionLabel}>
-                        Open Positions ({sortedPerpPositions.length})
+                        Perps ({sortedPerpPositions.length})
                       </Text>
                       {sortedPerpPositions.map((item, idx) => {
                         const positionSize = parseFloat(item.position.szi);
@@ -737,7 +737,7 @@ export default function PortfolioScreen(): React.JSX.Element {
                   {showSpot && sortedSpotBalances.length > 0 && (
                     <View style={styles.positionsContainer}>
                       <Text style={styles.sectionLabel}>
-                        Spot Balances ({sortedSpotBalances.length})
+                        Balances ({sortedSpotBalances.length})
                       </Text>
                       {sortedSpotBalances.map((item) => {
                         const price = item.price ? parseFloat(item.price) : 0;
@@ -779,9 +779,150 @@ export default function PortfolioScreen(): React.JSX.Element {
                     </View>
                   )}
 
+                  {/* Open Orders - Filtered by market type */}
+                  {(() => {
+                    const perpCoins = new Set(wsState.perpMarkets.map(m => m.name));
+                    const spotCoins = new Set(wsState.spotMarkets.map(m => m.name.split('/')[0]));
+                    
+                    // Helper to detect market type for an order
+                    const getOrderMarketType = (coin: string): 'perp' | 'spot' | null => {
+                      const perpMarket = wsState.perpMarkets.find(m => m.name === coin);
+                      if (perpMarket) return 'perp';
+                      
+                      // For spot, check both display name and apiName (@{index})
+                      const spotMarket = wsState.spotMarkets.find(m => m.name === coin || m.apiName === coin);
+                      if (spotMarket) return 'spot';
+                      
+                      return null;
+                    };
+                    
+                    // Helper to get display name for spot orders (converts @{index} to display name)
+                    const getDisplayName = (coin: string) => {
+                      const spotMarket = wsState.spotMarkets.find(m => m.name === coin || m.apiName === coin);
+                      if (spotMarket) return spotMarket.name;
+                      return coin;
+                    };
+                    
+                    // Filter orders by market type
+                    const filteredOrders = account.data.openOrders.filter((order: any) => {
+                      const orderMarketType = getOrderMarketType(order.coin);
+                      
+                      // Debug logging
+                      if (marketFilter === 'All') {
+                        console.log('[PortfolioScreen] Order:', order.coin, 'Type:', orderMarketType);
+                      }
+                      
+                      if (marketFilter === 'Perp') {
+                        return orderMarketType === 'perp';
+                      } else if (marketFilter === 'Spot') {
+                        return orderMarketType === 'spot';
+                      } else if (marketFilter === 'Perp+Spot') {
+                        return orderMarketType === 'perp' || orderMarketType === 'spot';
+                      } else if (marketFilter === 'All') {
+                        // For 'All', show both perp and spot orders
+                        return orderMarketType === 'perp' || orderMarketType === 'spot';
+                      } else if (marketFilter === 'Staking') {
+                        return false; // No orders for staking
+                      }
+                      return false;
+                    });
+                    
+                    return filteredOrders.length > 0 && (
+                      <View style={styles.positionsContainer}>
+                        <Text style={styles.sectionLabel}>
+                          Open Orders ({filteredOrders.length})
+                        </Text>
+                        {filteredOrders.slice(0, 10).map((order: any, idx: number) => {
+                          const orderMarketType = getOrderMarketType(order.coin);
+                          const displayName = getDisplayName(order.coin);
+                          
+                          return (
+                            <View key={`order-${idx}-${order.oid}`} style={styles.orderCard}>
+                              <TouchableOpacity
+                                style={styles.orderLeftSide}
+                                onPress={() => {
+                                  if (orderMarketType) {
+                                    handleNavigateToChart(order.coin, orderMarketType);
+                                  }
+                                }}
+                              >
+                                <View style={styles.orderCoinContainer}>
+                                  <Text style={styles.orderCoin}>{displayName}</Text>
+                                  <Text style={[
+                                    styles.orderSide,
+                                    order.side === 'B' ? styles.sideBuy : styles.sideSell
+                                  ]}>
+                                    {order.side === 'B' ? 'BUY' : 'SELL'}
+                                  </Text>
+                                </View>
+                                <View style={styles.orderDetails}>
+                                  <Text style={styles.orderPrice}>${order.limitPx}</Text>
+                                  <Text style={styles.orderSize}>{order.sz}</Text>
+                                </View>
+                              </TouchableOpacity>
+                              <View style={styles.orderRightSide}>
+                                <TouchableOpacity
+                                  style={styles.cancelOrderButton}
+                                  onPress={async () => {
+                                    if (!exchangeClient) {
+                                      Alert.alert('Error', 'Wallet not connected');
+                                      return;
+                                    }
+
+                                    // Get market info
+                                    const perpMarket = wsState.perpMarkets.find(m => m.name === order.coin);
+                                    const spotMarket = wsState.spotMarkets.find(m => m.name === order.coin || m.apiName === order.coin);
+                                    
+                                    let assetIndex: number;
+                                    if (orderMarketType === 'perp' && perpMarket) {
+                                      assetIndex = perpMarket.index;
+                                    } else if (orderMarketType === 'spot' && spotMarket) {
+                                      assetIndex = 10000 + spotMarket.index;
+                                    } else {
+                                      Alert.alert('Error', `Asset ${order.coin} not found`);
+                                      return;
+                                    }
+
+                                    Alert.alert(
+                                      `Cancel Order?`,
+                                      `${displayName}\n${order.side === 'B' ? 'BUY' : 'SELL'} ${order.sz} @ $${order.limitPx}`,
+                                      [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        {
+                                          text: 'Confirm',
+                                          style: 'destructive',
+                                          onPress: async () => {
+                                            try {
+                                              await exchangeClient.cancel({
+                                                cancels: [{ a: assetIndex, o: order.oid }],
+                                              });
+                                              Alert.alert('Success', 'Order canceled');
+                                              setTimeout(() => refetchAccount(), 1000);
+                                            } catch (err: any) {
+                                              Alert.alert('Error', `Failed: ${err.message}`);
+                                            }
+                                          },
+                                        },
+                                      ]
+                                    );
+                                  }}
+                                >
+                                  <Text style={styles.cancelOrderButtonText}>Cancel</Text>
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    );
+                  })()}
+
                   {/* Staking Section */}
                   {showStaking && (
                     <View style={styles.stakingSection}>
+                      {marketFilter === 'All' && (
+                        <Text style={styles.sectionLabel}>Staking</Text>
+                      )}
                       <View style={styles.stakingCard}>
                         {/* Staking Summary */}
                         <View style={styles.stakingSummaryRow}>
@@ -901,40 +1042,10 @@ export default function PortfolioScreen(): React.JSX.Element {
                     </View>
                   )}
 
-                  {/* Open Orders */}
-                  {account.data.openOrders.length > 0 && (
-                    <View style={styles.openOrdersContainer}>
-                      <Text style={styles.sectionTitle}>
-                        Open Orders ({account.data.openOrders.length})
-                      </Text>
-                      {account.data.openOrders.slice(0, 10).map((order: any, idx: number) => (
-                        <View key={`order-${idx}`} style={styles.orderCard}>
-                          <View style={styles.orderHeader}>
-                            <Text style={styles.orderCoin}>{order.coin}</Text>
-                            <Text style={[
-                              styles.orderSide,
-                              order.side === 'B' ? styles.sideBuy : styles.sideSell
-                            ]}>
-                              {order.side === 'B' ? 'BUY' : 'SELL'}
-                            </Text>
-                          </View>
-                          <View style={styles.orderDetail}>
-                            <Text style={styles.orderLabel}>Price:</Text>
-                            <Text style={styles.orderValue}>${order.limitPx}</Text>
-                          </View>
-                          <View style={styles.orderDetail}>
-                            <Text style={styles.orderLabel}>Size:</Text>
-                            <Text style={styles.orderValue}>{order.sz}</Text>
-                          </View>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-
                   {/* Recent Trades */}
                   {filteredFills.length > 0 && (
                     <View style={styles.recentTradesContainer}>
-                      <Text style={styles.sectionTitle}>
+                      <Text style={styles.sectionLabel}>
                         Recent Trades ({filteredFills.length})
                       </Text>
                       {filteredFills.slice(0, tradesDisplayLimit).map((fill: UserFill, idx: number) => (

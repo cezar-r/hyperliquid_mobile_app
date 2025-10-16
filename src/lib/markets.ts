@@ -63,6 +63,7 @@ export async function fetchSpotMarkets(
         isCanonical: market.isCanonical || false,
         baseToken: baseToken?.name,
         baseTokenIndex: baseTokenId,
+        apiName: `@${market.index}`, // API format for spot orders
       };
     });
 

@@ -121,6 +121,7 @@ export interface SpotMarket {
   index: number;
   szDecimals: number;
   isCanonical?: boolean;
+  apiName?: string; // Format: @{index}, used by API for spot orders
 }
 
 export interface AssetContext {

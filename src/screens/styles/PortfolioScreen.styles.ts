@@ -451,10 +451,10 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Open Orders Section
+  // Open Orders Section (compact style like ChartScreen)
   openOrdersContainer: {
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
     paddingBottom: spacing.md,
   },
   sectionTitle: {
@@ -464,30 +464,43 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   orderCard: {
-    backgroundColor: Color.BG_3,
-    padding: spacing.md,
-    borderRadius: 8,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: Color.ACCENT,
-  },
-  orderHeader: {
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 8,
+    width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    borderWidth: 2,
+    borderColor: Color.BG_1,
+  },
+  orderLeftSide: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  orderRightSide: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  orderCoinContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 5,
   },
   orderCoin: {
-    fontSize: fontSizes.md,
     color: Color.FG_1,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: 'bold',
   },
   orderSide: {
     fontSize: fontSizes.xs,
-    fontWeight: '700',
-    paddingHorizontal: spacing.sm,
+    fontWeight: 'bold',
+    paddingHorizontal: spacing.xs,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 3,
   },
   sideBuy: {
     color: Color.BRIGHT_ACCENT,
@@ -497,20 +510,31 @@ export const styles = StyleSheet.create({
     color: Color.RED,
     backgroundColor: Color.BG_2,
   },
-  orderDetail: {
+  orderDetails: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.xs,
+    gap: 8,
   },
-  orderLabel: {
-    fontSize: fontSizes.sm,
+  orderPrice: {
     color: Color.FG_3,
+    fontSize: 12,
   },
-  orderValue: {
-    fontSize: fontSizes.sm,
-    color: Color.FG_1,
-    fontWeight: '500',
+  orderSize: {
+    color: Color.FG_3,
+    fontSize: 12,
+  },
+  cancelOrderButton: {
+    backgroundColor: Color.BG_2,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: Color.RED,
+  },
+  cancelOrderButtonText: {
+    color: Color.RED,
+    fontSize: fontSizes.xs,
+    fontWeight: '600',
   },
 
   // Recent Trades Section (search-style layout)

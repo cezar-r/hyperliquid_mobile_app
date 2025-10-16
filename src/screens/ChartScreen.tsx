@@ -123,6 +123,7 @@ export default function ChartScreen(): React.JSX.Element {
   const [showOrderTicket, setShowOrderTicket] = useState(false);
   const [orderTicketDefaultSide, setOrderTicketDefaultSide] = useState<'buy' | 'sell'>('buy');
   const [closingPosition, setClosingPosition] = useState<boolean>(false);
+  const [cancelingOrder, setCancelingOrder] = useState<number | null>(null);
 
   // Price color animation
   const previousPrice = useRef<number | null>(null);
@@ -480,6 +481,68 @@ export default function ChartScreen(): React.JSX.Element {
               Alert.alert('Error', `Failed to close position: ${err.message}`);
             } finally {
               setClosingPosition(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Handle cancel order
+  const handleCancelOrder = async (coin: string, oid: number) => {
+    if (!exchangeClient || !selectedCoin) return;
+    
+    // Get market info
+    const perpMarket = state.perpMarkets.find(m => m.name === coin);
+    const spotMarket = state.spotMarkets.find(m => m.name === coin || m.apiName === coin);
+    
+    // Determine asset index
+    let assetIndex: number;
+    if (marketType === 'perp' && perpMarket) {
+      assetIndex = perpMarket.index;
+    } else if (marketType === 'spot' && spotMarket) {
+      assetIndex = 10000 + spotMarket.index; // Spot orders need +10000
+    } else {
+      Alert.alert('Error', `Asset ${coin} not found in markets`);
+      return;
+    }
+
+    // Show confirmation
+    Alert.alert(
+      `Cancel Order for ${coin}?`,
+      `Order ID: ${oid}\n\nThis will cancel the limit order.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Confirm',
+          style: 'destructive',
+          onPress: async () => {
+            setCancelingOrder(oid);
+
+            try {
+              const cancelPayload = {
+                cancels: [{
+                  a: assetIndex,
+                  o: oid,
+                }],
+              };
+
+              console.log('[ChartScreen] Canceling order:', { coin, oid, assetIndex, marketType });
+              const result = await exchangeClient.cancel(cancelPayload);
+
+              console.log('[ChartScreen] ✓ Order canceled:', result);
+              Alert.alert('Success', 'Order canceled successfully!');
+              
+              // Refetch account data
+              setTimeout(() => refetchAccount(), 1000);
+            } catch (err: any) {
+              console.error('[ChartScreen] Failed to cancel order:', err);
+              Alert.alert('Error', `Failed to cancel order: ${err.message}`);
+            } finally {
+              setCancelingOrder(null);
             }
           },
         },
@@ -916,6 +979,73 @@ export default function ChartScreen(): React.JSX.Element {
             </>
           )}
         </View>
+
+        {/* Open Orders for current ticker/market */}
+        {(() => {
+          const openOrders = account.data?.openOrders || [];
+          
+          // Helper to get display name for spot orders (converts @{index} to display name)
+          const getDisplayName = (coin: string) => {
+            const spotMarket = state.spotMarkets.find(m => m.name === coin || m.apiName === coin);
+            if (spotMarket) return spotMarket.name;
+            return coin;
+          };
+          
+          // Filter orders for current ticker and market type
+          const currentTickerOrders = openOrders.filter((order: any) => {
+            // Check if order coin matches selectedCoin directly (for perp orders)
+            if (order.coin === selectedCoin) return true;
+            
+            // For spot orders, the order.coin is in @{index} format
+            // Check if the apiName of current selected coin matches the order coin
+            const spotMarket = state.spotMarkets.find(m => m.name === selectedCoin);
+            if (spotMarket && order.coin === spotMarket.apiName) return true;
+            
+            return false;
+          });
+          
+          return currentTickerOrders.length > 0 && (
+            <View style={styles.openOrdersContainer}>
+              <Text style={styles.sectionLabel}>
+                Open Orders ({currentTickerOrders.length})
+              </Text>
+              {currentTickerOrders.map((order: any) => {
+                const displayName = getDisplayName(order.coin);
+                
+                return (
+                  <View key={`order-${order.oid}`} style={styles.orderCard}>
+                    <View style={styles.orderLeftSide}>
+                      <View style={styles.orderCoinContainer}>
+                        <Text style={styles.orderCoin}>{displayName}</Text>
+                        <Text style={[
+                          styles.orderSide,
+                          order.side === 'B' ? styles.sideBuy : styles.sideSell
+                        ]}>
+                          {order.side === 'B' ? 'BUY' : 'SELL'}
+                        </Text>
+                      </View>
+                      <View style={styles.orderDetails}>
+                        <Text style={styles.orderPrice}>${order.limitPx}</Text>
+                        <Text style={styles.orderSize}>{order.sz}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.orderRightSide}>
+                      <TouchableOpacity
+                        style={styles.cancelOrderButton}
+                        onPress={() => handleCancelOrder(order.coin, order.oid)}
+                        disabled={cancelingOrder === order.oid}
+                      >
+                        <Text style={styles.cancelOrderButtonText}>
+                          {cancelingOrder === order.oid ? 'Canceling...' : 'Cancel'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })()}
 
         {/* Trade history (per ticker, filtered by market type) */}
         <View style={styles.recentTradesContainer}>
