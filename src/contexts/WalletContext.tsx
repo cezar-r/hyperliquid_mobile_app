@@ -141,6 +141,23 @@ export function WalletProvider({
         const perpPositions = (perpState?.assetPositions || []).map((item: any) => {
           // API returns { type: "oneWay", position: {...} }
           const pos = item.position || item;
+          
+          // Find TP/SL orders for this position
+          const tpslOrders = (openOrders || []).filter((order: any) => 
+            order.coin === pos.coin && 
+            (order.orderType?.includes('Take Profit') || order.orderType?.includes('Stop'))
+          );
+          
+          const tpOrder = tpslOrders.find((o: any) => 
+            o.orderType?.includes('Take Profit')
+          );
+          const slOrder = tpslOrders.find((o: any) => 
+            o.orderType?.includes('Stop')
+          );
+          
+          const tpPrice = tpOrder?.triggerPx ? parseFloat(tpOrder.triggerPx) : null;
+          const slPrice = slOrder?.triggerPx ? parseFloat(slOrder.triggerPx) : null;
+          
           return {
             coin: pos.coin,
             szi: pos.szi,
@@ -151,6 +168,10 @@ export function WalletProvider({
             leverage: pos.leverage,
             liquidationPx: pos.liquidationPx,
             marginUsed: pos.marginUsed,
+            tpPrice,
+            slPrice,
+            tpOrderId: tpOrder?.oid || null,
+            slOrderId: slOrder?.oid || null,
           };
         });
 

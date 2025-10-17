@@ -222,40 +222,43 @@ export default function HistoryScreen(): React.JSX.Element {
                             Recent Trades ({filteredFills.length})
                           </Text>
                           {filteredFills.slice(0, tradesDisplayLimit).map((fill: UserFill, idx: number) => (
-                            <View key={`fill-${idx}`} style={styles.tradeCard}>
-                              <View style={styles.tradeLeftSide}>
-                                <View style={styles.tradeTopRow}>
-                                  <Text style={styles.tradeCoin}>{fill.coin}</Text>
-                                  <Text style={[
-                                    styles.tradeSide,
-                                    fill.side === 'B' ? styles.sideBuy : styles.sideSell
-                                  ]}>
-                                    {fill.side === 'B' ? 'BUY' : 'SELL'}
-                                  </Text>
-                                  {fill.closedPnl && parseFloat(fill.closedPnl) !== 0 && (
+                            <View key={`fill-${idx}`}>
+                              <View style={styles.tradeCard}>
+                                <View style={styles.tradeLeftSide}>
+                                  <View style={styles.tradeTopRow}>
+                                    <Text style={styles.tradeCoin}>{fill.coin}</Text>
                                     <Text style={[
-                                      styles.tradePnl,
-                                      parseFloat(fill.closedPnl) >= 0 ? styles.pnlPositive : styles.pnlNegative
+                                      styles.tradeSide,
+                                      fill.side === 'B' ? styles.sideBuy : styles.sideSell
                                     ]}>
-                                      {parseFloat(fill.closedPnl) >= 0 ? '+' : ''}${parseFloat(fill.closedPnl).toFixed(2)}
+                                      {fill.side === 'B' ? 'BUY' : 'SELL'}
+                                    </Text>
+                                    {fill.closedPnl && parseFloat(fill.closedPnl) !== 0 && (
+                                      <Text style={[
+                                        styles.tradePnl,
+                                        parseFloat(fill.closedPnl) >= 0 ? styles.pnlPositive : styles.pnlNegative
+                                      ]}>
+                                        {parseFloat(fill.closedPnl) >= 0 ? '+' : ''}${parseFloat(fill.closedPnl).toFixed(2)}
+                                      </Text>
+                                    )}
+                                  </View>
+                                  {fill.time && (
+                                    <Text style={styles.tradeTime}>
+                                      {new Date(fill.time).toLocaleString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
                                     </Text>
                                   )}
                                 </View>
-                                {fill.time && (
-                                  <Text style={styles.tradeTime}>
-                                    {new Date(fill.time).toLocaleString('en-US', {
-                                      month: 'short',
-                                      day: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                    })}
-                                  </Text>
-                                )}
+                                <View style={styles.tradeRightSide}>
+                                  <Text style={styles.tradePrice}>${formatNumber(parseFloat(fill.px), 2)}</Text>
+                                  <Text style={styles.tradeSize}>{fill.sz}</Text>
+                                </View>
                               </View>
-                              <View style={styles.tradeRightSide}>
-                                <Text style={styles.tradePrice}>${formatNumber(parseFloat(fill.px), 2)}</Text>
-                                <Text style={styles.tradeSize}>{fill.sz}</Text>
-                              </View>
+                              <View style={styles.cellSeparator} />
                             </View>
                           ))}
                           

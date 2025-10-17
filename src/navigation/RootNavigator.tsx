@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { useAccount, useProvider } from '@reown/appkit-react-native';
 import { useWallet } from '../contexts/WalletContext';
+import { WebSocketProvider } from '../contexts/WebSocketContext';
 import { loadSessionKey } from '../lib/sessionKey';
 import ConnectScreen from '../screens/ConnectScreen';
 import EnableSessionKeyScreen from '../screens/EnableSessionKeyScreen';
@@ -10,6 +11,26 @@ import ChartScreen from '../screens/ChartScreen';
 import TabNavigator from './TabNavigator';
 
 const Stack = createNativeStackNavigator();
+
+// Wrapper component for authenticated screens that need WebSocket
+function AuthenticatedScreens(): React.JSX.Element {
+  return (
+    <WebSocketProvider>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen 
+          name="Tabs" 
+          component={TabNavigator}
+          options={{ gestureEnabled: false }}
+        />
+        <Stack.Screen 
+          name="ChartDetail" 
+          component={ChartScreen}
+          options={{ headerShown: false }}
+        />
+      </Stack.Navigator>
+    </WebSocketProvider>
+  );
+}
 
 export default function RootNavigator(): React.JSX.Element {
   const navigation = useNavigation<any>();
@@ -50,14 +71,9 @@ export default function RootNavigator(): React.JSX.Element {
         options={{ gestureEnabled: false }}
       />
       <Stack.Screen 
-        name="Tabs" 
-        component={TabNavigator}
-        options={{ gestureEnabled: false }}
-      />
-      <Stack.Screen 
-        name="ChartDetail" 
-        component={ChartScreen}
-        options={{ headerShown: false }}
+        name="Authenticated" 
+        component={AuthenticatedScreens}
+        options={{ gestureEnabled: false, headerShown: false }}
       />
     </Stack.Navigator>
   );

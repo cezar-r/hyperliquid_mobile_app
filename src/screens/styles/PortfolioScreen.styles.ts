@@ -20,21 +20,15 @@ export const styles = StyleSheet.create({
 
   // Market Filter Dropdown
   marketDropdownContainer: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    // paddingBottom: spacing.xs,
     zIndex: 1000,
   },
   marketDropdownButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: Color.BG_3,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Color.ACCENT,
   },
   marketDropdownButtonText: {
     fontSize: fontSizes.md,
@@ -47,9 +41,9 @@ export const styles = StyleSheet.create({
   },
   marketDropdownMenu: {
     position: 'absolute',
-    top: 60,
-    left: spacing.md,
-    right: spacing.md,
+    top: 50,
+    left: 0,
+    right: 0,
     backgroundColor: Color.BG_3,
     borderRadius: 8,
     borderWidth: 1,
@@ -113,7 +107,7 @@ export const styles = StyleSheet.create({
   // Trading Volume Display
   volumeContainer: {
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.md,
     // paddingBottom: spacing.sm,
   },
   volumeLabel: {
@@ -137,7 +131,7 @@ export const styles = StyleSheet.create({
   portfolioValueLabel: {
     fontSize: fontSizes.sm,
     color: Color.FG_3,
-    marginBottom: spacing.xs,
+    // marginBottom: spacing.sm,
   },
   portfolioValue: {
     fontSize: 42,
@@ -272,18 +266,31 @@ export const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
+  // Position Cell Container
+  positionCellContainer: {
+    width: '100%',
+  },
+  
   // Position Cell (from HomeScreen)
   positionCell: {
-    borderRadius: 5,
     paddingHorizontal: 10,
-    paddingVertical: 7,
-    marginBottom: 8,
+    paddingVertical: 12,
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    borderWidth: 2,
-    borderColor: Color.BG_1,
+    backgroundColor: '#0b0f13',
   },
+  
+  // TP/SL Inline Styles
+  tpslInline: {
+    fontSize: 11,
+    color: Color.FG_3,
+    marginTop: 2,
+  },
+  editTpslIcon: {
+    marginLeft: 6,
+  },
+  
   leftSide: {
     justifyContent: 'space-between',
   },
@@ -335,7 +342,7 @@ export const styles = StyleSheet.create({
   stakingSection: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: spacing.md,
+    // paddingBottom: spacing.md,
   },
   stakingCard: {
     // No background styling - blends with page
@@ -463,17 +470,25 @@ export const styles = StyleSheet.create({
     color: Color.FG_1,
     marginBottom: spacing.md,
   },
+  ordersHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  cancelAllText: {
+    color: Color.RED,
+    fontSize: 14,
+    fontWeight: '600',
+  },
   orderCard: {
-    borderRadius: 5,
     paddingHorizontal: 10,
-    paddingVertical: 7,
-    marginBottom: 8,
+    paddingVertical: 12,
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: Color.BG_1,
+    backgroundColor: '#0b0f13',
   },
   orderLeftSide: {
     flex: 1,
@@ -546,12 +561,9 @@ export const styles = StyleSheet.create({
   tradeCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    marginBottom: spacing.xs,
-    borderRadius: 5,
-    borderWidth: 2,
-    borderColor: Color.BG_1,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    backgroundColor: '#0b0f13',
   },
   tradeLeftSide: {
     flex: 1,
@@ -660,5 +672,10 @@ export const styles = StyleSheet.create({
     height: 1,
     backgroundColor: Color.BG_1,
     // marginVertical: spacing.md,
+  },
+  cellSeparator: {
+    borderBottomColor: Color.BG_1,
+    borderBottomWidth: 1,
+    width: '100%',
   },
 });

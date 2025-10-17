@@ -874,12 +874,14 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
               </View>
             </View>
 
-            {/* Error Message */}
+            {/* Error Message
             {error && (
               <View style={styles.errorMessage}>
                 <Text style={styles.errorText}>{error}</Text>
               </View>
-            )}
+            )} 
+             this should instead be an alert banner using react-native-notifier
+             */}
 
             {/* Submit Button */}
             <TouchableOpacity

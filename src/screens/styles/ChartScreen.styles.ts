@@ -638,16 +638,24 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 10,
   },
+  positionCellContainer: {
+    width: '100%',
+  },
   positionCell: {
-    borderRadius: 5,
     paddingHorizontal: 10,
-    paddingVertical: 7,
-    marginBottom: 8,
+    paddingVertical: 12,
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    borderWidth: 2,
-    borderColor: Color.BG_1,
+    backgroundColor: '#0b0f13',
+  },
+  tpslInline: {
+    fontSize: 11,
+    color: Color.FG_3,
+    marginTop: 2,
+  },
+  editTpslIcon: {
+    marginLeft: 6,
   },
   leftSide: {
     justifyContent: 'space-between',
@@ -711,12 +719,9 @@ export const styles = StyleSheet.create({
   tradeCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    marginBottom: spacing.xs,
-    borderRadius: 5,
-    borderWidth: 2,
-    borderColor: Color.BG_1,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    backgroundColor: '#0b0f13',
   },
   tradeLeftSide: {
     flex: 1,
@@ -798,16 +803,13 @@ export const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   orderCard: {
-    borderRadius: 5,
     paddingHorizontal: 10,
-    paddingVertical: 7,
-    marginBottom: 8,
+    paddingVertical: 12,
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: Color.BG_1,
+    backgroundColor: '#0b0f13',
   },
   orderLeftSide: {
     flex: 1,
@@ -861,6 +863,13 @@ export const styles = StyleSheet.create({
     color: Color.RED,
     fontSize: fontSizes.xs,
     fontWeight: '600',
+  },
+  
+  // Cell Separator
+  cellSeparator: {
+    borderBottomColor: Color.BG_1,
+    borderBottomWidth: 1,
+    width: '100%',
   },
 });
 

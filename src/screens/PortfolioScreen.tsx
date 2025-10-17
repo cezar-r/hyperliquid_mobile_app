@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, SafeAreaView, Alert, Animated } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAccount } from '@reown/appkit-react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -17,8 +18,9 @@ import TransferToStakingModal from '../components/TransferToStakingModal';
 import TransferFromStakingModal from '../components/TransferFromStakingModal';
 import DelegateModal from '../components/DelegateModal';
 import UndelegateModal from '../components/UndelegateModal';
+import TPSLEditModal from '../components/TPSLEditModal';
 
-type MarketFilter = 'Perp' | 'Spot' | 'Staking' | 'Perp+Spot' | 'All';
+type MarketFilter = 'Perp' | 'Spot' | 'Staking' | 'Perp+Spot' | 'All Markets';
 type TimeFilter = '24h' | '7d' | '30d' | 'All Time';
 
 const PORTFOLIO_MARKET_FILTER_KEY = 'hl_portfolio_market_filter';
@@ -83,12 +85,18 @@ export default function PortfolioScreen(): React.JSX.Element {
   const [delegateModalVisible, setDelegateModalVisible] = useState(false);
   const [undelegateModalVisible, setUndelegateModalVisible] = useState(false);
   const [selectedDelegation, setSelectedDelegation] = useState<{ validator: `0x${string}`; amount: string } | null>(null);
+  const [editingTPSL, setEditingTPSL] = useState<PerpPosition | null>(null);
 
   // Filter states
-  const [marketFilter, setMarketFilter] = useState<MarketFilter>('All');
+  const [marketFilter, setMarketFilter] = useState<MarketFilter>('All Markets');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24h');
   const [tradesDisplayLimit, setTradesDisplayLimit] = useState(10);
   const [marketDropdownVisible, setMarketDropdownVisible] = useState(false);
+  
+  // For value animation
+  const [previousValue, setPreviousValue] = useState<number | null>(null);
+  const colorAnim = useRef(new Animated.Value(0)).current;
+  const [isIncrease, setIsIncrease] = useState<boolean | null>(null);
   
   // For swipe animation
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -98,7 +106,7 @@ export default function PortfolioScreen(): React.JSX.Element {
     const loadFilters = async () => {
       try {
         const savedMarketFilter = await AsyncStorage.getItem(PORTFOLIO_MARKET_FILTER_KEY);
-        if (savedMarketFilter && ['Perp', 'Spot', 'Perp+Spot', 'Staking', 'All'].includes(savedMarketFilter)) {
+        if (savedMarketFilter && ['Perp', 'Spot', 'Perp+Spot', 'Staking', 'All Markets'].includes(savedMarketFilter)) {
           setMarketFilter(savedMarketFilter as MarketFilter);
         }
         
@@ -192,7 +200,7 @@ export default function PortfolioScreen(): React.JSX.Element {
     } else if (marketFilter === 'Staking') {
       fills = []; // No fills for staking
     }
-    // 'All' shows all fills
+    // 'All Markets' shows all fills
     
     return fills;
   }, [account.data?.userFills, timeFilter, marketFilter, wsState.perpMarkets, wsState.spotMarkets]);
@@ -315,6 +323,42 @@ export default function PortfolioScreen(): React.JSX.Element {
     };
   }, [account.data, wsState.prices, perpAccountValue, spotTotalValue, stakingValue, filteredFills, marketFilter]);
 
+  // Animate value changes - only when there's an actual change at 2 decimal places
+  useEffect(() => {
+    // Round to 2 decimals for comparison
+    const currentRounded = Math.round(totalValue * 100) / 100;
+    const previousRounded = previousValue !== null ? Math.round(previousValue * 100) / 100 : null;
+    
+    if (previousRounded === null) {
+      setPreviousValue(currentRounded);
+      return;
+    }
+    
+    // Only animate if there's an actual change
+    if (currentRounded !== previousRounded) {
+      setIsIncrease(currentRounded > previousRounded);
+      colorAnim.setValue(0);
+      Animated.sequence([
+        Animated.timing(colorAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: false,
+        }),
+        Animated.timing(colorAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: false,
+        })
+      ]).start();
+      setPreviousValue(currentRounded);
+    }
+  }, [totalValue, colorAnim]);
+
+  const textColor = colorAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [Color.FG_1, isIncrease ? Color.BRIGHT_ACCENT : Color.RED]
+  });
+
   // Prepare sorted perp positions with USD values
   const sortedPerpPositions = useMemo(() => {
     if (!account.data?.perpPositions) return [];
@@ -375,11 +419,109 @@ export default function PortfolioScreen(): React.JSX.Element {
     navigation.navigate('ChartDetail');
   };
 
+  // Handle cancel all orders
+  const handleCancelAll = async () => {
+    if (!exchangeClient) {
+      Alert.alert('Error', 'Wallet not connected');
+      return;
+    }
+
+    if (!account.data) {
+      Alert.alert('Error', 'Account data not loaded');
+      return;
+    }
+
+    // Get filtered orders (defined in the JSX section below)
+    const perpCoins = new Set(wsState.perpMarkets.map(m => m.name));
+    const spotCoins = new Set(wsState.spotMarkets.map(m => m.name.split('/')[0]));
+    
+    const getOrderMarketType = (coin: string): 'perp' | 'spot' | null => {
+      const perpMarket = wsState.perpMarkets.find(m => m.name === coin);
+      if (perpMarket) return 'perp';
+      
+      const spotMarket = wsState.spotMarkets.find(m => m.name === coin || m.apiName === coin);
+      if (spotMarket) return 'spot';
+      
+      return null;
+    };
+    
+    const filteredOrders = account.data.openOrders.filter((order: any) => {
+      const orderMarketType = getOrderMarketType(order.coin);
+      
+      if (marketFilter === 'Perp') {
+        return orderMarketType === 'perp';
+      } else if (marketFilter === 'Spot') {
+        return orderMarketType === 'spot';
+      } else if (marketFilter === 'Perp+Spot') {
+        return orderMarketType === 'perp' || orderMarketType === 'spot';
+      } else if (marketFilter === 'All Markets') {
+        return orderMarketType === 'perp' || orderMarketType === 'spot';
+      } else if (marketFilter === 'Staking') {
+        return false;
+      }
+      return false;
+    });
+
+    if (filteredOrders.length === 0) {
+      Alert.alert('No Orders', 'No open orders to cancel');
+      return;
+    }
+
+    Alert.alert(
+      'Cancel All Orders?',
+      `Cancel ALL ${filteredOrders.length} open order${filteredOrders.length !== 1 ? 's' : ''}?\n\nThis will cancel all your visible open limit orders.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Build cancels array with asset index and order ID for each order
+              const cancels = filteredOrders.map((order: any) => {
+                const perpMarket = wsState.perpMarkets.find(m => m.name === order.coin);
+                const spotMarket = wsState.spotMarkets.find(m => m.name === order.coin || m.apiName === order.coin);
+                
+                let assetIndex: number;
+                if (perpMarket) {
+                  assetIndex = perpMarket.index;
+                } else if (spotMarket) {
+                  assetIndex = 10000 + spotMarket.index;
+                } else {
+                  console.error('[PortfolioScreen] Market not found for order:', order.coin);
+                  assetIndex = 0; // Fallback
+                }
+                
+                return {
+                  a: assetIndex,
+                  o: order.oid,
+                };
+              });
+
+              console.log('[PortfolioScreen] Canceling all orders:', cancels.length);
+              console.log('[PortfolioScreen] Cancel payload:', JSON.stringify({ cancels }, null, 2));
+
+              await exchangeClient.cancel({ cancels });
+              
+              Alert.alert('Success', `${filteredOrders.length} order${filteredOrders.length !== 1 ? 's' : ''} canceled successfully!`);
+              
+              // Refetch account data
+              setTimeout(() => refetchAccount(), 1000);
+            } catch (err: any) {
+              console.error('[PortfolioScreen] Failed to cancel all orders:', err);
+              Alert.alert('Error', `Failed to cancel orders: ${err.message}`);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Check what to show based on market filter
-  const showPerps = ['Perp', 'Perp+Spot', 'All'].includes(marketFilter);
-  const showSpot = ['Spot', 'Perp+Spot', 'All'].includes(marketFilter);
-  const showStaking = ['Staking', 'All'].includes(marketFilter);
-  const showEquityBreakdown = ['Perp+Spot', 'All', 'Staking'].includes(marketFilter);
+  const showPerps = ['Perp', 'Perp+Spot', 'All Markets'].includes(marketFilter);
+  const showSpot = ['Spot', 'Perp+Spot', 'All Markets'].includes(marketFilter);
+  const showStaking = ['Staking', 'All Markets'].includes(marketFilter);
+  const showEquityBreakdown = ['Perp+Spot', 'All Markets', 'Staking'].includes(marketFilter);
 
   // Pan gesture for horizontal swipe (timeframes)
   const panGesture = Gesture.Pan()
@@ -526,16 +668,19 @@ export default function PortfolioScreen(): React.JSX.Element {
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.marketDropdownItem}
-                  onPress={() => handleMarketFilterChange('All')}
+                  onPress={() => handleMarketFilterChange('All Markets')}
                 >
                   <Text style={[
                     styles.marketDropdownItemText,
-                    marketFilter === 'All' && styles.marketDropdownItemTextActive
-                  ]}>All</Text>
+                    marketFilter === 'All Markets' && styles.marketDropdownItemTextActive
+                  ]}>All Markets</Text>
                 </TouchableOpacity>
               </View>
             )}
           </View>
+
+          {/* Separator below market dropdown */}
+          <View style={styles.separator} />
 
           {!address && (
             <View style={styles.emptyState}>
@@ -573,7 +718,7 @@ export default function PortfolioScreen(): React.JSX.Element {
 
                   {/* Portfolio Value */}
                   <View style={styles.portfolioValueContainer}>
-                    <Text style={styles.portfolioValue}>${formatNumber(totalValue, 2)}</Text>
+                    <Animated.Text style={[styles.portfolioValue, { color: textColor }]}>${formatNumber(totalValue, 2)}</Animated.Text>
                     {showPnL && totalPnL !== 0 && (
                       <Text style={[
                         styles.portfolioPnL,
@@ -586,19 +731,19 @@ export default function PortfolioScreen(): React.JSX.Element {
                     {/* Equity Breakdown */}
                     {showEquityBreakdown && (
                       <View style={styles.equityBreakdownContainer}>
-                        {(showPerps || marketFilter === 'All') && perpAccountValue > 0 && (
+                        {(showPerps || marketFilter === 'All Markets') && perpAccountValue > 0 && (
                           <View style={styles.equityRow}>
                             <Text style={styles.equityLabel}>Perp</Text>
                             <Text style={styles.equityValue}>${formatNumber(perpAccountValue, 2)}</Text>
                           </View>
                         )}
-                        {(showSpot || marketFilter === 'All') && spotTotalValue > 0 && (
+                        {(showSpot || marketFilter === 'All Markets') && spotTotalValue > 0 && (
                           <View style={styles.equityRow}>
                             <Text style={styles.equityLabel}>Spot</Text>
                             <Text style={styles.equityValue}>${formatNumber(spotTotalValue, 2)}</Text>
                           </View>
                         )}
-                        {(showStaking && (marketFilter === 'All' || marketFilter !== 'Staking')) && stakingValue > 0 && (
+                        {(showStaking && (marketFilter === 'All Markets' || marketFilter !== 'Staking')) && stakingValue > 0 && (
                           <View style={styles.equityRow}>
                             <Text style={styles.equityLabel}>Staking</Text>
                             <Text style={styles.equityValue}>${formatNumber(stakingValue, 2)}</Text>
@@ -609,7 +754,7 @@ export default function PortfolioScreen(): React.JSX.Element {
                   </View>
 
                   {/* Account Details */}
-                  {(showPerps || showSpot || marketFilter === 'Perp+Spot' || marketFilter === 'All') && (
+                  {(showPerps || showSpot || marketFilter === 'Perp+Spot' || marketFilter === 'All Markets') && (
                     <>
                       <View style={styles.separator} />
                       <View style={styles.accountDetailsContainer}>
@@ -692,42 +837,58 @@ export default function PortfolioScreen(): React.JSX.Element {
                         const priceChange = price - prevDayPx;
                         const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
                         
+                        // Format TP/SL display
+                        const tpDisplay = item.position.tpPrice ? item.position.tpPrice.toFixed(2) : '--';
+                        const slDisplay = item.position.slPrice ? item.position.slPrice.toFixed(2) : '--';
+                        
                         return (
-                          <TouchableOpacity
-                            key={`perp-${item.position.coin}`}
-                            style={styles.positionCell}
-                            onPress={() => handleNavigateToChart(item.position.coin, 'perp')}
-                          >
-                            <View style={styles.leftSide}>
-                              <View style={styles.tickerContainer}>
-                                <Text style={styles.ticker}>{item.position.coin}</Text>
+                          <View key={`perp-${item.position.coin}`}>
+                            <TouchableOpacity
+                              style={styles.positionCell}
+                              onPress={() => handleNavigateToChart(item.position.coin, 'perp')}
+                            >
+                              <View style={styles.leftSide}>
+                                <View style={styles.tickerContainer}>
+                                  <Text style={styles.ticker}>{item.position.coin}</Text>
+                                  <Text style={[
+                                    styles.leverage,
+                                    { color: isLong ? Color.BRIGHT_ACCENT : Color.RED }
+                                  ]}>
+                                    {leverage}x
+                                  </Text>
+                                </View>
+                                <View style={styles.priceContainer}>
+                                  <Text style={styles.size}>${formatNumber(price)}</Text>
+                                  <Text style={[
+                                    styles.priceChange,
+                                    { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
+                                  ]}>
+                                    {formatPercent(priceChangePct)}
+                                  </Text>
+                                  <TouchableOpacity 
+                                    style={{ flexDirection: 'row', alignItems: 'center' }}
+                                    onPress={(e) => {
+                                      e.stopPropagation();
+                                      setEditingTPSL(item.position);
+                                    }}
+                                  >
+                                    <Text style={styles.tpslInline}>TP/SL {tpDisplay}/{slDisplay}</Text>
+                                    <MaterialIcons name="edit" size={14} color={Color.BRIGHT_ACCENT} style={styles.editTpslIcon} />
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+                              <View style={styles.rightSide}>
+                                <Text style={styles.price}>${formatNumber(item.marginUsed, 2)}</Text>
                                 <Text style={[
-                                  styles.leverage,
-                                  { color: isLong ? Color.BRIGHT_ACCENT : Color.RED }
+                                  styles.pnl,
+                                  { color: item.pnl.pnl >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
                                 ]}>
-                                  {leverage}x
+                                  {item.pnl.pnl >= 0 ? '+' : '-'}${formatNumber(Math.abs(item.pnl.pnl), 2)}
                                 </Text>
                               </View>
-                              <View style={styles.priceContainer}>
-                                <Text style={styles.size}>${formatNumber(price)}</Text>
-                                <Text style={[
-                                  styles.priceChange,
-                                  { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
-                                ]}>
-                                  {formatPercent(priceChangePct)}
-                                </Text>
-                              </View>
-                            </View>
-                            <View style={styles.rightSide}>
-                              <Text style={styles.price}>${formatNumber(item.marginUsed, 2)}</Text>
-                              <Text style={[
-                                styles.pnl,
-                                { color: item.pnl.pnl >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
-                              ]}>
-                                {item.pnl.pnl >= 0 ? '+' : '-'}${formatNumber(Math.abs(item.pnl.pnl), 2)}
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
+                            </TouchableOpacity>
+                            <View style={styles.cellSeparator} />
+                          </View>
                         );
                       })}
                     </View>
@@ -748,32 +909,34 @@ export default function PortfolioScreen(): React.JSX.Element {
                         const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
                         
                         return (
-                          <TouchableOpacity
-                            key={`spot-${item.balance.coin}`}
-                            style={styles.positionCell}
-                            onPress={() => handleNavigateToChart(item.balance.coin, 'spot')}
-                          >
-                            <View style={styles.leftSide}>
-                              <View style={styles.tickerContainer}>
-                                <Text style={styles.ticker}>{item.balance.coin}</Text>
+                          <View key={`spot-${item.balance.coin}`}>
+                            <TouchableOpacity
+                              style={styles.positionCell}
+                              onPress={() => handleNavigateToChart(item.balance.coin, 'spot')}
+                            >
+                              <View style={styles.leftSide}>
+                                <View style={styles.tickerContainer}>
+                                  <Text style={styles.ticker}>{item.balance.coin}</Text>
+                                </View>
+                                <View style={styles.priceContainer}>
+                                  <Text style={styles.size}>${formatNumber(price)}</Text>
+                                  <Text style={[
+                                    styles.priceChange,
+                                    { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
+                                  ]}>
+                                    {formatPercent(priceChangePct)}
+                                  </Text>
+                                </View>
                               </View>
-                              <View style={styles.priceContainer}>
-                                <Text style={styles.size}>${formatNumber(price)}</Text>
-                                <Text style={[
-                                  styles.priceChange,
-                                  { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
-                                ]}>
-                                  {formatPercent(priceChangePct)}
+                              <View style={styles.rightSide}>
+                                <Text style={styles.price}>${formatNumber(item.usdValue, 2)}</Text>
+                                <Text style={[styles.pnl, { color: Color.FG_3 }]}>
+                                  {formatNumber(item.total, 4)} {item.balance.coin}
                                 </Text>
                               </View>
-                            </View>
-                            <View style={styles.rightSide}>
-                              <Text style={styles.price}>${formatNumber(item.usdValue, 2)}</Text>
-                              <Text style={[styles.pnl, { color: Color.FG_3 }]}>
-                                {formatNumber(item.total, 4)} {item.balance.coin}
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
+                            </TouchableOpacity>
+                            <View style={styles.cellSeparator} />
+                          </View>
                         );
                       })}
                     </View>
@@ -808,7 +971,7 @@ export default function PortfolioScreen(): React.JSX.Element {
                       const orderMarketType = getOrderMarketType(order.coin);
                       
                       // Debug logging
-                      if (marketFilter === 'All') {
+                      if (marketFilter === 'All Markets') {
                         console.log('[PortfolioScreen] Order:', order.coin, 'Type:', orderMarketType);
                       }
                       
@@ -818,8 +981,8 @@ export default function PortfolioScreen(): React.JSX.Element {
                         return orderMarketType === 'spot';
                       } else if (marketFilter === 'Perp+Spot') {
                         return orderMarketType === 'perp' || orderMarketType === 'spot';
-                      } else if (marketFilter === 'All') {
-                        // For 'All', show both perp and spot orders
+                      } else if (marketFilter === 'All Markets') {
+                        // For 'All Markets', show both perp and spot orders
                         return orderMarketType === 'perp' || orderMarketType === 'spot';
                       } else if (marketFilter === 'Staking') {
                         return false; // No orders for staking
@@ -829,41 +992,47 @@ export default function PortfolioScreen(): React.JSX.Element {
                     
                     return filteredOrders.length > 0 && (
                       <View style={styles.positionsContainer}>
-                        <Text style={styles.sectionLabel}>
-                          Open Orders ({filteredOrders.length})
-                        </Text>
+                        <View style={styles.ordersHeaderRow}>
+                          <Text style={styles.sectionLabel}>
+                            Open Orders ({filteredOrders.length})
+                          </Text>
+                          <TouchableOpacity onPress={handleCancelAll}>
+                            <Text style={styles.cancelAllText}>Cancel All</Text>
+                          </TouchableOpacity>
+                        </View>
                         {filteredOrders.slice(0, 10).map((order: any, idx: number) => {
                           const orderMarketType = getOrderMarketType(order.coin);
                           const displayName = getDisplayName(order.coin);
                           
                           return (
-                            <View key={`order-${idx}-${order.oid}`} style={styles.orderCard}>
-                              <TouchableOpacity
-                                style={styles.orderLeftSide}
-                                onPress={() => {
-                                  if (orderMarketType) {
-                                    handleNavigateToChart(order.coin, orderMarketType);
-                                  }
-                                }}
-                              >
-                                <View style={styles.orderCoinContainer}>
-                                  <Text style={styles.orderCoin}>{displayName}</Text>
-                                  <Text style={[
-                                    styles.orderSide,
-                                    order.side === 'B' ? styles.sideBuy : styles.sideSell
-                                  ]}>
-                                    {order.side === 'B' ? 'BUY' : 'SELL'}
-                                  </Text>
-                                </View>
-                                <View style={styles.orderDetails}>
-                                  <Text style={styles.orderPrice}>${order.limitPx}</Text>
-                                  <Text style={styles.orderSize}>{order.sz}</Text>
-                                </View>
-                              </TouchableOpacity>
-                              <View style={styles.orderRightSide}>
+                            <View key={`order-${idx}-${order.oid}`}>
+                              <View style={styles.orderCard}>
                                 <TouchableOpacity
-                                  style={styles.cancelOrderButton}
-                                  onPress={async () => {
+                                  style={styles.orderLeftSide}
+                                  onPress={() => {
+                                    if (orderMarketType) {
+                                      handleNavigateToChart(order.coin, orderMarketType);
+                                    }
+                                  }}
+                                >
+                                  <View style={styles.orderCoinContainer}>
+                                    <Text style={styles.orderCoin}>{displayName}</Text>
+                                    <Text style={[
+                                      styles.orderSide,
+                                      order.side === 'B' ? styles.sideBuy : styles.sideSell
+                                    ]}>
+                                      {order.side === 'B' ? 'BUY' : 'SELL'}
+                                    </Text>
+                                  </View>
+                                  <View style={styles.orderDetails}>
+                                    <Text style={styles.orderPrice}>${order.limitPx}</Text>
+                                    <Text style={styles.orderSize}>{order.sz}</Text>
+                                  </View>
+                                </TouchableOpacity>
+                                <View style={styles.orderRightSide}>
+                                  <TouchableOpacity
+                                    style={styles.cancelOrderButton}
+                                    onPress={async () => {
                                     if (!exchangeClient) {
                                       Alert.alert('Error', 'Wallet not connected');
                                       return;
@@ -907,9 +1076,11 @@ export default function PortfolioScreen(): React.JSX.Element {
                                     );
                                   }}
                                 >
-                                  <Text style={styles.cancelOrderButtonText}>Cancel</Text>
-                                </TouchableOpacity>
+                                    <Text style={styles.cancelOrderButtonText}>Cancel</Text>
+                                  </TouchableOpacity>
+                                </View>
                               </View>
+                              <View style={styles.cellSeparator} />
                             </View>
                           );
                         })}
@@ -920,7 +1091,7 @@ export default function PortfolioScreen(): React.JSX.Element {
                   {/* Staking Section */}
                   {showStaking && (
                     <View style={styles.stakingSection}>
-                      {marketFilter === 'All' && (
+                      {marketFilter === 'All Markets' && (
                         <Text style={styles.sectionLabel}>Staking</Text>
                       )}
                       <View style={styles.stakingCard}>
@@ -980,20 +1151,20 @@ export default function PortfolioScreen(): React.JSX.Element {
                         {/* Transfer Buttons */}
                         <View style={styles.stakingButtons}>
                           <TouchableOpacity 
-                            style={styles.stakingButton}
+                            style={styles.depositButton}
                             onPress={() => setTransferToStakingVisible(true)}
                             disabled={!account.data.spotBalances.find(b => b.coin === 'HYPE') || 
                                       parseFloat(account.data.spotBalances.find(b => b.coin === 'HYPE')?.total || '0') <= 0}
                           >
-                            <Text style={styles.stakingButtonText}>Transfer to Staking</Text>
+                            <Text style={styles.depositButtonText}>Transfer to Staking</Text>
                           </TouchableOpacity>
                           <TouchableOpacity 
-                            style={styles.stakingButton}
+                            style={styles.withdrawButton}
                             onPress={() => setTransferFromStakingVisible(true)}
                             disabled={!account.data.stakingSummary || 
                                       parseFloat(account.data.stakingSummary.undelegated || '0') <= 0}
                           >
-                            <Text style={styles.stakingButtonText}>Transfer to Spot</Text>
+                            <Text style={styles.withdrawButtonText}>Transfer to Spot</Text>
                           </TouchableOpacity>
                         </View>
 
@@ -1042,6 +1213,9 @@ export default function PortfolioScreen(): React.JSX.Element {
                     </View>
                   )}
 
+                  {/* Separator */}
+                  <View style={styles.separator} />
+
                   {/* Recent Trades */}
                   {filteredFills.length > 0 && (
                     <View style={styles.recentTradesContainer}>
@@ -1049,40 +1223,43 @@ export default function PortfolioScreen(): React.JSX.Element {
                         Recent Trades ({filteredFills.length})
                       </Text>
                       {filteredFills.slice(0, tradesDisplayLimit).map((fill: UserFill, idx: number) => (
-                        <View key={`fill-${idx}`} style={styles.tradeCard}>
-                          <View style={styles.tradeLeftSide}>
-                            <View style={styles.tradeTopRow}>
-                              <Text style={styles.tradeCoin}>{fill.coin}</Text>
-                              <Text style={[
-                                styles.tradeSide,
-                                fill.side === 'B' ? styles.sideBuy : styles.sideSell
-                              ]}>
-                                {fill.side === 'B' ? 'BUY' : 'SELL'}
-                              </Text>
-                              {fill.closedPnl && parseFloat(fill.closedPnl) !== 0 && (
+                        <View key={`fill-${idx}`}>
+                          <View style={styles.tradeCard}>
+                            <View style={styles.tradeLeftSide}>
+                              <View style={styles.tradeTopRow}>
+                                <Text style={styles.tradeCoin}>{fill.coin}</Text>
                                 <Text style={[
-                                  styles.tradePnl,
-                                  parseFloat(fill.closedPnl) >= 0 ? styles.pnlPositive : styles.pnlNegative
+                                  styles.tradeSide,
+                                  fill.side === 'B' ? styles.sideBuy : styles.sideSell
                                 ]}>
-                                  {parseFloat(fill.closedPnl) >= 0 ? '+' : ''}${parseFloat(fill.closedPnl).toFixed(2)}
+                                  {fill.side === 'B' ? 'BUY' : 'SELL'}
+                                </Text>
+                                {fill.closedPnl && parseFloat(fill.closedPnl) !== 0 && (
+                                  <Text style={[
+                                    styles.tradePnl,
+                                    parseFloat(fill.closedPnl) >= 0 ? styles.pnlPositive : styles.pnlNegative
+                                  ]}>
+                                    {parseFloat(fill.closedPnl) >= 0 ? '+' : ''}${parseFloat(fill.closedPnl).toFixed(2)}
+                                  </Text>
+                                )}
+                              </View>
+                              {fill.time && (
+                                <Text style={styles.tradeTime}>
+                                  {new Date(fill.time).toLocaleString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
                                 </Text>
                               )}
                             </View>
-                            {fill.time && (
-                              <Text style={styles.tradeTime}>
-                                {new Date(fill.time).toLocaleString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
-                              </Text>
-                            )}
+                            <View style={styles.tradeRightSide}>
+                              <Text style={styles.tradePrice}>${formatNumber(parseFloat(fill.px), 2)}</Text>
+                              <Text style={styles.tradeSize}>{fill.sz}</Text>
+                            </View>
                           </View>
-                          <View style={styles.tradeRightSide}>
-                            <Text style={styles.tradePrice}>${formatNumber(parseFloat(fill.px), 2)}</Text>
-                            <Text style={styles.tradeSize}>{fill.sz}</Text>
-                          </View>
+                          <View style={styles.cellSeparator} />
                         </View>
                       ))}
                       
@@ -1172,6 +1349,14 @@ export default function PortfolioScreen(): React.JSX.Element {
           }}
           validator={selectedDelegation.validator}
           maxAmount={parseFloat(selectedDelegation.amount)}
+        />
+      )}
+      {editingTPSL && (
+        <TPSLEditModal
+          visible={!!editingTPSL}
+          onClose={() => setEditingTPSL(null)}
+          position={editingTPSL}
+          currentPrice={parseFloat(wsState.prices[editingTPSL.coin] || editingTPSL.entryPx)}
         />
       )}
     </SafeAreaView>

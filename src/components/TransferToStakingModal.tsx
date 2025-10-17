@@ -5,7 +5,7 @@ import {
   Modal,
   TouchableOpacity,
   TextInput,
-  ActivityIndicator,
+  Image,
   Animated,
   KeyboardAvoidingView,
   Platform,
@@ -244,7 +244,10 @@ export default function TransferToStakingModal({
 
               <View style={styles.body}>
                 <View style={styles.statusContainer}>
-                  <ActivityIndicator size="large" color="#00FF94" />
+                  <Image 
+                    source={require('../../assets/blob_green.gif')} 
+                    style={styles.loadingGif}
+                  />
                   <Text style={styles.statusText}>
                     Transferring {amountNum.toFixed(6)} HYPE to staking...
                   </Text>

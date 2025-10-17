@@ -28,6 +28,10 @@ export interface PerpPosition {
   };
   liquidationPx?: string | null;
   marginUsed?: string;
+  tpPrice?: number | null;
+  slPrice?: number | null;
+  tpOrderId?: number | null;
+  slOrderId?: number | null;
 }
 
 export interface SpotBalance {
@@ -62,6 +66,8 @@ export interface OpenOrder {
   oid: number;
   timestamp: number;
   origSz: string;
+  triggerPx?: string;
+  orderType?: string;
 }
 
 export interface StakingSummary {

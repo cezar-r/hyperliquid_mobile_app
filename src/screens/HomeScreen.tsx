@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Animated, SafeAreaView } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAccount } from '@reown/appkit-react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,6 +12,7 @@ import { formatPrice, formatSize } from '../lib/formatting';
 import { styles } from './styles/HomeScreen.styles';
 import type { PerpPosition, SpotBalance } from '../types';
 import Color from '../styles/colors';
+import TPSLEditModal from '../components/TPSLEditModal';
 
 type MarketFilter = 'Perp' | 'Spot' | 'Perp+Spot';
 
@@ -50,6 +52,7 @@ export default function HomeScreen(): React.JSX.Element {
   const navigation = useNavigation<any>();
   const [closingPosition, setClosingPosition] = useState<string | null>(null);
   const [marketFilter, setMarketFilter] = useState<MarketFilter>('Perp+Spot');
+  const [editingTPSL, setEditingTPSL] = useState<PerpPosition | null>(null);
   
   // For balance animation
   const [previousBalance, setPreviousBalance] = useState<number | null>(null);
@@ -440,12 +443,32 @@ export default function HomeScreen(): React.JSX.Element {
 
         {!account.isLoading && !account.error && account.data && (
           <View style={styles.positionsContainer}>
-            {/* Perp Positions */}
-            {(marketFilter === 'Perp' || marketFilter === 'Perp+Spot') && sortedPerpPositions.length > 0 && (
+            {/* Perp Positions + USDC Withdrawable */}
+            {(marketFilter === 'Perp' || marketFilter === 'Perp+Spot') && (
               <View>
                 {marketFilter === 'Perp+Spot' && (
                   <Text style={styles.sectionLabel}>Perps</Text>
                 )}
+                
+                {/* USDC Withdrawable (Perp Account) */}
+                <View style={styles.positionCell}>
+                  <View style={styles.leftSide}>
+                    <View style={styles.tickerContainer}>
+                      <Text style={styles.ticker}>USDC</Text>
+                    </View>
+                    <View style={styles.priceContainer}>
+                      <Text style={styles.size}>Withdrawable</Text>
+                    </View>
+                  </View>
+                  <View style={styles.rightSide}>
+                    <Text style={styles.price}>${formatNumber(withdrawableUsdc, 2)}</Text>
+                    <Text style={[styles.pnl, { color: Color.FG_3 }]}>
+                      {formatNumber(withdrawableUsdc, 2)} USDC
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.separator} />
+                
                 {sortedPerpPositions.map((item, idx) => {
                   const positionSize = parseFloat(item.position.szi);
                   const isLong = positionSize > 0;
@@ -457,42 +480,48 @@ export default function HomeScreen(): React.JSX.Element {
                   const priceChange = price - prevDayPx;
                   const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
                   
+                  // Format TP/SL display
+                  const tpDisplay = item.position.tpPrice ? item.position.tpPrice.toFixed(2) : '--';
+                  const slDisplay = item.position.slPrice ? item.position.slPrice.toFixed(2) : '--';
+                  
                   return (
-                    <TouchableOpacity
-                      key={`perp-${item.position.coin}`}
-                      style={styles.positionCell}
-                      onPress={() => handleNavigateToChart(item.position.coin, 'perp')}
-                    >
-                      <View style={styles.leftSide}>
-                        <View style={styles.tickerContainer}>
-                          <Text style={styles.ticker}>{item.position.coin}</Text>
+                    <View key={`perp-${item.position.coin}`}>
+                      <TouchableOpacity
+                        style={styles.positionCell}
+                        onPress={() => handleNavigateToChart(item.position.coin, 'perp')}
+                      >
+                        <View style={styles.leftSide}>
+                          <View style={styles.tickerContainer}>
+                            <Text style={styles.ticker}>{item.position.coin}</Text>
+                            <Text style={[
+                              styles.leverage,
+                              { color: isLong ? Color.BRIGHT_ACCENT : Color.RED }
+                            ]}>
+                              {leverage}x
+                            </Text>
+                          </View>
+                          <View style={styles.priceContainer}>
+                            <Text style={styles.size}>${formatNumber(price)}</Text>
+                            <Text style={[
+                              styles.priceChange,
+                              { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
+                            ]}>
+                              {formatPercent(priceChangePct)}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.rightSide}>
+                          <Text style={styles.price}>${formatNumber(item.marginUsed, 2)}</Text>
                           <Text style={[
-                            styles.leverage,
-                            { color: isLong ? Color.BRIGHT_ACCENT : Color.RED }
+                            styles.pnl,
+                            { color: item.pnl.pnl >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
                           ]}>
-                            {leverage}x
+                            {item.pnl.pnl >= 0 ? '+' : '-'}${formatNumber(Math.abs(item.pnl.pnl), 2)}
                           </Text>
                         </View>
-                        <View style={styles.priceContainer}>
-                          <Text style={styles.size}>${formatNumber(price)}</Text>
-                          <Text style={[
-                            styles.priceChange,
-                            { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
-                          ]}>
-                            {formatPercent(priceChangePct)}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.rightSide}>
-                        <Text style={styles.price}>${formatNumber(item.marginUsed, 2)}</Text>
-                        <Text style={[
-                          styles.pnl,
-                          { color: item.pnl.pnl >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
-                        ]}>
-                          {item.pnl.pnl >= 0 ? '+' : '-'}${formatNumber(Math.abs(item.pnl.pnl), 2)}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                      <View style={styles.separator} />
+                    </View>
                   );
                 })}
               </View>
@@ -502,7 +531,7 @@ export default function HomeScreen(): React.JSX.Element {
             {(marketFilter === 'Spot' || marketFilter === 'Perp+Spot') && sortedSpotBalances.length > 0 && (
               <View style={marketFilter === 'Perp+Spot' ? styles.spotSection : undefined}>
                 {marketFilter === 'Perp+Spot' && (
-                  <Text style={styles.sectionLabel}>Balances</Text>
+                  <Text style={styles.balancesLabel}>Balances</Text>
                 )}
                 {sortedSpotBalances.map((item) => {
                   const price = item.price ? parseFloat(item.price) : 0;
@@ -513,32 +542,34 @@ export default function HomeScreen(): React.JSX.Element {
                   const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
                   
                   return (
-                    <TouchableOpacity
-                      key={`spot-${item.balance.coin}`}
-                      style={styles.positionCell}
-                      onPress={() => handleNavigateToChart(item.balance.coin, 'spot')}
-                    >
-                      <View style={styles.leftSide}>
-                        <View style={styles.tickerContainer}>
-                          <Text style={styles.ticker}>{item.balance.coin}</Text>
+                    <View key={`spot-${item.balance.coin}`}>
+                      <TouchableOpacity
+                        style={styles.positionCell}
+                        onPress={() => handleNavigateToChart(item.balance.coin, 'spot')}
+                      >
+                        <View style={styles.leftSide}>
+                          <View style={styles.tickerContainer}>
+                            <Text style={styles.ticker}>{item.balance.coin}</Text>
+                          </View>
+                          <View style={styles.priceContainer}>
+                            <Text style={styles.size}>${formatNumber(price)}</Text>
+                            <Text style={[
+                              styles.priceChange,
+                              { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
+                            ]}>
+                              {formatPercent(priceChangePct)}
+                            </Text>
+                          </View>
                         </View>
-                        <View style={styles.priceContainer}>
-                          <Text style={styles.size}>${formatNumber(price)}</Text>
-                          <Text style={[
-                            styles.priceChange,
-                            { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
-                          ]}>
-                            {formatPercent(priceChangePct)}
+                        <View style={styles.rightSide}>
+                          <Text style={styles.price}>${formatNumber(item.usdValue, 2)}</Text>
+                          <Text style={[styles.pnl, { color: Color.FG_3 }]}>
+                            {formatNumber(item.total, 4)} {item.balance.coin}
                           </Text>
                         </View>
-                      </View>
-                      <View style={styles.rightSide}>
-                        <Text style={styles.price}>${formatNumber(item.usdValue, 2)}</Text>
-                        <Text style={[styles.pnl, { color: Color.FG_3 }]}>
-                          {formatNumber(item.total, 4)} {item.balance.coin}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                      <View style={styles.separator} />
+                    </View>
                   );
                 })}
               </View>
@@ -568,6 +599,16 @@ export default function HomeScreen(): React.JSX.Element {
           </Animated.View>
         </GestureDetector>
       </View>
+      
+      {/* TP/SL Edit Modal */}
+      {editingTPSL && (
+        <TPSLEditModal
+          visible={!!editingTPSL}
+          onClose={() => setEditingTPSL(null)}
+          position={editingTPSL}
+          currentPrice={parseFloat(wsState.prices[editingTPSL.coin] || editingTPSL.entryPx)}
+        />
+      )}
     </SafeAreaView>
   );
 }

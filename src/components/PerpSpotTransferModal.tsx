@@ -2,7 +2,7 @@
  * Perp <-> Spot Transfer Modal - Internal USDC transfers between Perp and Spot accounts
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import { useWallet } from '../contexts/WalletContext';
+import { useWebSocket } from '../contexts/WebSocketContext';
 import { styles } from './styles/PerpSpotTransferModal.styles';
 
 interface PerpSpotTransferModalProps {
@@ -32,15 +33,38 @@ export default function PerpSpotTransferModal({
   perpBalance,
   spotBalance,
 }: PerpSpotTransferModalProps): React.JSX.Element {
-  const { mainExchangeClient, refetchAccount } = useWallet();
+  const { mainExchangeClient, refetchAccount, account } = useWallet();
+  const { state: wsState } = useWebSocket();
   const [amount, setAmount] = useState('');
   const [toPerp, setToPerp] = useState(true); // true = Spot -> Perp, false = Perp -> Spot
   const [step, setStep] = useState<Step>('form');
   const [error, setError] = useState<string | null>(null);
   const [slideAnim] = useState(new Animated.Value(1000));
 
+  // Calculate USDC locked in spot BUY limit orders
+  const lockedSpotUSDC = useMemo(() => {
+    const openOrders = account.data?.openOrders || [];
+    const spotMarkets = wsState.spotMarkets;
+    
+    return openOrders.reduce((locked, order) => {
+      // Check if this is a spot order by matching apiName (@{index} format)
+      const spotMarket = spotMarkets.find(m => m.apiName === order.coin);
+      
+      // Only count BUY orders (they lock USDC)
+      if (spotMarket && order.side === 'B') {
+        const price = parseFloat(order.limitPx);
+        const size = parseFloat(order.sz);
+        return locked + (price * size);
+      }
+      
+      return locked;
+    }, 0);
+  }, [account.data?.openOrders, wsState.spotMarkets]);
+
   const amountNum = parseFloat(amount) || 0;
-  const maxAmount = toPerp ? spotBalance : perpBalance;
+  // When transferring Spot → Perp, deduct locked USDC from available balance
+  const availableSpotUSDC = Math.max(0, spotBalance - lockedSpotUSDC);
+  const maxAmount = toPerp ? availableSpotUSDC : perpBalance;
   const isValid = amountNum > 0 && amountNum <= maxAmount;
 
   useEffect(() => {
@@ -215,7 +239,7 @@ export default function PerpSpotTransferModal({
                   </View>
                   <View style={styles.balanceRow}>
                     <Text style={styles.balanceLabel}>Spot Balance:</Text>
-                    <Text style={styles.balanceValue}>{spotBalance.toFixed(2)} USDC</Text>
+                    <Text style={styles.balanceValue}>{availableSpotUSDC.toFixed(2)} USDC</Text>
                   </View>
                   <View style={[styles.balanceRow, { marginBottom: 0 }]}>
                     <Text style={styles.balanceLabel}>Available to Transfer:</Text>

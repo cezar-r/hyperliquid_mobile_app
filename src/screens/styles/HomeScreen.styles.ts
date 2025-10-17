@@ -77,8 +77,16 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     color: Color.FG_3,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 4,
     // marginTop: 8,
+  },
+
+  balancesLabel: {
+    fontSize: 15,
+    color: Color.FG_3,
+    fontWeight: '600',
+    marginBottom: 1,
+    paddingTop: 6,
   },
   
   // Spot Section Spacing
@@ -86,17 +94,35 @@ export const styles = StyleSheet.create({
     marginTop: 20,
   },
 
+  // Position Cell Container
+  positionCellContainer: {
+    width: '100%',
+  },
+  
   // Position Cell (for both perp and spot)
   positionCell: {
-    borderRadius: 5,
     paddingHorizontal: 10,
-    paddingVertical: 7,
-    marginBottom: 8,
+    paddingVertical: 12,
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    borderWidth: 2,
-    borderColor: Color.BG_1,
+    backgroundColor: '#0b0f13',
+  },
+  
+  // TP/SL Inline Styles
+  tpslInline: {
+    fontSize: 11,
+    color: Color.FG_3,
+    marginTop: 2,
+  },
+  editTpslIcon: {
+    marginLeft: 6,
+  },
+  
+  separator: {
+    borderBottomColor: Color.BG_1,
+    borderBottomWidth: 1,
+    width: '100%',
   },
   leftSide: {
     justifyContent: 'space-between',

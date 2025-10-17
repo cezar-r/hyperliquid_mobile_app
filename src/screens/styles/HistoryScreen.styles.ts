@@ -71,12 +71,14 @@ export const styles = StyleSheet.create({
   tradeCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    marginBottom: spacing.xs,
-    borderRadius: 5,
-    borderWidth: 2,
-    borderColor: Color.BG_1,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    backgroundColor: '#0b0f13',
+  },
+  cellSeparator: {
+    borderBottomColor: Color.BG_1,
+    borderBottomWidth: 1,
+    width: '100%',
   },
   tradeLeftSide: {
     flex: 1,

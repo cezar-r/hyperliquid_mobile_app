@@ -9,7 +9,7 @@ import {
   Modal,
   TouchableOpacity,
   TextInput,
-  ActivityIndicator,
+  Image,
   ScrollView,
   Linking,
   Alert,
@@ -428,7 +428,10 @@ export default function DepositModal({ visible, onClose }: DepositModalProps): R
               {/* Pending Step */}
               {step === 'pending' && (
                 <View style={styles.pendingStep}>
-                  <ActivityIndicator size="large" color={Color.BRIGHT_ACCENT} style={styles.spinner} />
+                  <Image 
+                    source={require('../../assets/blob_green.gif')} 
+                    style={styles.loadingGif}
+                  />
                   <Text style={styles.pendingTitle}>Transaction Pending...</Text>
                   <Text style={styles.pendingText}>
                     Please wait for the transaction to be confirmed on {arbitrumChain.name}.

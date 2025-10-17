@@ -10,7 +10,6 @@ import { AppKit, AppKitProvider } from '@reown/appkit-react-native';
 import Color from './src/styles/colors';
 import RootNavigator from './src/navigation/RootNavigator';
 import { WalletProvider } from './src/contexts/WalletContext';
-import { WebSocketProvider } from './src/contexts/WebSocketContext';
 import { appKit } from './src/lib/appKitConfig';
 
 SplashScreen.preventAutoHideAsync();
@@ -60,11 +59,9 @@ export default function App(): React.JSX.Element {
           </View>
           {appKitReady && (
             <NavigationContainer>
-              <WebSocketProvider>
-                <WalletProvider>
-                  <RootNavigator />
-                </WalletProvider>
-              </WebSocketProvider>
+              <WalletProvider>
+                <RootNavigator />
+              </WalletProvider>
             </NavigationContainer>
           )}
           <StatusBar style="light" />

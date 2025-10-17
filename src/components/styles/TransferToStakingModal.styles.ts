@@ -192,6 +192,10 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.xl,
   },
+  loadingGif: {
+    width: 100,
+    height: 100,
+  },
   statusText: {
     fontSize: fontSizes.md,
     color: Color.FG_1,

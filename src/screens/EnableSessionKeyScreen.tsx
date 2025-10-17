@@ -28,7 +28,7 @@ export default function EnableSessionKeyScreen(): React.JSX.Element {
       console.log('[EnableSessionKey] Enabling session key for:', address);
       await enableSessionKey(address);
       console.log('[EnableSessionKey] ✓ Session key enabled successfully');
-      navigation.replace('Tabs');
+      navigation.replace('Authenticated', { screen: 'Tabs' });
     } catch (err: any) {
       console.error('[EnableSessionKey] Failed to enable session key:', err);
       setError(err.message || 'Failed to enable auto-approve. Please try again.');
@@ -38,7 +38,7 @@ export default function EnableSessionKeyScreen(): React.JSX.Element {
 
   const handleSkip = () => {
     console.log('[EnableSessionKey] User skipped session key setup');
-    navigation.replace('Tabs');
+    navigation.replace('Authenticated', { screen: 'Tabs' });
   };
 
   return (

@@ -289,7 +289,9 @@ export const styles = StyleSheet.create({
   pendingStep: {
     alignItems: 'center',
   },
-  spinner: {
+  loadingGif: {
+    width: 100,
+    height: 100,
     marginBottom: 20,
   },
   pendingTitle: {

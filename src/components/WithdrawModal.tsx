@@ -9,7 +9,7 @@ import {
   Modal,
   TouchableOpacity,
   TextInput,
-  ActivityIndicator,
+  Image,
   ScrollView,
   Alert,
   Animated,
@@ -73,7 +73,7 @@ export default function WithdrawModal({ visible, onClose }: WithdrawModalProps):
         useNativeDriver: true,
       }).start();
     }
-  }, [visible, address, account.data, slideAnim]);
+  }, [visible, slideAnim]);
 
   // Validate amount
   const validateAmount = useCallback((): string | null => {
@@ -309,7 +309,10 @@ export default function WithdrawModal({ visible, onClose }: WithdrawModalProps):
               {/* Pending Step */}
               {step === 'pending' && (
                 <View style={styles.pendingStep}>
-                  <ActivityIndicator size="large" color={Color.BRIGHT_ACCENT} style={styles.spinner} />
+                  <Image 
+                    source={require('../../assets/blob_green.gif')} 
+                    style={styles.loadingGif}
+                  />
                   <Text style={styles.pendingTitle}>Withdrawal Submitted</Text>
                   <Text style={styles.pendingText}>
                     Your withdrawal request has been signed and submitted to Hyperliquid validators.

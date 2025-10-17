@@ -11,10 +11,12 @@ import {
   Alert,
   Image,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import LightweightChartBridge, { LWCandle } from '../components/chart/LightweightChartBridge';
 import OrderTicket from '../components/OrderTicket';
 import SpotOrderTicket from '../components/SpotOrderTicket';
+import TPSLEditModal from '../components/TPSLEditModal';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { useWallet } from '../contexts/WalletContext';
 import { resolveSubscriptionCoin } from '../lib/markets';
@@ -124,6 +126,7 @@ export default function ChartScreen(): React.JSX.Element {
   const [orderTicketDefaultSide, setOrderTicketDefaultSide] = useState<'buy' | 'sell'>('buy');
   const [closingPosition, setClosingPosition] = useState<boolean>(false);
   const [cancelingOrder, setCancelingOrder] = useState<number | null>(null);
+  const [editingTPSL, setEditingTPSL] = useState<any | null>(null);
 
   // Price color animation
   const previousPrice = useRef<number | null>(null);
@@ -876,6 +879,10 @@ export default function ChartScreen(): React.JSX.Element {
                   ? parseFloat(perpPosition.marginUsed)
                   : parseFloat(perpPosition.positionValue || '0') / leverage;
                 
+                // Format TP/SL display
+                const tpDisplay = perpPosition.tpPrice ? perpPosition.tpPrice.toFixed(2) : '--';
+                const slDisplay = perpPosition.slPrice ? perpPosition.slPrice.toFixed(2) : '--';
+                
                 return (
                   <>
                     <View style={styles.positionCell}>
@@ -897,6 +904,13 @@ export default function ChartScreen(): React.JSX.Element {
                           ]}>
                             {formatPercentage(priceChangePct * 100)}
                           </Text>
+                          <TouchableOpacity 
+                            style={{ flexDirection: 'row', alignItems: 'center' }}
+                            onPress={() => setEditingTPSL(perpPosition)}
+                          >
+                            <Text style={styles.tpslInline}>TP/SL {tpDisplay}/{slDisplay}</Text>
+                            <MaterialIcons name="edit" size={14} color={Color.BRIGHT_ACCENT} style={styles.editTpslIcon} />
+                          </TouchableOpacity>
                         </View>
                       </View>
                       <View style={styles.rightSide}>
@@ -909,6 +923,7 @@ export default function ChartScreen(): React.JSX.Element {
                         </Text>
                       </View>
                     </View>
+                    
                     <TouchableOpacity
                       onPress={handleClosePosition}
                       disabled={closingPosition}
@@ -949,27 +964,30 @@ export default function ChartScreen(): React.JSX.Element {
                     const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
                     
                     return (
-                      <View key={`bal-${idx}`} style={styles.positionCell}>
-                        <View style={styles.leftSide}>
-                          <View style={styles.tickerContainer}>
-                            <Text style={styles.ticker}>{b.coin}</Text>
+                      <View key={`bal-${idx}`}>
+                        <View style={styles.positionCell}>
+                          <View style={styles.leftSide}>
+                            <View style={styles.tickerContainer}>
+                              <Text style={styles.ticker}>{b.coin}</Text>
+                            </View>
+                            <View style={styles.priceContainer}>
+                              <Text style={styles.size}>${formatNumber(coinPrice)}</Text>
+                              <Text style={[
+                                styles.priceChange,
+                                { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
+                              ]}>
+                                {formatPercentage(priceChangePct * 100)}
+                              </Text>
+                            </View>
                           </View>
-                          <View style={styles.priceContainer}>
-                            <Text style={styles.size}>${formatNumber(coinPrice)}</Text>
-                            <Text style={[
-                              styles.priceChange,
-                              { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
-                            ]}>
-                              {formatPercentage(priceChangePct * 100)}
+                          <View style={styles.rightSide}>
+                            <Text style={styles.price}>${formatNumber(usdValue, 2)}</Text>
+                            <Text style={[styles.pnl, { color: Color.FG_3 }]}>
+                              {formatNumber(balance, 4)} {b.coin}
                             </Text>
                           </View>
                         </View>
-                        <View style={styles.rightSide}>
-                          <Text style={styles.price}>${formatNumber(usdValue, 2)}</Text>
-                          <Text style={[styles.pnl, { color: Color.FG_3 }]}>
-                            {formatNumber(balance, 4)} {b.coin}
-                          </Text>
-                        </View>
+                        <View style={styles.cellSeparator} />
                       </View>
                     );
                   })
@@ -1013,33 +1031,36 @@ export default function ChartScreen(): React.JSX.Element {
                 const displayName = getDisplayName(order.coin);
                 
                 return (
-                  <View key={`order-${order.oid}`} style={styles.orderCard}>
-                    <View style={styles.orderLeftSide}>
-                      <View style={styles.orderCoinContainer}>
-                        <Text style={styles.orderCoin}>{displayName}</Text>
-                        <Text style={[
-                          styles.orderSide,
-                          order.side === 'B' ? styles.sideBuy : styles.sideSell
-                        ]}>
-                          {order.side === 'B' ? 'BUY' : 'SELL'}
-                        </Text>
+                  <View key={`order-${order.oid}`}>
+                    <View style={styles.orderCard}>
+                      <View style={styles.orderLeftSide}>
+                        <View style={styles.orderCoinContainer}>
+                          <Text style={styles.orderCoin}>{displayName}</Text>
+                          <Text style={[
+                            styles.orderSide,
+                            order.side === 'B' ? styles.sideBuy : styles.sideSell
+                          ]}>
+                            {order.side === 'B' ? 'BUY' : 'SELL'}
+                          </Text>
+                        </View>
+                        <View style={styles.orderDetails}>
+                          <Text style={styles.orderPrice}>${order.limitPx}</Text>
+                          <Text style={styles.orderSize}>{order.sz}</Text>
+                        </View>
                       </View>
-                      <View style={styles.orderDetails}>
-                        <Text style={styles.orderPrice}>${order.limitPx}</Text>
-                        <Text style={styles.orderSize}>{order.sz}</Text>
+                      <View style={styles.orderRightSide}>
+                        <TouchableOpacity
+                          style={styles.cancelOrderButton}
+                          onPress={() => handleCancelOrder(order.coin, order.oid)}
+                          disabled={cancelingOrder === order.oid}
+                        >
+                          <Text style={styles.cancelOrderButtonText}>
+                            {cancelingOrder === order.oid ? 'Canceling...' : 'Cancel'}
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
-                    <View style={styles.orderRightSide}>
-                      <TouchableOpacity
-                        style={styles.cancelOrderButton}
-                        onPress={() => handleCancelOrder(order.coin, order.oid)}
-                        disabled={cancelingOrder === order.oid}
-                      >
-                        <Text style={styles.cancelOrderButtonText}>
-                          {cancelingOrder === order.oid ? 'Canceling...' : 'Cancel'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                    <View style={styles.cellSeparator} />
                   </View>
                 );
               })}
@@ -1049,7 +1070,7 @@ export default function ChartScreen(): React.JSX.Element {
 
         {/* Trade history (per ticker, filtered by market type) */}
         <View style={styles.recentTradesContainer}>
-          <Text style={styles.sectionTitle}>Recent Trades</Text>
+          <Text style={styles.sectionLabel}>Recent Trades</Text>
           {(() => {
             // Filter trades by market type
             const perpCoins = new Set(state.perpMarkets.map(m => m.name));
@@ -1065,40 +1086,43 @@ export default function ChartScreen(): React.JSX.Element {
             
             return filteredTrades.length > 0 ? (
               filteredTrades.slice(0, 10).map((fill: any, idx: number) => (
-                <View key={`fill-${idx}`} style={styles.tradeCard}>
-                  <View style={styles.tradeLeftSide}>
-                    <View style={styles.tradeTopRow}>
-                      <Text style={styles.tradeCoin}>{fill.coin}</Text>
-                      <Text style={[
-                        styles.tradeSide,
-                        fill.side === 'B' ? styles.sideBuy : styles.sideSell
-                      ]}>
-                        {fill.side === 'B' ? 'BUY' : 'SELL'}
-                      </Text>
-                      {fill.closedPnl && parseFloat(fill.closedPnl) !== 0 && (
+                <View key={`fill-${idx}`}>
+                  <View style={styles.tradeCard}>
+                    <View style={styles.tradeLeftSide}>
+                      <View style={styles.tradeTopRow}>
+                        <Text style={styles.tradeCoin}>{fill.coin}</Text>
                         <Text style={[
-                          styles.tradePnl,
-                          parseFloat(fill.closedPnl) >= 0 ? styles.pnlPositive : styles.pnlNegative
+                          styles.tradeSide,
+                          fill.side === 'B' ? styles.sideBuy : styles.sideSell
                         ]}>
-                          {parseFloat(fill.closedPnl) >= 0 ? '+' : ''}${parseFloat(fill.closedPnl).toFixed(2)}
+                          {fill.side === 'B' ? 'BUY' : 'SELL'}
+                        </Text>
+                        {fill.closedPnl && parseFloat(fill.closedPnl) !== 0 && (
+                          <Text style={[
+                            styles.tradePnl,
+                            parseFloat(fill.closedPnl) >= 0 ? styles.pnlPositive : styles.pnlNegative
+                          ]}>
+                            {parseFloat(fill.closedPnl) >= 0 ? '+' : ''}${parseFloat(fill.closedPnl).toFixed(2)}
+                          </Text>
+                        )}
+                      </View>
+                      {fill.time && (
+                        <Text style={styles.tradeCardTime}>
+                          {new Date(fill.time).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
                         </Text>
                       )}
                     </View>
-                    {fill.time && (
-                      <Text style={styles.tradeCardTime}>
-                        {new Date(fill.time).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </Text>
-                    )}
+                    <View style={styles.tradeRightSide}>
+                      <Text style={styles.tradeCardPrice}>${formatNumber(parseFloat(fill.px), 2)}</Text>
+                      <Text style={styles.tradeCardSize}>{fill.sz}</Text>
+                    </View>
                   </View>
-                  <View style={styles.tradeRightSide}>
-                    <Text style={styles.tradeCardPrice}>${formatNumber(parseFloat(fill.px), 2)}</Text>
-                    <Text style={styles.tradeCardSize}>{fill.sz}</Text>
-                  </View>
+                  <View style={styles.cellSeparator} />
                 </View>
               ))
             ) : (
@@ -1144,6 +1168,16 @@ export default function ChartScreen(): React.JSX.Element {
           visible={showOrderTicket}
           onClose={() => setShowOrderTicket(false)}
           defaultSide={orderTicketDefaultSide}
+        />
+      )}
+      
+      {/* TP/SL Edit Modal */}
+      {editingTPSL && (
+        <TPSLEditModal
+          visible={!!editingTPSL}
+          onClose={() => setEditingTPSL(null)}
+          position={editingTPSL}
+          currentPrice={typeof currentPrice === 'string' ? parseFloat(currentPrice) : (currentPrice || 0)}
         />
       )}
     </View>
