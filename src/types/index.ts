@@ -188,3 +188,14 @@ export interface WebSocketState {
   recentTrades: Trade[];
 }
 
+export interface LedgerUpdate {
+  time: number;
+  hash: string;
+  delta:
+    | { type: 'deposit'; usdc: string }
+    | { type: 'withdraw'; usdc: string; nonce: number; fee: string }
+    | { type: 'accountClassTransfer'; usdc: string; toPerp: boolean }
+    | { type: 'spotTransfer'; token: string; amount: string; user: string; destination: string; fee: string; usdcValue: string }
+    | { type: 'internalTransfer'; usdc: string; user: string; destination: string; fee: string };
+}
+

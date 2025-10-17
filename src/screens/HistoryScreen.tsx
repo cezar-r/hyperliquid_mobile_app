@@ -1,43 +1,56 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, SafeAreaView, Animated } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useAccount } from '@reown/appkit-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../contexts/WalletContext';
-import { useWebSocket } from '../contexts/WebSocketContext';
 import { styles } from './styles/HistoryScreen.styles';
-import type { UserFill } from '../types';
+import type { UserFill, LedgerUpdate } from '../types';
 import Color from '../styles/colors';
 
-type MarketFilter = 'Perp' | 'Spot' | 'Perp+Spot';
+type ViewFilter = 'Trades' | 'Ledger';
 
-const HISTORY_MARKET_FILTER_KEY = 'hl_history_market_filter';
+const HISTORY_VIEW_FILTER_KEY = 'hl_history_view_filter';
 
-// Helper to format numbers
-function formatNumber(num: number, decimals: number = 2): string {
-  return num.toFixed(decimals);
+// Helper to format price like SearchScreen
+function formatPrice(num: number | undefined | null, maxDecimals: number = 5): string {
+  if (typeof num !== 'number' || !Number.isFinite(num)) {
+    return '0';
+  }
+  return num.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: maxDecimals,
+  });
+}
+
+// Helper to format dollar amounts (PnL, transfers) with commas and 2 decimals
+function formatDollarAmount(amount: string): string {
+  const num = parseFloat(amount);
+  if (!Number.isFinite(num)) {
+    return '0.00';
+  }
+  return num.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 export default function HistoryScreen(): React.JSX.Element {
   const { address } = useAccount();
-  const { account } = useWallet();
-  const { state: wsState } = useWebSocket();
+  const { account, infoClient } = useWallet();
   
   // Filter states
-  const [marketFilter, setMarketFilter] = useState<MarketFilter>('Perp+Spot');
-  const [tradesDisplayLimit, setTradesDisplayLimit] = useState(10);
-  
-  // For swipe animation
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  const [viewFilter, setViewFilter] = useState<ViewFilter>('Trades');
+  const [ledgerUpdates, setLedgerUpdates] = useState<LedgerUpdate[]>([]);
+  const [isLoadingLedger, setIsLoadingLedger] = useState(false);
+  const [ledgerError, setLedgerError] = useState<string | null>(null);
 
   // Load saved filter on mount
   useEffect(() => {
     const loadFilter = async () => {
       try {
-        const savedFilter = await AsyncStorage.getItem(HISTORY_MARKET_FILTER_KEY);
-        if (savedFilter && ['Perp', 'Spot', 'Perp+Spot'].includes(savedFilter)) {
-          setMarketFilter(savedFilter as MarketFilter);
+        const savedFilter = await AsyncStorage.getItem(HISTORY_VIEW_FILTER_KEY);
+        if (savedFilter && ['Trades', 'Ledger'].includes(savedFilter)) {
+          setViewFilter(savedFilter as ViewFilter);
         }
       } catch (error) {
         console.error('[HistoryScreen] Error loading filter:', error);
@@ -46,262 +59,320 @@ export default function HistoryScreen(): React.JSX.Element {
     loadFilter();
   }, []);
 
-  // Helper to get next/previous filter (circular navigation)
-  const getNextFilter = (current: MarketFilter, direction: 'left' | 'right'): MarketFilter => {
-    const filters: MarketFilter[] = ['Perp', 'Spot', 'Perp+Spot'];
-    const currentIndex = filters.indexOf(current);
-    
-    if (direction === 'left') {
-      // Swipe left: move to next
-      return filters[(currentIndex + 1) % filters.length];
-    } else {
-      // Swipe right: move to previous
-      return filters[(currentIndex - 1 + filters.length) % filters.length];
-    }
-  };
+  // Fetch ledger updates when viewing Ledger tab
+  useEffect(() => {
+    const fetchLedgerHistory = async () => {
+      if (!infoClient || !address || viewFilter !== 'Ledger') return;
 
-  // Save market filter when it changes with animation
-  const handleFilterChange = async (filter: MarketFilter, animated: boolean = false, direction?: 'left' | 'right') => {
-    if (animated && direction) {
-      // Start slide animation
-      const slideDistance = direction === 'left' ? -50 : 50;
-      slideAnim.setValue(slideDistance);
-      
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    }
-    
-    setMarketFilter(filter);
-    setTradesDisplayLimit(10); // Reset display limit when changing filter
+      setIsLoadingLedger(true);
+      setLedgerError(null);
+
+      try {
+        // Fetch last 30 days of ledger updates
+        const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        
+        const updates = await infoClient.userNonFundingLedgerUpdates({
+          user: address as `0x${string}`,
+          startTime: thirtyDaysAgo,
+        });
+
+        // Reverse to show newest first
+        setLedgerUpdates((updates as LedgerUpdate[]).reverse());
+      } catch (err: any) {
+        console.error('[HistoryScreen] Failed to fetch ledger history:', err);
+        setLedgerError('Failed to load ledger history');
+      } finally {
+        setIsLoadingLedger(false);
+      }
+    };
+
+    fetchLedgerHistory();
+  }, [infoClient, address, viewFilter]);
+
+  // Save view filter when it changes
+  const handleFilterChange = async (filter: ViewFilter) => {
+    setViewFilter(filter);
     try {
-      await AsyncStorage.setItem(HISTORY_MARKET_FILTER_KEY, filter);
+      await AsyncStorage.setItem(HISTORY_VIEW_FILTER_KEY, filter);
     } catch (error) {
       console.error('[HistoryScreen] Error saving filter:', error);
     }
   };
-  
-  // Handle swipe gesture
-  const handleSwipe = (direction: 'left' | 'right') => {
-    const nextFilter = getNextFilter(marketFilter, direction);
-    handleFilterChange(nextFilter, true, direction);
-  };
 
-  // Filter fills by market type
-  const filteredFills = useMemo(() => {
-    if (!account.data?.userFills) return [];
+  // All trades (no market filtering)
+  const allTrades = useMemo(() => {
+    return account.data?.userFills || [];
+  }, [account.data?.userFills]);
+
+  // Helper to format ledger type info
+  const renderLedgerCard = (update: LedgerUpdate) => {
+    const { delta } = update;
     
-    const perpCoins = new Set(wsState.perpMarkets.map(m => m.name));
-    const spotCoins = new Set(wsState.spotMarkets.map(m => m.name.split('/')[0]));
-    
-    let fills = account.data.userFills;
-    
-    // Filter by market type
-    if (marketFilter === 'Perp') {
-      fills = fills.filter(fill => perpCoins.has(fill.coin));
-    } else if (marketFilter === 'Spot') {
-      fills = fills.filter(fill => spotCoins.has(fill.coin));
-    } else if (marketFilter === 'Perp+Spot') {
-      fills = fills.filter(fill => perpCoins.has(fill.coin) || spotCoins.has(fill.coin));
+    const formatDate = (timestamp: number) => {
+      return new Date(timestamp).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    };
+
+    const truncateAddress = (addr: string) => {
+      return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+    };
+
+    switch (delta.type) {
+      case 'deposit':
+        return (
+          <View style={styles.tradeLeftSide}>
+            <View style={styles.tradeTopRow}>
+              <Text style={[styles.tradeSide, styles.sideBuy]}>DEPOSIT</Text>
+              <Text style={[styles.tradePnl, styles.pnlPositive]}>
+                +{formatDollarAmount(delta.usdc)} USDC
+              </Text>
+            </View>
+            <Text style={styles.ledgerDetails}>From Arbitrum</Text>
+            <Text style={styles.tradeTime}>{formatDate(update.time)}</Text>
+          </View>
+        );
+
+      case 'withdraw':
+        return (
+          <View style={styles.tradeLeftSide}>
+            <View style={styles.tradeTopRow}>
+              <Text style={[styles.tradeSide, styles.sideSell]}>WITHDRAWAL</Text>
+              <Text style={[styles.tradePnl, styles.pnlNegative]}>
+                -{formatDollarAmount(delta.usdc)} USDC
+              </Text>
+            </View>
+            <Text style={styles.ledgerDetails}>To Arbitrum (Fee: {formatDollarAmount(delta.fee)} USDC)</Text>
+            <Text style={styles.tradeTime}>{formatDate(update.time)}</Text>
+          </View>
+        );
+
+      case 'accountClassTransfer':
+        return (
+          <View style={styles.tradeLeftSide}>
+            <View style={styles.tradeTopRow}>
+              <Text style={[styles.tradeSide, styles.sideTransfer]}>TRANSFER</Text>
+              <Text style={[styles.tradePnl, styles.pnlPositive]}>
+                {formatDollarAmount(delta.usdc)} USDC
+              </Text>
+            </View>
+            <Text style={styles.ledgerDetails}>
+              {delta.toPerp ? 'Spot → Perp' : 'Perp → Spot'}
+            </Text>
+            <Text style={styles.tradeTime}>{formatDate(update.time)}</Text>
+          </View>
+        );
+
+      case 'spotTransfer':
+        return (
+          <View style={styles.tradeLeftSide}>
+            <View style={styles.tradeTopRow}>
+              <Text style={[styles.tradeSide, styles.sideTransfer]}>SPOT TRANSFER</Text>
+              <Text style={[styles.tradePnl, styles.pnlPositive]}>
+                {formatDollarAmount(delta.amount)} {delta.token}
+              </Text>
+            </View>
+            <Text style={styles.ledgerDetails}>
+              {address?.toLowerCase() === delta.user.toLowerCase()
+                ? `To ${truncateAddress(delta.destination)}`
+                : `From ${truncateAddress(delta.user)}`}
+            </Text>
+            <Text style={styles.tradeTime}>{formatDate(update.time)}</Text>
+          </View>
+        );
+
+      case 'internalTransfer':
+        return (
+          <View style={styles.tradeLeftSide}>
+            <View style={styles.tradeTopRow}>
+              <Text style={[styles.tradeSide, styles.sideTransfer]}>INTERNAL TRANSFER</Text>
+              <Text style={[styles.tradePnl, styles.pnlPositive]}>
+                {formatDollarAmount(delta.usdc)} USDC
+              </Text>
+            </View>
+            <Text style={styles.ledgerDetails}>
+              {address?.toLowerCase() === delta.user.toLowerCase()
+                ? `To ${truncateAddress(delta.destination)}`
+                : `From ${truncateAddress(delta.user)}`}
+            </Text>
+            <Text style={styles.tradeTime}>{formatDate(update.time)}</Text>
+          </View>
+        );
+
+      default:
+        return null;
     }
-    
-    return fills;
-  }, [account.data?.userFills, marketFilter, wsState.perpMarkets, wsState.spotMarkets]);
-
-  // Pan gesture for horizontal swipe
-  const panGesture = Gesture.Pan()
-    .onEnd((event) => {
-      const { velocityX, translationX } = event;
-      
-      // Check if gesture is predominantly horizontal and fast enough
-      if (Math.abs(velocityX) > 500 || Math.abs(translationX) > 100) {
-        if (translationX < -50) {
-          // Swipe left
-          runOnJS(handleSwipe)('left');
-        } else if (translationX > 50) {
-          // Swipe right
-          runOnJS(handleSwipe)('right');
-        }
-      }
-    })
-    .activeOffsetX([-10, 10])
-    .failOffsetY([-20, 20]);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.contentContainer}>
-        {/* Market Filter Selector */}
+        {/* View Filter Selector */}
         <View style={styles.filterContainer}>
           <View style={styles.panelSelector}>
             <TouchableOpacity
               style={styles.panelButton}
-              onPress={() => handleFilterChange('Perp')}
+              onPress={() => handleFilterChange('Trades')}
             >
               <Text style={[
                 styles.panelText,
-                marketFilter === 'Perp' && styles.panelTextActive
+                viewFilter === 'Trades' && styles.panelTextActive
               ]}>
-                Perp
+                Trades
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.panelButton}
-              onPress={() => handleFilterChange('Spot')}
+              onPress={() => handleFilterChange('Ledger')}
             >
               <Text style={[
                 styles.panelText,
-                marketFilter === 'Spot' && styles.panelTextActive
+                viewFilter === 'Ledger' && styles.panelTextActive
               ]}>
-                Spot
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.panelButton}
-              onPress={() => handleFilterChange('Perp+Spot')}
-            >
-              <Text style={[
-                styles.panelText,
-                marketFilter === 'Perp+Spot' && styles.panelTextActive
-              ]}>
-                Perp+Spot
+                Ledger
               </Text>
             </TouchableOpacity>
           </View>
           <View style={styles.separatorContainer}>
             <View style={[
               styles.separatorSegment,
-              marketFilter === 'Perp' && styles.separatorActive
+              viewFilter === 'Trades' && styles.separatorActive
             ]} />
             <View style={[
               styles.separatorSegment,
-              marketFilter === 'Spot' && styles.separatorActive
-            ]} />
-            <View style={[
-              styles.separatorSegment,
-              marketFilter === 'Perp+Spot' && styles.separatorActive
+              viewFilter === 'Ledger' && styles.separatorActive
             ]} />
           </View>
         </View>
 
-        {/* Entire content wrapped with Swipe Gesture */}
-        <GestureDetector gesture={panGesture}>
-          <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-              {!address && (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>No wallet connected</Text>
-                  <Text style={styles.emptySubtext}>
-                    Connect your wallet to view trade history
-                  </Text>
+        {/* Content */}
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+          {!address && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No wallet connected</Text>
+              <Text style={styles.emptySubtext}>
+                Connect your wallet to view history
+              </Text>
+            </View>
+          )}
+
+          {address && viewFilter === 'Trades' && (
+            <>
+              {account.isLoading && (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={Color.BRIGHT_ACCENT} />
+                  <Text style={styles.loadingText}>Loading trades...</Text>
                 </View>
               )}
 
-              {address && (
+              {account.error && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>⚠️ {account.error}</Text>
+                </View>
+              )}
+
+              {!account.isLoading && !account.error && account.data && (
                 <>
-                  {account.isLoading && (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="large" color={Color.BRIGHT_ACCENT} />
-                      <Text style={styles.loadingText}>Loading trade history...</Text>
-                    </View>
-                  )}
-
-                  {account.error && (
-                    <View style={styles.errorContainer}>
-                      <Text style={styles.errorText}>⚠️ {account.error}</Text>
-                    </View>
-                  )}
-
-                  {!account.isLoading && !account.error && account.data && (
-                    <>
-                      {/* Recent Trades */}
-                      {filteredFills.length > 0 ? (
-                        <View style={styles.recentTradesContainer}>
-                          <Text style={styles.sectionTitle}>
-                            Recent Trades ({filteredFills.length})
-                          </Text>
-                          {filteredFills.slice(0, tradesDisplayLimit).map((fill: UserFill, idx: number) => (
-                            <View key={`fill-${idx}`}>
-                              <View style={styles.tradeCard}>
-                                <View style={styles.tradeLeftSide}>
-                                  <View style={styles.tradeTopRow}>
-                                    <Text style={styles.tradeCoin}>{fill.coin}</Text>
-                                    <Text style={[
-                                      styles.tradeSide,
-                                      fill.side === 'B' ? styles.sideBuy : styles.sideSell
-                                    ]}>
-                                      {fill.side === 'B' ? 'BUY' : 'SELL'}
-                                    </Text>
-                                    {fill.closedPnl && parseFloat(fill.closedPnl) !== 0 && (
-                                      <Text style={[
-                                        styles.tradePnl,
-                                        parseFloat(fill.closedPnl) >= 0 ? styles.pnlPositive : styles.pnlNegative
-                                      ]}>
-                                        {parseFloat(fill.closedPnl) >= 0 ? '+' : ''}${parseFloat(fill.closedPnl).toFixed(2)}
-                                      </Text>
-                                    )}
-                                  </View>
-                                  {fill.time && (
-                                    <Text style={styles.tradeTime}>
-                                      {new Date(fill.time).toLocaleString('en-US', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                      })}
-                                    </Text>
-                                  )}
-                                </View>
-                                <View style={styles.tradeRightSide}>
-                                  <Text style={styles.tradePrice}>${formatNumber(parseFloat(fill.px), 2)}</Text>
-                                  <Text style={styles.tradeSize}>{fill.sz}</Text>
-                                </View>
+                  {allTrades.length > 0 ? (
+                    <View style={styles.recentTradesContainer}>
+                      {allTrades.map((fill: UserFill, idx: number) => (
+                        <View key={`fill-${idx}`}>
+                          <View style={styles.tradeCard}>
+                            <View style={styles.tradeLeftSide}>
+                              <View style={styles.tradeTopRow}>
+                                <Text style={styles.tradeCoin}>{fill.coin}</Text>
+                                <Text style={[
+                                  styles.tradeSide,
+                                  fill.side === 'B' ? styles.sideBuy : styles.sideSell
+                                ]}>
+                                  {fill.side === 'B' ? 'BUY' : 'SELL'}
+                                </Text>
+                                {fill.closedPnl && parseFloat(fill.closedPnl) !== 0 && (
+                                  <Text style={[
+                                    styles.tradePnl,
+                                    parseFloat(fill.closedPnl) >= 0 ? styles.pnlPositive : styles.pnlNegative
+                                  ]}>
+                                    {parseFloat(fill.closedPnl) >= 0 ? '+' : ''}${formatDollarAmount(fill.closedPnl)}
+                                  </Text>
+                                )}
                               </View>
-                              <View style={styles.cellSeparator} />
+                              {fill.time && (
+                                <Text style={styles.tradeTime}>
+                                  {new Date(fill.time).toLocaleString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </Text>
+                              )}
                             </View>
-                          ))}
-                          
-                          {/* Show More Button */}
-                          {filteredFills.length > tradesDisplayLimit && (
-                            <TouchableOpacity 
-                              style={styles.showMoreButton}
-                              onPress={() => {
-                                if (tradesDisplayLimit === 10) {
-                                  setTradesDisplayLimit(20);
-                                } else if (tradesDisplayLimit === 20) {
-                                  setTradesDisplayLimit(50);
-                                } else if (tradesDisplayLimit === 50) {
-                                  setTradesDisplayLimit(filteredFills.length);
-                                }
-                              }}
-                            >
-                              <Text style={styles.showMoreText}>
-                                Show More ({Math.min(
-                                  tradesDisplayLimit === 10 ? 20 : 
-                                  tradesDisplayLimit === 20 ? 50 : 
-                                  filteredFills.length, 
-                                  filteredFills.length
-                                )} of {filteredFills.length})
-                              </Text>
-                            </TouchableOpacity>
-                          )}
+                            <View style={styles.tradeRightSide}>
+                              <Text style={styles.tradePrice}>${formatPrice(parseFloat(fill.px))}</Text>
+                              <Text style={styles.tradeSize}>{fill.sz}</Text>
+                            </View>
+                          </View>
+                          <View style={styles.cellSeparator} />
                         </View>
-                      ) : (
-                        <View style={styles.emptyState}>
-                          <Text style={styles.emptyText}>No trades yet</Text>
-                          <Text style={styles.emptySubtext}>
-                            Your trade history will appear here
-                          </Text>
-                        </View>
-                      )}
-                    </>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyText}>No trades yet</Text>
+                      <Text style={styles.emptySubtext}>
+                        Your trade history will appear here
+                      </Text>
+                    </View>
                   )}
                 </>
               )}
-            </ScrollView>
-          </Animated.View>
-        </GestureDetector>
+            </>
+          )}
+
+          {address && viewFilter === 'Ledger' && (
+            <>
+              {isLoadingLedger && (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={Color.BRIGHT_ACCENT} />
+                  <Text style={styles.loadingText}>Loading ledger...</Text>
+                </View>
+              )}
+
+              {ledgerError && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>⚠️ {ledgerError}</Text>
+                </View>
+              )}
+
+              {!isLoadingLedger && !ledgerError && (
+                <>
+                  {ledgerUpdates.length > 0 ? (
+                    <View style={styles.recentTradesContainer}>
+                      {ledgerUpdates.map((update: LedgerUpdate, idx: number) => (
+                        <View key={`ledger-${update.hash}-${idx}`}>
+                          <View style={styles.tradeCard}>
+                            {renderLedgerCard(update)}
+                          </View>
+                          <View style={styles.cellSeparator} />
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyText}>No ledger activity</Text>
+                      <Text style={styles.emptySubtext}>
+                        Deposits, withdrawals, and transfers will appear here
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </ScrollView>
       </View>
     </SafeAreaView>
   );

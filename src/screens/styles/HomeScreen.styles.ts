@@ -88,6 +88,19 @@ export const styles = StyleSheet.create({
     marginBottom: 1,
     paddingTop: 6,
   },
+
+  // Perps Header Row
+  perpsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  closeAllText: {
+    color: Color.RED,
+    fontSize: 14,
+    fontWeight: '600',
+  },
   
   // Spot Section Spacing
   spotSection: {

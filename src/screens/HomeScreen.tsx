@@ -343,6 +343,111 @@ export default function HomeScreen(): React.JSX.Element {
     );
   };
 
+  // Handle close all positions
+  const handleCloseAll = async () => {
+    if (!exchangeClient) {
+      Alert.alert('Error', 'Wallet not connected');
+      return;
+    }
+
+    if (sortedPerpPositions.length === 0) {
+      Alert.alert('No Positions', 'No open perp positions to close');
+      return;
+    }
+
+    Alert.alert(
+      'Close All Positions?',
+      `Close ALL ${sortedPerpPositions.length} perp position${sortedPerpPositions.length !== 1 ? 's' : ''}?\n\nThis will close all your open perpetual positions.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              let successCount = 0;
+              let failCount = 0;
+              
+              // Close each position one by one
+              for (const item of sortedPerpPositions) {
+                const coin = item.position.coin;
+                const size = parseFloat(item.position.szi);
+                const market = wsState.perpMarkets.find(m => m.name === coin);
+                
+                if (!market) {
+                  console.error('[HomeScreen] Market not found for:', coin);
+                  failCount++;
+                  continue;
+                }
+                
+                const assetIndex = market.index;
+                const szDecimals = market.szDecimals || 4;
+                const currentPrice = parseFloat(wsState.prices[coin] || '0');
+                
+                if (!currentPrice) {
+                  console.error('[HomeScreen] No price for:', coin);
+                  failCount++;
+                  continue;
+                }
+
+                let executionPrice: number;
+                if (size > 0) {
+                  executionPrice = currentPrice * 0.999;
+                } else {
+                  executionPrice = currentPrice * 1.001;
+                }
+
+                try {
+                  // Use proper formatting functions like ChartScreen
+                  const formattedPrice = formatPrice(executionPrice, szDecimals, true);
+                  const formattedSize = formatSize(Math.abs(size), szDecimals, currentPrice);
+                  
+                  const orderPayload = {
+                    orders: [{
+                      a: assetIndex,
+                      b: size < 0,
+                      p: formattedPrice,
+                      s: formattedSize,
+                      r: true,
+                      t: {
+                        limit: { tif: 'Ioc' as const },
+                      },
+                    }],
+                    grouping: 'na' as const,
+                  };
+
+                  console.log(`[HomeScreen] Closing position ${coin}...`);
+                  await exchangeClient.order(orderPayload);
+                  successCount++;
+                } catch (err: any) {
+                  console.error(`[HomeScreen] Failed to close ${coin}:`, err.message);
+                  failCount++;
+                }
+              }
+
+              console.log('[HomeScreen] Closed positions:', successCount, 'succeeded,', failCount, 'failed');
+              
+              if (successCount > 0) {
+                Alert.alert(
+                  'Positions Closed', 
+                  `Successfully closed ${successCount} position${successCount !== 1 ? 's' : ''}${failCount > 0 ? `\n${failCount} failed` : ''}`
+                );
+              } else {
+                Alert.alert('Error', 'Failed to close any positions');
+              }
+              
+              // Refetch account data
+              setTimeout(() => refetchAccount(), 2000);
+            } catch (err: any) {
+              console.error('[HomeScreen] Failed to close all positions:', err);
+              Alert.alert('Error', `Failed to close positions: ${err.message}`);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Pan gesture for horizontal swipe
   const panGesture = Gesture.Pan()
     .onEnd((event) => {
@@ -446,7 +551,16 @@ export default function HomeScreen(): React.JSX.Element {
             {/* Perp Positions + USDC Withdrawable */}
             {(marketFilter === 'Perp' || marketFilter === 'Perp+Spot') && (
               <View>
-                {marketFilter === 'Perp+Spot' && (
+                {marketFilter === 'Perp+Spot' && sortedPerpPositions.length > 0 && (
+                  <View style={styles.perpsHeaderRow}>
+                    <Text style={styles.sectionLabel}>Perps</Text>
+                    <TouchableOpacity onPress={handleCloseAll}>
+                      <Text style={styles.closeAllText}>Close All</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                
+                {marketFilter === 'Perp+Spot' && sortedPerpPositions.length === 0 && (
                   <Text style={styles.sectionLabel}>Perps</Text>
                 )}
                 

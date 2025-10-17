@@ -58,7 +58,7 @@ export const styles = StyleSheet.create({
 
   // Recent Trades Section
   recentTradesContainer: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
   },
@@ -92,12 +92,12 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   tradeCoin: {
-    fontSize: fontSizes.md,
+    fontSize: 15,
     color: Color.FG_1,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   tradeSide: {
-    fontSize: fontSizes.xs,
+    fontSize: 12,
     fontWeight: 'bold',
     paddingHorizontal: spacing.xs,
     paddingVertical: 2,
@@ -111,9 +111,19 @@ export const styles = StyleSheet.create({
     color: Color.RED,
     backgroundColor: Color.BG_2,
   },
+  sideTransfer: {
+    color: Color.FG_1,
+    backgroundColor: Color.BG_2,
+  },
   tradePnl: {
-    fontSize: fontSizes.xs,
+    fontSize: 11,
+    paddingTop: 2,
     fontWeight: '600',
+  },
+  ledgerDetails: {
+    fontSize: fontSizes.xs,
+    color: Color.FG_3,
+    marginBottom: spacing.xs,
   },
   pnlPositive: {
     color: Color.BRIGHT_ACCENT,
@@ -130,13 +140,13 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   tradePrice: {
-    fontSize: fontSizes.md,
+    fontSize: 15,
     color: Color.FG_1,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginBottom: spacing.xs,
   },
   tradeSize: {
-    fontSize: fontSizes.sm,
+    fontSize: 12,
     color: Color.FG_3,
   },
   showMoreButton: {
