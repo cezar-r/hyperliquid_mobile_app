@@ -414,11 +414,13 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     paddingTop: spacing.xs,
   },
+  statsScrollView: {
+    flex: 1,
+  },
   statsRowContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    flex: 1,
   },
   statItem: {
     flexDirection: 'row',

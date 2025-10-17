@@ -25,6 +25,22 @@
         let chart, candleSeries, smaSeries;
         let lastBarTime = null;
 
+        // Get local timezone offset in seconds
+        const timezoneOffsetSeconds = new Date().getTimezoneOffset() * 60;
+
+        // Convert UTC timestamp to local timezone
+        function toLocalTime(utcTime) {
+          return utcTime - timezoneOffsetSeconds;
+        }
+
+        // Adjust candle data to local timezone
+        function adjustCandlesToLocal(candles) {
+          return candles.map(candle => ({
+            ...candle,
+            time: toLocalTime(candle.time)
+          }));
+        }
+
         function computeSMA(data, period) {
           const result = [];
           let sum = 0;
@@ -52,7 +68,11 @@
                 textColor: (opts.theme && opts.theme.fg) || '#c5ced9',
               },
               rightPriceScale: { borderVisible: false },
-              timeScale: { borderVisible: false },
+              timeScale: { 
+                borderVisible: false,
+                timeVisible: true,
+                secondsVisible: false
+              },
               grid: { vertLines: { color: '#161b22' }, horzLines: { color: '#161b22' } },
             });
             candleSeries = chart.addCandlestickSeries({
@@ -78,20 +98,22 @@
 
           if (type === 'setData') {
             if (!chart) ensureChart({});
-            candleSeries.setData(payload.candles || []);
-            if (payload.candles && payload.candles.length) {
-              lastBarTime = payload.candles[payload.candles.length - 1].time;
+            const adjustedCandles = adjustCandlesToLocal(payload.candles || []);
+            candleSeries.setData(adjustedCandles);
+            if (adjustedCandles.length) {
+              lastBarTime = adjustedCandles[adjustedCandles.length - 1].time;
             }
           }
 
           if (type === 'updateBar') {
             if (!candleSeries) return;
             const bar = payload.bar;
-            if (lastBarTime === bar.time) {
-              candleSeries.update(bar);
+            const adjustedBar = { ...bar, time: toLocalTime(bar.time) };
+            if (lastBarTime === adjustedBar.time) {
+              candleSeries.update(adjustedBar);
             } else {
-              candleSeries.update(bar);
-              lastBarTime = bar.time;
+              candleSeries.update(adjustedBar);
+              lastBarTime = adjustedBar.time;
             }
           }
 
@@ -103,7 +125,8 @@
             // Expect RN to send both setData before setSMA, so we recompute over last setData cache if needed.
             // For simplicity, RN will send candles again with setSMA if desired in future.
             if (payload.candles) {
-              const sma = computeSMA(payload.candles, period);
+              const adjustedCandles = adjustCandlesToLocal(payload.candles);
+              const sma = computeSMA(adjustedCandles, period);
               if (!smaSeries) smaSeries = chart.addLineSeries({ color: '#5ab0ff', lineWidth: 2 });
               smaSeries.setData(sma);
             }

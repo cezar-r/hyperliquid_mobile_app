@@ -627,7 +627,12 @@ export default function ChartScreen(): React.JSX.Element {
           <Text style={styles.marketTypeLabel}>
             {marketType === 'perp' ? 'Perpetual' : 'Spot'}
           </Text>
-          <View style={styles.statsRowContainer}>
+          <ScrollView
+            horizontal={true}
+            showsHorizontalScrollIndicator={false}
+            style={styles.statsScrollView}
+            contentContainerStyle={styles.statsRowContainer}
+          >
             {assetCtx?.dayNtlVlm != null && (
               <View style={styles.statItem}>
                 <Text style={styles.statLabel}>24h Vol: </Text>
@@ -654,7 +659,7 @@ export default function ChartScreen(): React.JSX.Element {
                 <Text style={styles.statValue}>${formatLargeNumber(openInterestUSD)}</Text>
               </View>
             )}
-          </View>
+          </ScrollView>
         </View>
       </View>
 
