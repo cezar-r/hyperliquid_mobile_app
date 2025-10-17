@@ -10,6 +10,24 @@ export interface LWCandle {
   close: number;
 }
 
+export interface ChartMarker {
+  time: number; // Unix timestamp in seconds
+  position: 'belowBar' | 'aboveBar';
+  color: string;
+  shape: 'circle';
+  text: string;
+  size?: number;
+  textColor?: string;
+}
+
+export interface ChartPriceLine {
+  price: number;
+  color: string;
+  lineWidth: number;
+  lineStyle: 'solid' | 'dashed';
+  title: string;
+}
+
 export interface BridgeTheme {
   bg: string;
   fg: string;
@@ -26,6 +44,8 @@ export interface LightweightChartBridgeRef {
   setData: (candles: LWCandle[]) => void;
   updateBar: (bar: LWCandle) => void;
   setSMA: (period: number, candles?: LWCandle[]) => void;
+  setMarkers: (markers: ChartMarker[]) => void;
+  setPriceLines: (lines: ChartPriceLine[]) => void;
 }
 
 const html = require('../../../assets/chart/index.html');
@@ -44,6 +64,8 @@ const LightweightChartBridge = forwardRef<LightweightChartBridgeRef, Lightweight
       setData: (c) => post('setData', { candles: c }),
       updateBar: (b) => post('updateBar', { bar: b }),
       setSMA: (p, c) => post('setSMA', { period: p, candles: c }),
+      setMarkers: (m) => post('setMarkers', { markers: m }),
+      setPriceLines: (l) => post('setPriceLines', { lines: l }),
     }));
 
     useEffect(() => {

@@ -1,7 +1,9 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, SafeAreaView } from 'react-native';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, Image, TouchableOpacity, SafeAreaView, Animated } from 'react-native';
 import { useAccount } from '@reown/appkit-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { getDisplayTicker } from '../lib/formatting';
@@ -46,6 +48,9 @@ export default function HistoryScreen(): React.JSX.Element {
   const [ledgerUpdates, setLedgerUpdates] = useState<LedgerUpdate[]>([]);
   const [isLoadingLedger, setIsLoadingLedger] = useState(false);
   const [ledgerError, setLedgerError] = useState<string | null>(null);
+  
+  // For swipe animation
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   // Helper to check if a fill is a spot trade
   const isSpotFill = useCallback((coin: string) => {
@@ -97,8 +102,34 @@ export default function HistoryScreen(): React.JSX.Element {
     fetchLedgerHistory();
   }, [infoClient, address, viewFilter]);
 
-  // Save view filter when it changes
-  const handleFilterChange = async (filter: ViewFilter) => {
+  // Helper to get next/previous filter (circular navigation)
+  const getNextViewFilter = (current: ViewFilter, direction: 'left' | 'right'): ViewFilter => {
+    const filters: ViewFilter[] = ['Trades', 'Ledger'];
+    const currentIndex = filters.indexOf(current);
+    
+    if (direction === 'left') {
+      // Swipe left: move to next
+      return filters[(currentIndex + 1) % filters.length];
+    } else {
+      // Swipe right: move to previous
+      return filters[(currentIndex - 1 + filters.length) % filters.length];
+    }
+  };
+
+  // Save view filter when it changes with animation
+  const handleFilterChange = async (filter: ViewFilter, animated: boolean = false, direction?: 'left' | 'right') => {
+    if (animated && direction) {
+      // Start slide animation
+      const slideDistance = direction === 'left' ? -50 : 50;
+      slideAnim.setValue(slideDistance);
+      
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    }
+    
     setViewFilter(filter);
     try {
       await AsyncStorage.setItem(HISTORY_VIEW_FILTER_KEY, filter);
@@ -106,11 +137,36 @@ export default function HistoryScreen(): React.JSX.Element {
       console.error('[HistoryScreen] Error saving filter:', error);
     }
   };
+  
+  // Handle swipe gesture
+  const handleSwipe = (direction: 'left' | 'right') => {
+    const nextFilter = getNextViewFilter(viewFilter, direction);
+    handleFilterChange(nextFilter, true, direction);
+  };
 
   // All trades (no market filtering)
   const allTrades = useMemo(() => {
     return account.data?.userFills || [];
   }, [account.data?.userFills]);
+
+  // Pan gesture for swipe navigation
+  const panGesture = Gesture.Pan()
+    .onEnd((event) => {
+      const { velocityX, translationX } = event;
+      
+      // Check if gesture is predominantly horizontal and fast enough
+      if (Math.abs(velocityX) > 500 || Math.abs(translationX) > 100) {
+        if (translationX < -50) {
+          // Swipe left
+          runOnJS(handleSwipe)('left');
+        } else if (translationX > 50) {
+          // Swipe right
+          runOnJS(handleSwipe)('right');
+        }
+      }
+    })
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-20, 20]);
 
   // Helper to format ledger type info
   const renderLedgerCard = (update: LedgerUpdate) => {
@@ -257,15 +313,17 @@ export default function HistoryScreen(): React.JSX.Element {
         </View>
 
         {/* Content */}
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-          {!address && (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No wallet connected</Text>
-              <Text style={styles.emptySubtext}>
-                Connect your wallet to view history
-              </Text>
-            </View>
-          )}
+        <GestureDetector gesture={panGesture}>
+          <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
+            <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+              {!address && (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>No wallet connected</Text>
+                  <Text style={styles.emptySubtext}>
+                    Connect your wallet to view history
+                  </Text>
+                </View>
+              )}
 
           {address && viewFilter === 'Trades' && (
             <>
@@ -389,7 +447,9 @@ export default function HistoryScreen(): React.JSX.Element {
               )}
             </>
           )}
-        </ScrollView>
+            </ScrollView>
+          </Animated.View>
+        </GestureDetector>
       </View>
     </SafeAreaView>
   );

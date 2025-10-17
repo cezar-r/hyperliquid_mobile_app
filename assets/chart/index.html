@@ -24,22 +24,7 @@
 
         let chart, candleSeries, smaSeries;
         let lastBarTime = null;
-
-        // Get local timezone offset in seconds
-        const timezoneOffsetSeconds = new Date().getTimezoneOffset() * 60;
-
-        // Convert UTC timestamp to local timezone
-        function toLocalTime(utcTime) {
-          return utcTime - timezoneOffsetSeconds;
-        }
-
-        // Adjust candle data to local timezone
-        function adjustCandlesToLocal(candles) {
-          return candles.map(candle => ({
-            ...candle,
-            time: toLocalTime(candle.time)
-          }));
-        }
+        let priceLines = [];
 
         function computeSMA(data, period) {
           const result = [];
@@ -98,22 +83,21 @@
 
           if (type === 'setData') {
             if (!chart) ensureChart({});
-            const adjustedCandles = adjustCandlesToLocal(payload.candles || []);
-            candleSeries.setData(adjustedCandles);
-            if (adjustedCandles.length) {
-              lastBarTime = adjustedCandles[adjustedCandles.length - 1].time;
+            const candles = payload.candles || [];
+            candleSeries.setData(candles);
+            if (candles.length) {
+              lastBarTime = candles[candles.length - 1].time;
             }
           }
 
           if (type === 'updateBar') {
             if (!candleSeries) return;
             const bar = payload.bar;
-            const adjustedBar = { ...bar, time: toLocalTime(bar.time) };
-            if (lastBarTime === adjustedBar.time) {
-              candleSeries.update(adjustedBar);
+            if (lastBarTime === bar.time) {
+              candleSeries.update(bar);
             } else {
-              candleSeries.update(adjustedBar);
-              lastBarTime = adjustedBar.time;
+              candleSeries.update(bar);
+              lastBarTime = bar.time;
             }
           }
 
@@ -125,8 +109,8 @@
             // Expect RN to send both setData before setSMA, so we recompute over last setData cache if needed.
             // For simplicity, RN will send candles again with setSMA if desired in future.
             if (payload.candles) {
-              const adjustedCandles = adjustCandlesToLocal(payload.candles);
-              const sma = computeSMA(adjustedCandles, period);
+              const candles = payload.candles;
+              const sma = computeSMA(candles, period);
               if (!smaSeries) smaSeries = chart.addLineSeries({ color: '#5ab0ff', lineWidth: 2 });
               smaSeries.setData(sma);
             }
@@ -134,6 +118,43 @@
 
           if (type === 'resize') {
             if (chart) chart.applyOptions({ width: payload.width, height: payload.height });
+          }
+
+          if (type === 'setMarkers') {
+            if (!candleSeries) return;
+            const markers = payload.markers || [];
+            candleSeries.setMarkers(markers);
+          }
+
+          if (type === 'setPriceLines') {
+            if (!candleSeries) return;
+            // Remove existing price lines
+            priceLines.forEach(line => {
+              try {
+                candleSeries.removePriceLine(line);
+              } catch (e) {
+                // Ignore errors if line was already removed
+              }
+            });
+            priceLines = [];
+            
+            // Add new price lines
+            const lines = payload.lines || [];
+            lines.forEach(lineConfig => {
+              try {
+                const priceLine = candleSeries.createPriceLine({
+                  price: lineConfig.price,
+                  color: lineConfig.color,
+                  lineWidth: lineConfig.lineWidth || 1,
+                  lineStyle: lineConfig.lineStyle === 'dashed' ? 2 : 0, // 0 = solid, 2 = dashed
+                  axisLabelVisible: true,
+                  title: lineConfig.title || '',
+                });
+                priceLines.push(priceLine);
+              } catch (e) {
+                console.error('Error creating price line:', e);
+              }
+            });
           }
         }
 

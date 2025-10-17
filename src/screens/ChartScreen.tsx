@@ -11,9 +11,10 @@ import {
   Alert,
   Image,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import LightweightChartBridge, { LWCandle } from '../components/chart/LightweightChartBridge';
+import LightweightChartBridge, { LWCandle, ChartMarker, ChartPriceLine, LightweightChartBridgeRef } from '../components/chart/LightweightChartBridge';
 import OrderTicket from '../components/OrderTicket';
 import SpotOrderTicket from '../components/SpotOrderTicket';
 import TPSLEditModal from '../components/TPSLEditModal';
@@ -118,7 +119,8 @@ export default function ChartScreen(): React.JSX.Element {
   const { selectedCoin, marketType, spotMarkets } = state;
 
   const [candles, setCandles] = useState<ChartData[]>([]);
-  const [interval, setInterval] = useState<CandleInterval>('1h');
+  const [interval, setInterval] = useState<CandleInterval | null>(null);
+  const [intervalLoaded, setIntervalLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<'orderbook' | 'trades'>('orderbook');
@@ -131,6 +133,9 @@ export default function ChartScreen(): React.JSX.Element {
   const [editingTPSL, setEditingTPSL] = useState<any | null>(null);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
+
+  // Chart ref for markers and price lines
+  const chartRef = useRef<LightweightChartBridgeRef>(null);
 
   // Price color animation
   const previousPrice = useRef<number | null>(null);
@@ -178,6 +183,29 @@ export default function ChartScreen(): React.JSX.Element {
     
     loadStarredState();
   }, [selectedCoin, marketType]);
+
+  // Load saved interval on mount
+  useEffect(() => {
+    const loadSavedInterval = async () => {
+      try {
+        const savedInterval = await AsyncStorage.getItem('chartInterval');
+        if (savedInterval && INTERVALS.includes(savedInterval as CandleInterval)) {
+          setInterval(savedInterval as CandleInterval);
+        } else {
+          // Default to 1d if no saved interval
+          setInterval('1d');
+        }
+      } catch (error) {
+        console.error('[ChartScreen] Failed to load saved interval:', error);
+        // Default to 1d on error
+        setInterval('1d');
+      } finally {
+        setIntervalLoaded(true);
+      }
+    };
+    
+    loadSavedInterval();
+  }, []);
 
   // Set default tick size to minimum when options change
   useEffect(() => {
@@ -262,7 +290,7 @@ export default function ChartScreen(): React.JSX.Element {
   );
 
   useEffect(() => {
-    if (!selectedCoin) return;
+    if (!selectedCoin || !intervalLoaded || !interval) return;
 
     fetchHistoricalCandles(selectedCoin, interval);
 
@@ -275,6 +303,24 @@ export default function ChartScreen(): React.JSX.Element {
           low: parseFloat(candle.l),
           close: parseFloat(candle.c),
         };
+
+        // Validate the new candle before adding
+        if (!newCandle.timestamp || newCandle.timestamp <= 0) {
+          console.log('[ChartScreen] Ignoring live candle with invalid timestamp:', newCandle);
+          return prev;
+        }
+        if (newCandle.timestamp < 1577836800000) {
+          console.log('[ChartScreen] Ignoring very old live candle:', new Date(newCandle.timestamp).toISOString());
+          return prev;
+        }
+        if (!newCandle.open || !newCandle.high || !newCandle.low || !newCandle.close) {
+          console.log('[ChartScreen] Ignoring live candle with invalid price data:', newCandle);
+          return prev;
+        }
+        if (newCandle.open <= 0 || newCandle.high <= 0 || newCandle.low <= 0 || newCandle.close <= 0) {
+          console.log('[ChartScreen] Ignoring live candle with zero/negative prices:', newCandle);
+          return prev;
+        }
 
         const existingIndex = prev.findIndex(
           (c) => c.timestamp === newCandle.timestamp
@@ -302,6 +348,7 @@ export default function ChartScreen(): React.JSX.Element {
   }, [
     selectedCoin,
     interval,
+    intervalLoaded,
     subscribeToCandles,
     unsubscribeFromCandles,
     subscribeToOrderbook,
@@ -315,15 +362,29 @@ export default function ChartScreen(): React.JSX.Element {
   ]);
 
   const handleIntervalChange = (newInterval: CandleInterval): void => {
+    // Update state immediately for instant UI response
     setInterval(newInterval);
+    
+    // Save to storage in background (non-blocking)
+    AsyncStorage.setItem('chartInterval', newInterval).catch((error) => {
+      console.error('[ChartScreen] Failed to save interval:', error);
+    });
   };
 
   // Handle star toggle
-  const handleToggleStar = async () => {
+  const handleToggleStar = () => {
     if (!selectedCoin || !marketType) return;
     
-    const newStarredState = await toggleStarredTicker(selectedCoin, marketType);
+    // Optimistically update UI immediately
+    const newStarredState = !isStarred;
     setIsStarred(newStarredState);
+    
+    // Save to storage in background (non-blocking)
+    toggleStarredTicker(selectedCoin, marketType).catch((error) => {
+      console.error('[ChartScreen] Failed to toggle star:', error);
+      // Revert on error
+      setIsStarred(!newStarredState);
+    });
   };
 
   if (!selectedCoin) {
@@ -339,7 +400,46 @@ export default function ChartScreen(): React.JSX.Element {
     );
   }
 
-  const lwcCandles: LWCandle[] = candles.map((c) => ({
+  // Filter and deduplicate candles before sending to chart
+  const validCandles = candles
+    .filter((c) => {
+      // Remove candles with invalid timestamps
+      if (!c.timestamp || c.timestamp <= 0) {
+        console.log('[ChartScreen] Filtered out candle with invalid timestamp:', c);
+        return false;
+      }
+      // Remove very old candles (before year 2020)
+      if (c.timestamp < 1577836800000) {
+        console.log('[ChartScreen] Filtered out very old candle:', new Date(c.timestamp).toISOString(), c);
+        return false;
+      }
+      // Remove candles with invalid price data
+      if (!c.open || !c.high || !c.low || !c.close) return false;
+      if (c.open <= 0 || c.high <= 0 || c.low <= 0 || c.close <= 0) return false;
+      return true;
+    })
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  // Deduplicate by timestamp - keep only the last candle for each unique timestamp
+  const dedupedCandles: ChartData[] = [];
+  const seenTimes = new Set<number>();
+  const duplicates: ChartData[] = [];
+  
+  for (let i = validCandles.length - 1; i >= 0; i--) {
+    const timeKey = Math.floor(validCandles[i].timestamp / 1000);
+    if (!seenTimes.has(timeKey)) {
+      seenTimes.add(timeKey);
+      dedupedCandles.unshift(validCandles[i]);
+    } else {
+      duplicates.push(validCandles[i]);
+    }
+  }
+  
+  if (duplicates.length > 0) {
+    console.log('[ChartScreen] Removed', duplicates.length, 'duplicate candles');
+  }
+
+  const lwcCandles: LWCandle[] = dedupedCandles.map((c) => ({
     time: Math.floor(c.timestamp / 1000),
     open: c.open,
     high: c.high,
@@ -427,6 +527,155 @@ export default function ChartScreen(): React.JSX.Element {
       ? [Color.RED, Color.FG_1]  // Red to white
       : [Color.FG_1, Color.FG_1],  // Default white
   });
+
+  // Update chart markers and price lines
+  useEffect(() => {
+    if (!chartRef.current || !selectedCoin || candles.length === 0) return;
+
+    // Prepare buy/sell markers from user fills
+    const markers: ChartMarker[] = [];
+    if (userFills && userFills.length > 0) {
+      // Get time range of visible candles
+      const minTime = Math.min(...candles.map(c => c.timestamp));
+      const maxTime = Math.max(...candles.map(c => c.timestamp));
+
+      // Filter fills within visible timeframe
+      const visibleFills = userFills.filter((fill: any) => {
+        const fillTime = fill.time;
+        return fillTime >= minTime && fillTime <= maxTime;
+      });
+
+      // Map to chart markers
+      visibleFills.forEach((fill: any) => {
+        const isBuy = fill.side === 'B' || fill.side === 'buy';
+        markers.push({
+          time: Math.floor(fill.time / 1000), // Convert to seconds
+          position: isBuy ? 'belowBar' : 'aboveBar',
+          color: isBuy ? '#26a69a' : '#ef5350',
+          shape: 'circle',
+          text: '',
+          size: 1,
+        });
+      });
+    }
+
+    // Prepare price lines
+    const priceLines: ChartPriceLine[] = [];
+
+    // Add liquidation price line for perp positions
+    if (marketType === 'perp' && perpPosition && perpPosition.liquidationPx) {
+      const liqPrice = typeof perpPosition.liquidationPx === 'string' 
+        ? parseFloat(perpPosition.liquidationPx) 
+        : perpPosition.liquidationPx;
+      
+      if (!isNaN(liqPrice) && liqPrice > 0) {
+        priceLines.push({
+          price: liqPrice,
+          color: Color.RED,
+          lineWidth: 1,
+          lineStyle: 'dashed',
+          title: `Liq`,
+        });
+      }
+    }
+
+    // Add limit order lines for current ticker
+    const openOrders = account.data?.openOrders || [];
+    const getDisplayName = (coin: string) => {
+      const spotMarket = state.spotMarkets.find(m => m.name === coin || m.apiName === coin);
+      if (spotMarket) return spotMarket.name;
+      return coin;
+    };
+
+    // Filter orders for current ticker
+    const currentTickerOrders = openOrders.filter((order: any) => {
+      if (order.coin === selectedCoin) return true;
+      const spotMarket = state.spotMarkets.find(m => m.name === selectedCoin);
+      if (spotMarket && order.coin === spotMarket.apiName) return true;
+      return false;
+    });
+
+    currentTickerOrders.forEach((order: any) => {
+      const limitPrice = typeof order.limitPx === 'string' 
+        ? parseFloat(order.limitPx) 
+        : order.limitPx;
+
+      if (isNaN(limitPrice)) return;
+
+      // Check if it's a TP or SL order
+      const orderType = order.orderType?.toLowerCase() || '';
+      const isTpOrder = orderType.includes('tp') || orderType.includes('take');
+      const isSlOrder = orderType.includes('sl') || orderType.includes('stop');
+
+      let color: string;
+      let title: string;
+
+      if (isTpOrder) {
+        color = Color.BRIGHT_ACCENT;
+        title = `TP`;
+      } else if (isSlOrder) {
+        color = Color.RED;
+        title = `SL`;
+      } else {
+        color = '#FFA500'; // Orange/yellow for regular limit orders
+        title = `Limit`;
+      }
+
+      priceLines.push({
+        price: limitPrice,
+        color,
+        lineWidth: 1,
+        lineStyle: 'dashed',
+        title,
+      });
+    });
+
+    // Add TP/SL lines from position if they exist and aren't already in orders
+    if (marketType === 'perp' && perpPosition) {
+      if (perpPosition.tpPrice && perpPosition.tpPrice > 0) {
+        // Check if we already have this TP line from orders
+        const alreadyHasTp = priceLines.some(line => 
+          Math.abs(line.price - perpPosition.tpPrice!) < 0.01 && line.title.startsWith('TP')
+        );
+        if (!alreadyHasTp) {
+          priceLines.push({
+            price: perpPosition.tpPrice,
+            color: Color.BRIGHT_ACCENT,
+            lineWidth: 1,
+            lineStyle: 'dashed',
+            title: `TP`,
+          });
+        }
+      }
+      if (perpPosition.slPrice && perpPosition.slPrice > 0) {
+        // Check if we already have this SL line from orders
+        const alreadyHasSl = priceLines.some(line => 
+          Math.abs(line.price - perpPosition.slPrice!) < 0.01 && line.title.startsWith('SL')
+        );
+        if (!alreadyHasSl) {
+          priceLines.push({
+            price: perpPosition.slPrice,
+            color: Color.RED,
+            lineWidth: 1,
+            lineStyle: 'dashed',
+            title: `SL $${perpPosition.slPrice.toFixed(2)}`,
+          });
+        }
+      }
+    }
+
+    // Send to chart
+    chartRef.current.setMarkers(markers);
+    chartRef.current.setPriceLines(priceLines);
+  }, [
+    selectedCoin,
+    candles,
+    userFills,
+    perpPosition,
+    account.data?.openOrders,
+    marketType,
+    state.spotMarkets,
+  ]);
 
   // Handle close position
   const handleClosePosition = async () => {
@@ -717,7 +966,7 @@ export default function ChartScreen(): React.JSX.Element {
 
         {!isLoading && !error && candles.length > 0 && (
           <View style={styles.chartContainer}>
-            <LightweightChartBridge candles={lwcCandles} smaPeriod={20} height={400} />
+            <LightweightChartBridge ref={chartRef} candles={lwcCandles} smaPeriod={20} height={400} />
           </View>
         )}
 
