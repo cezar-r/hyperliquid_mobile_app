@@ -49,7 +49,8 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Color.ACCENT,
     overflow: 'hidden',
-    zIndex: 1001,
+    zIndex: 1002,
+    elevation: 1002,
   },
   marketDropdownItem: {
     paddingVertical: spacing.md,
@@ -65,6 +66,30 @@ export const styles = StyleSheet.create({
   marketDropdownItemTextActive: {
     color: Color.BRIGHT_ACCENT,
     fontWeight: '700',
+  },
+  dropdownBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1001,
+    elevation: 1001,
+    backgroundColor: 'transparent',
+  },
+  marketDropdownMenuOverlay: {
+    position: 'absolute',
+    top: 130,
+    left: 0,
+    right: 0,
+    backgroundColor: Color.BG_3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Color.ACCENT,
+    marginHorizontal: spacing.md,
+    overflow: 'hidden',
+    zIndex: 1002,
+    elevation: 1002,
   },
 
   // Time Filter

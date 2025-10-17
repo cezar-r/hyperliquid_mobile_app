@@ -167,6 +167,15 @@ export default function SearchScreen(): React.JSX.Element {
       );
     }
 
+    // Filter out spot tickers with 0 volume
+    if (wsState.marketType === 'spot') {
+      filtered = filtered.filter((m) => {
+        const ctx = wsState.assetContexts[m.name];
+        const volume = ctx?.dayNtlVlm || 0;
+        return volume > 0;
+      });
+    }
+
     // Sort the filtered results
     const sorted = [...filtered].sort((a, b) => {
       const aCtx = wsState.assetContexts[a.name];
@@ -333,9 +342,8 @@ export default function SearchScreen(): React.JSX.Element {
     switch (currentSort) {
       case SortType.VOLUME:
       case SortType.OPEN_INTEREST:
-        return Color.FG_3;
       case SortType.MARKET_CAP:
-        return Color.BRIGHT_ACCENT;
+        return Color.FG_3;
       case SortType.FUNDING:
         return (ctx?.funding || 0) > 0 ? Color.BRIGHT_ACCENT : Color.RED;
       default:
@@ -387,11 +395,12 @@ export default function SearchScreen(): React.JSX.Element {
         price = ctx?.markPx || 0;
       }
       
-      // Check if we should show metric under ticker (for volume, funding, OI)
+      // Check if we should show metric under ticker (for volume, funding, OI, market cap)
       const showMetricUnderTicker = 
         currentSort === SortType.VOLUME || 
         currentSort === SortType.FUNDING || 
-        currentSort === SortType.OPEN_INTEREST;
+        currentSort === SortType.OPEN_INTEREST ||
+        currentSort === SortType.MARKET_CAP;
 
       return (
         <View>

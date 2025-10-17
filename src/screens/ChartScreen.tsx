@@ -17,6 +17,7 @@ import LightweightChartBridge, { LWCandle } from '../components/chart/Lightweigh
 import OrderTicket from '../components/OrderTicket';
 import SpotOrderTicket from '../components/SpotOrderTicket';
 import TPSLEditModal from '../components/TPSLEditModal';
+import ClosePositionModal from '../components/ClosePositionModal';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { useWallet } from '../contexts/WalletContext';
 import { resolveSubscriptionCoin } from '../lib/markets';
@@ -127,6 +128,7 @@ export default function ChartScreen(): React.JSX.Element {
   const [closingPosition, setClosingPosition] = useState<boolean>(false);
   const [cancelingOrder, setCancelingOrder] = useState<number | null>(null);
   const [editingTPSL, setEditingTPSL] = useState<any | null>(null);
+  const [showCloseModal, setShowCloseModal] = useState(false);
 
   // Price color animation
   const previousPrice = useRef<number | null>(null);
@@ -384,6 +386,16 @@ export default function ChartScreen(): React.JSX.Element {
     return oi * price;
   }, [assetCtx?.openInterest, currentPrice]);
 
+  // Calculate market cap in USD (circulating supply * price) for spot tickers
+  const marketCapUSD = useMemo(() => {
+    if (marketType !== 'spot' || !assetCtx?.circulatingSupply || !currentPrice) return null;
+    const supply = typeof assetCtx.circulatingSupply === 'string' 
+      ? parseFloat(assetCtx.circulatingSupply) 
+      : assetCtx.circulatingSupply;
+    const price = typeof currentPrice === 'string' ? parseFloat(currentPrice) : currentPrice;
+    return supply * price;
+  }, [assetCtx?.circulatingSupply, currentPrice, marketType]);
+
   // Interpolate price color based on animation and direction
   const animatedPriceColor = colorAnimation.interpolate({
     inputRange: [0, 1],
@@ -596,6 +608,12 @@ export default function ChartScreen(): React.JSX.Element {
               <View style={styles.statItem}>
                 <Text style={styles.statLabel}>24h Vol: </Text>
                 <Text style={styles.statValue}>${formatLargeNumber(assetCtx.dayNtlVlm)}</Text>
+              </View>
+            )}
+            {marketType === 'spot' && marketCapUSD != null && (
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Market Cap: </Text>
+                <Text style={styles.statValue}>${formatLargeNumber(marketCapUSD)}</Text>
               </View>
             )}
             {marketType === 'perp' && assetCtx?.funding != null && (
@@ -925,12 +943,11 @@ export default function ChartScreen(): React.JSX.Element {
                     </View>
                     
                     <TouchableOpacity
-                      onPress={handleClosePosition}
-                      disabled={closingPosition}
+                      onPress={() => setShowCloseModal(true)}
                       style={styles.marketCloseButton}
                     >
                       <Text style={styles.marketCloseText}>
-                        {closingPosition ? 'Closing...' : 'Market Close'}
+                        Market Close
                       </Text>
                     </TouchableOpacity>
                   </>
@@ -1178,6 +1195,17 @@ export default function ChartScreen(): React.JSX.Element {
           onClose={() => setEditingTPSL(null)}
           position={editingTPSL}
           currentPrice={typeof currentPrice === 'string' ? parseFloat(currentPrice) : (currentPrice || 0)}
+        />
+      )}
+      
+      {/* Close Position Modal */}
+      {perpPosition && selectedCoin && (
+        <ClosePositionModal
+          visible={showCloseModal}
+          onClose={() => setShowCloseModal(false)}
+          position={perpPosition}
+          currentPrice={typeof currentPrice === 'string' ? parseFloat(currentPrice) : (currentPrice || 0)}
+          coin={selectedCoin}
         />
       )}
     </View>

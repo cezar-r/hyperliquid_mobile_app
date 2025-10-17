@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, Image, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useAccount } from '@reown/appkit-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWallet } from '../contexts/WalletContext';
@@ -263,7 +263,10 @@ export default function HistoryScreen(): React.JSX.Element {
             <>
               {account.isLoading && (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={Color.BRIGHT_ACCENT} />
+                  <Image 
+                    source={require('../../assets/blob_green.gif')} 
+                    style={styles.loadingGif}
+                  />
                   <Text style={styles.loadingText}>Loading trades...</Text>
                 </View>
               )}
@@ -336,7 +339,10 @@ export default function HistoryScreen(): React.JSX.Element {
             <>
               {isLoadingLedger && (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={Color.BRIGHT_ACCENT} />
+                  <Image 
+                    source={require('../../assets/blob_green.gif')} 
+                    style={styles.loadingGif}
+                  />
                   <Text style={styles.loadingText}>Loading ledger...</Text>
                 </View>
               )}

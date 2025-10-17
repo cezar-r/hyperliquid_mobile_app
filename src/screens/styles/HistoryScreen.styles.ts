@@ -176,6 +176,11 @@ export const styles = StyleSheet.create({
     color: Color.FG_3,
     marginTop: spacing.md,
   },
+  loadingGif: {
+    width: 100,
+    height: 100,
+    marginBottom: 20,
+  },
   errorContainer: {
     backgroundColor: Color.BG_1,
     padding: spacing.lg,
