@@ -3,6 +3,8 @@
  * Based on SDK test utilities
  */
 
+import { SPOT_TICKER_MAP } from '../constants/constants';
+
 /**
  * Round to N significant figures
  */
@@ -108,5 +110,22 @@ export function formatSize(size: number, szDecimals: number, price?: number): st
 export function removeTrailingZeros(value: string): string {
   if (!value.includes('.')) return value;
   return value.replace(/\.?0+$/, '');
+}
+
+/**
+ * Get display ticker name for spot tokens
+ * Maps wrapped tokens (UBTC, USOL, etc.) to their display names (BTC, SOL, etc.)
+ * Returns original ticker if not in map
+ */
+export function getDisplayTicker(ticker: string): string {
+  // Handle ticker pairs (e.g., "UBTC/USDC" -> "BTC/USDC")
+  if (ticker.includes('/')) {
+    const [base, quote] = ticker.split('/');
+    const mappedBase = (SPOT_TICKER_MAP as Record<string, string>)[base] || base;
+    return `${mappedBase}/${quote}`;
+  }
+  
+  // Handle single tickers
+  return (SPOT_TICKER_MAP as Record<string, string>)[ticker] || ticker;
 }
 

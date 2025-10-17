@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, SafeAreaView, Alert, Animated } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAccount } from '@reown/appkit-react-native';
@@ -8,7 +8,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder } from '../lib/formatting';
+import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker } from '../lib/formatting';
 import { styles } from './styles/PortfolioScreen.styles';
 import type { PerpPosition, UserFill } from '../types';
 import Color from '../styles/colors';
@@ -205,6 +205,11 @@ export default function PortfolioScreen(): React.JSX.Element {
     
     return fills;
   }, [account.data?.userFills, timeFilter, marketFilter, wsState.perpMarkets, wsState.spotMarkets]);
+
+  // Helper to check if a fill is a spot trade
+  const isSpotFill = useCallback((coin: string) => {
+    return wsState.spotMarkets.some(m => m.name.split('/')[0] === coin);
+  }, [wsState.spotMarkets]);
 
   // Calculate trading volume for perp trades
   const tradingVolume = useMemo(() => {
@@ -973,15 +978,24 @@ export default function PortfolioScreen(): React.JSX.Element {
                             const priceChange = price - prevDayPx;
                             const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
                             
+                            // Find the spot market for this coin to get the full pair name
+                            const spotMarket = wsState.spotMarkets.find(m => m.name.split('/')[0] === item.balance.coin);
+                            const displayName = spotMarket ? getDisplayTicker(spotMarket.name) : item.balance.coin;
+                            
                             return (
                               <View key={`spot-${item.balance.coin}`}>
                                 <TouchableOpacity
                                   style={styles.positionCell}
-                                  onPress={() => handleNavigateToChart(item.balance.coin, 'spot')}
+                                  onPress={() => {
+                                    // Don't navigate for USDC
+                                    if (item.balance.coin === 'USDC') return;
+                                    // Pass the full market name for spot (e.g., "UBTC/USDC")
+                                    handleNavigateToChart(spotMarket?.name || item.balance.coin, 'spot');
+                                  }}
                                 >
                                   <View style={styles.leftSide}>
                                     <View style={styles.tickerContainer}>
-                                      <Text style={styles.ticker}>{item.balance.coin}</Text>
+                                      <Text style={styles.ticker}>{displayName}</Text>
                                     </View>
                                     <View style={styles.priceContainer}>
                                       <Text style={styles.size}>${formatNumber(price)}</Text>
@@ -996,7 +1010,7 @@ export default function PortfolioScreen(): React.JSX.Element {
                                   <View style={styles.rightSide}>
                                     <Text style={styles.price}>${formatNumber(item.usdValue, 2)}</Text>
                                     <Text style={[styles.pnl, { color: Color.FG_3 }]}>
-                                      {formatNumber(item.total, 4)} {item.balance.coin}
+                                      {formatNumber(item.total, 4)} {getDisplayTicker(item.balance.coin)}
                                     </Text>
                                   </View>
                                 </TouchableOpacity>
@@ -1236,15 +1250,24 @@ export default function PortfolioScreen(): React.JSX.Element {
                             const priceChange = price - prevDayPx;
                             const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
                             
+                            // Find the spot market for this coin to get the full pair name
+                            const spotMarket = wsState.spotMarkets.find(m => m.name.split('/')[0] === item.balance.coin);
+                            const displayName = spotMarket ? getDisplayTicker(spotMarket.name) : item.balance.coin;
+                            
                             return (
                               <View key={`spot-${item.balance.coin}`}>
                                 <TouchableOpacity
                                   style={styles.positionCell}
-                                  onPress={() => handleNavigateToChart(item.balance.coin, 'spot')}
+                                  onPress={() => {
+                                    // Don't navigate for USDC
+                                    if (item.balance.coin === 'USDC') return;
+                                    // Pass the full market name for spot (e.g., "UBTC/USDC")
+                                    handleNavigateToChart(spotMarket?.name || item.balance.coin, 'spot');
+                                  }}
                                 >
                                   <View style={styles.leftSide}>
                                     <View style={styles.tickerContainer}>
-                                      <Text style={styles.ticker}>{item.balance.coin}</Text>
+                                      <Text style={styles.ticker}>{displayName}</Text>
                                     </View>
                                     <View style={styles.priceContainer}>
                                       <Text style={styles.size}>${formatNumber(price)}</Text>
@@ -1259,7 +1282,7 @@ export default function PortfolioScreen(): React.JSX.Element {
                                   <View style={styles.rightSide}>
                                     <Text style={styles.price}>${formatNumber(item.usdValue, 2)}</Text>
                                     <Text style={[styles.pnl, { color: Color.FG_3 }]}>
-                                      {formatNumber(item.total, 4)} {item.balance.coin}
+                                      {formatNumber(item.total, 4)} {getDisplayTicker(item.balance.coin)}
                                     </Text>
                                   </View>
                                 </TouchableOpacity>
@@ -1552,12 +1575,14 @@ export default function PortfolioScreen(): React.JSX.Element {
                       <Text style={styles.sectionLabel}>
                         Recent Trades ({filteredFills.length})
                       </Text>
-                      {filteredFills.slice(0, tradesDisplayLimit).map((fill: UserFill, idx: number) => (
+                      {filteredFills.slice(0, tradesDisplayLimit).map((fill: UserFill, idx: number) => {
+                        const displayCoin = isSpotFill(fill.coin) ? getDisplayTicker(fill.coin) : fill.coin;
+                        return (
                         <View key={`fill-${idx}`}>
                           <View style={styles.tradeCard}>
                             <View style={styles.tradeLeftSide}>
                               <View style={styles.tradeTopRow}>
-                                <Text style={styles.tradeCoin}>{fill.coin}</Text>
+                                <Text style={styles.tradeCoin}>{displayCoin}</Text>
                                 <Text style={[
                                   styles.tradeSide,
                                   fill.side === 'B' ? styles.sideBuy : styles.sideSell
@@ -1591,7 +1616,8 @@ export default function PortfolioScreen(): React.JSX.Element {
                           </View>
                           <View style={styles.cellSeparator} />
                         </View>
-                      ))}
+                        );
+                      })}
                       
                       {/* Show More Button */}
                       {filteredFills.length > tradesDisplayLimit && (

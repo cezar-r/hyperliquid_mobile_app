@@ -479,6 +479,13 @@ export const styles = StyleSheet.create({
     color: Color.BRIGHT_ACCENT,
     fontWeight: '600',
   },
+  starButton: {
+    marginLeft: 'auto',
+    // paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   
   // Order Buttons (sticky at bottom)
   orderButtonsContainer: {

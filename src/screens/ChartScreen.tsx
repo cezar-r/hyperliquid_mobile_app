@@ -22,7 +22,8 @@ import { useWebSocket } from '../contexts/WebSocketContext';
 import { useWallet } from '../contexts/WalletContext';
 import { resolveSubscriptionCoin } from '../lib/markets';
 import { generateTickSizeOptions, calculateMantissa, calculateNSigFigs } from '../lib/tickSize';
-import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder } from '../lib/formatting';
+import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker } from '../lib/formatting';
+import { isTickerStarred, toggleStarredTicker } from '../lib/starredTickers';
 import type { Candle, CandleInterval } from '../types';
 import { styles } from './styles/ChartScreen.styles';
 import Color from '../styles/colors';
@@ -129,6 +130,7 @@ export default function ChartScreen(): React.JSX.Element {
   const [cancelingOrder, setCancelingOrder] = useState<number | null>(null);
   const [editingTPSL, setEditingTPSL] = useState<any | null>(null);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [isStarred, setIsStarred] = useState(false);
 
   // Price color animation
   const previousPrice = useRef<number | null>(null);
@@ -164,6 +166,18 @@ export default function ChartScreen(): React.JSX.Element {
   useEffect(() => {
     setTickSize(null);
   }, [selectedCoin]);
+
+  // Load starred state when coin or market type changes
+  useEffect(() => {
+    if (!selectedCoin || !marketType) return;
+    
+    const loadStarredState = async () => {
+      const starred = await isTickerStarred(selectedCoin, marketType);
+      setIsStarred(starred);
+    };
+    
+    loadStarredState();
+  }, [selectedCoin, marketType]);
 
   // Set default tick size to minimum when options change
   useEffect(() => {
@@ -302,6 +316,14 @@ export default function ChartScreen(): React.JSX.Element {
 
   const handleIntervalChange = (newInterval: CandleInterval): void => {
     setInterval(newInterval);
+  };
+
+  // Handle star toggle
+  const handleToggleStar = async () => {
+    if (!selectedCoin || !marketType) return;
+    
+    const newStarredState = await toggleStarredTicker(selectedCoin, marketType);
+    setIsStarred(newStarredState);
   };
 
   if (!selectedCoin) {
@@ -579,7 +601,9 @@ export default function ChartScreen(): React.JSX.Element {
         </View>
         <View style={styles.tickerTopRow}>
           <View style={styles.tickerLeftGroup}>
-            <Text style={styles.tickerName}>{selectedCoin}</Text>
+            <Text style={styles.tickerName}>
+              {marketType === 'spot' && selectedCoin ? getDisplayTicker(selectedCoin) : selectedCoin}
+            </Text>
             {marketType === 'perp' && maxLeverage && (
               <View style={styles.leverageBadge}>
                 <Text style={styles.leverageText}>{maxLeverage}x</Text>
@@ -658,6 +682,17 @@ export default function ChartScreen(): React.JSX.Element {
               </Text>
             </TouchableOpacity>
           ))}
+          <TouchableOpacity
+            onPress={handleToggleStar}
+            style={styles.starButton}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons 
+              name={isStarred ? "star" : "star-border"} 
+              size={22} 
+              color={isStarred ? Color.GOLD : Color.FG_1}
+            />
+          </TouchableOpacity>
         </View>
 
         {isLoading && (
@@ -980,12 +1015,16 @@ export default function ChartScreen(): React.JSX.Element {
                     const priceChange = coinPrice - prevDayPx;
                     const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
                     
+                    // Find the spot market for this coin to get the full pair name
+                    const spotMarket = state.spotMarkets.find(m => m.name.split('/')[0] === b.coin);
+                    const displayName = spotMarket ? getDisplayTicker(spotMarket.name) : b.coin;
+                    
                     return (
                       <View key={`bal-${idx}`}>
                         <View style={styles.positionCell}>
                           <View style={styles.leftSide}>
                             <View style={styles.tickerContainer}>
-                              <Text style={styles.ticker}>{b.coin}</Text>
+                              <Text style={styles.ticker}>{displayName}</Text>
                             </View>
                             <View style={styles.priceContainer}>
                               <Text style={styles.size}>${formatNumber(coinPrice)}</Text>
@@ -1000,7 +1039,7 @@ export default function ChartScreen(): React.JSX.Element {
                           <View style={styles.rightSide}>
                             <Text style={styles.price}>${formatNumber(usdValue, 2)}</Text>
                             <Text style={[styles.pnl, { color: Color.FG_3 }]}>
-                              {formatNumber(balance, 4)} {b.coin}
+                              {formatNumber(balance, 4)} {getDisplayTicker(b.coin)}
                             </Text>
                           </View>
                         </View>
@@ -1102,12 +1141,17 @@ export default function ChartScreen(): React.JSX.Element {
             });
             
             return filteredTrades.length > 0 ? (
-              filteredTrades.slice(0, 10).map((fill: any, idx: number) => (
-                <View key={`fill-${idx}`}>
-                  <View style={styles.tradeCard}>
-                    <View style={styles.tradeLeftSide}>
-                      <View style={styles.tradeTopRow}>
-                        <Text style={styles.tradeCoin}>{fill.coin}</Text>
+              filteredTrades.slice(0, 10).map((fill: any, idx: number) => {
+                // Check if this is a spot trade and apply mapping
+                const isSpot = spotCoins.has(fill.coin);
+                const displayCoin = isSpot ? getDisplayTicker(fill.coin) : fill.coin;
+                
+                return (
+                  <View key={`fill-${idx}`}>
+                    <View style={styles.tradeCard}>
+                      <View style={styles.tradeLeftSide}>
+                        <View style={styles.tradeTopRow}>
+                          <Text style={styles.tradeCoin}>{displayCoin}</Text>
                         <Text style={[
                           styles.tradeSide,
                           fill.side === 'B' ? styles.sideBuy : styles.sideSell
@@ -1140,8 +1184,9 @@ export default function ChartScreen(): React.JSX.Element {
                     </View>
                   </View>
                   <View style={styles.cellSeparator} />
-                </View>
-              ))
+                  </View>
+                );
+              })
             ) : (
               <Text style={styles.subtitle}>No trades for this market type</Text>
             );

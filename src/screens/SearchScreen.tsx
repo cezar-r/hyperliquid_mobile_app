@@ -16,6 +16,8 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import type { PerpMarket, SpotMarket } from '../types';
+import { getDisplayTicker } from '../lib/formatting';
+import { getStarredTickers } from '../lib/starredTickers';
 import { styles } from './styles/SearchScreen.styles';
 import Color from '../styles/colors';
 
@@ -79,19 +81,37 @@ export default function SearchScreen(): React.JSX.Element {
   const [perpAscending, setPerpAscending] = useState(false);
   const [spotAscending, setSpotAscending] = useState(false);
   
+  // Store starred filter state per market type
+  const [showStarredOnly, setShowStarredOnly] = useState(false);
+  const [perpShowStarredOnly, setPerpShowStarredOnly] = useState(false);
+  const [spotShowStarredOnly, setSpotShowStarredOnly] = useState(false);
+  const [starredTickers, setStarredTickers] = useState<string[]>([]);
+  
   // For swipe animation
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  // Restore sort when market type changes
+  // Restore sort and starred filter when market type changes
   React.useEffect(() => {
     if (wsState.marketType === 'perp') {
       setCurrentSort(perpSort);
       setIsAscending(perpAscending);
+      setShowStarredOnly(perpShowStarredOnly);
     } else {
       setCurrentSort(spotSort);
       setIsAscending(spotAscending);
+      setShowStarredOnly(spotShowStarredOnly);
     }
-  }, [wsState.marketType, perpSort, spotSort, perpAscending, spotAscending]);
+  }, [wsState.marketType, perpSort, spotSort, perpAscending, spotAscending, perpShowStarredOnly, spotShowStarredOnly]);
+
+  // Load starred tickers when market type changes
+  React.useEffect(() => {
+    const loadStarredTickers = async () => {
+      const starred = await getStarredTickers(wsState.marketType);
+      setStarredTickers(starred);
+    };
+    
+    loadStarredTickers();
+  }, [wsState.marketType]);
 
   // Debug logging for spot markets (reduced)
   React.useEffect(() => {
@@ -176,6 +196,11 @@ export default function SearchScreen(): React.JSX.Element {
       });
     }
 
+    // Filter by starred tickers if active
+    if (showStarredOnly) {
+      filtered = filtered.filter((m) => starredTickers.includes(m.name));
+    }
+
     // Sort the filtered results
     const sorted = [...filtered].sort((a, b) => {
       const aCtx = wsState.assetContexts[a.name];
@@ -250,7 +275,7 @@ export default function SearchScreen(): React.JSX.Element {
     });
 
     return sorted;
-  }, [currentMarkets, wsState.assetContexts, wsState.marketType, wsState.prices, searchQuery, currentSort, isAscending]);
+  }, [currentMarkets, wsState.assetContexts, wsState.marketType, wsState.prices, searchQuery, currentSort, isAscending, showStarredOnly, starredTickers]);
 
   const handleMarketSelect = useCallback((marketName: string): void => {
     Keyboard.dismiss();
@@ -285,6 +310,18 @@ export default function SearchScreen(): React.JSX.Element {
       : (wsState.marketType === 'spot' ? 'perp' : 'spot');
     handleMarketTypeToggle(nextType, true, direction);
   }, [wsState.marketType, handleMarketTypeToggle]);
+
+  const handleStarFilterToggle = useCallback(() => {
+    const newState = !showStarredOnly;
+    setShowStarredOnly(newState);
+    
+    // Save to market type specific state
+    if (wsState.marketType === 'perp') {
+      setPerpShowStarredOnly(newState);
+    } else {
+      setSpotShowStarredOnly(newState);
+    }
+  }, [showStarredOnly, wsState.marketType]);
 
   const handleClearSearch = useCallback(() => {
     setSearchQuery('');
@@ -410,7 +447,9 @@ export default function SearchScreen(): React.JSX.Element {
           >
             <View style={styles.tickerLeftContainer}>
               <View style={styles.tickerNameRow}>
-                <Text style={styles.tickerSymbol}>{item.name}</Text>
+                <Text style={styles.tickerSymbol}>
+                  {wsState.marketType === 'spot' ? getDisplayTicker(item.name) : item.name}
+                </Text>
                 {wsState.marketType === 'perp' && (
                   <Text style={styles.leverage}>
                     {(item as PerpMarket).maxLeverage}x
@@ -569,6 +608,16 @@ export default function SearchScreen(): React.JSX.Element {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.sortScrollContent}
           >
+            <TouchableOpacity 
+              style={styles.sortButton}
+              onPress={handleStarFilterToggle}
+            >
+              <Ionicons 
+                name={showStarredOnly ? "star" : "star-outline"} 
+                size={16}
+                color={showStarredOnly ? Color.GOLD : Color.FG_3}
+              />
+            </TouchableOpacity>
             {sortOptions.map((sortType) => (
               <TouchableOpacity
                 key={sortType}

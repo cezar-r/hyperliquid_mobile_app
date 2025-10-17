@@ -8,7 +8,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import { formatPrice, formatSize } from '../lib/formatting';
+import { formatPrice, formatSize, getDisplayTicker } from '../lib/formatting';
 import { styles } from './styles/HomeScreen.styles';
 import type { PerpPosition, SpotBalance } from '../types';
 import Color from '../styles/colors';
@@ -655,15 +655,24 @@ export default function HomeScreen(): React.JSX.Element {
                   const priceChange = price - prevDayPx;
                   const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
                   
+                  // Find the spot market for this coin to get the full pair name
+                  const spotMarket = wsState.spotMarkets.find(m => m.name.split('/')[0] === item.balance.coin);
+                  const displayName = spotMarket ? getDisplayTicker(spotMarket.name) : item.balance.coin;
+                  
                   return (
                     <View key={`spot-${item.balance.coin}`}>
                       <TouchableOpacity
                         style={styles.positionCell}
-                        onPress={() => handleNavigateToChart(item.balance.coin, 'spot')}
+                        onPress={() => {
+                          // Don't navigate for USDC
+                          if (item.balance.coin === 'USDC') return;
+                          // Pass the full market name for spot (e.g., "UBTC/USDC")
+                          handleNavigateToChart(spotMarket?.name || item.balance.coin, 'spot');
+                        }}
                       >
                         <View style={styles.leftSide}>
                           <View style={styles.tickerContainer}>
-                            <Text style={styles.ticker}>{item.balance.coin}</Text>
+                            <Text style={styles.ticker}>{displayName}</Text>
                           </View>
                           <View style={styles.priceContainer}>
                             <Text style={styles.size}>${formatNumber(price)}</Text>
@@ -678,7 +687,7 @@ export default function HomeScreen(): React.JSX.Element {
                         <View style={styles.rightSide}>
                           <Text style={styles.price}>${formatNumber(item.usdValue, 2)}</Text>
                           <Text style={[styles.pnl, { color: Color.FG_3 }]}>
-                            {formatNumber(item.total, 4)} {item.balance.coin}
+                            {formatNumber(item.total, 4)} {getDisplayTicker(item.balance.coin)}
                           </Text>
                         </View>
                       </TouchableOpacity>

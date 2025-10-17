@@ -1,8 +1,10 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useAccount } from '@reown/appkit-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWallet } from '../contexts/WalletContext';
+import { useWebSocket } from '../contexts/WebSocketContext';
+import { getDisplayTicker } from '../lib/formatting';
 import { styles } from './styles/HistoryScreen.styles';
 import type { UserFill, LedgerUpdate } from '../types';
 import Color from '../styles/colors';
@@ -37,12 +39,18 @@ function formatDollarAmount(amount: string): string {
 export default function HistoryScreen(): React.JSX.Element {
   const { address } = useAccount();
   const { account, infoClient } = useWallet();
+  const { state: wsState } = useWebSocket();
   
   // Filter states
   const [viewFilter, setViewFilter] = useState<ViewFilter>('Trades');
   const [ledgerUpdates, setLedgerUpdates] = useState<LedgerUpdate[]>([]);
   const [isLoadingLedger, setIsLoadingLedger] = useState(false);
   const [ledgerError, setLedgerError] = useState<string | null>(null);
+
+  // Helper to check if a fill is a spot trade
+  const isSpotFill = useCallback((coin: string) => {
+    return wsState.spotMarkets.some(m => m.name.split('/')[0] === coin);
+  }, [wsState.spotMarkets]);
 
   // Load saved filter on mount
   useEffect(() => {
@@ -281,12 +289,14 @@ export default function HistoryScreen(): React.JSX.Element {
                 <>
                   {allTrades.length > 0 ? (
                     <View style={styles.recentTradesContainer}>
-                      {allTrades.map((fill: UserFill, idx: number) => (
+                      {allTrades.map((fill: UserFill, idx: number) => {
+                        const displayCoin = isSpotFill(fill.coin) ? getDisplayTicker(fill.coin) : fill.coin;
+                        return (
                         <View key={`fill-${idx}`}>
                           <View style={styles.tradeCard}>
                             <View style={styles.tradeLeftSide}>
                               <View style={styles.tradeTopRow}>
-                                <Text style={styles.tradeCoin}>{fill.coin}</Text>
+                                <Text style={styles.tradeCoin}>{displayCoin}</Text>
                                 <Text style={[
                                   styles.tradeSide,
                                   fill.side === 'B' ? styles.sideBuy : styles.sideSell
@@ -320,7 +330,8 @@ export default function HistoryScreen(): React.JSX.Element {
                           </View>
                           <View style={styles.cellSeparator} />
                         </View>
-                      ))}
+                        );
+                      })}
                     </View>
                   ) : (
                     <View style={styles.emptyState}>

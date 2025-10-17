@@ -12,6 +12,7 @@ export const enum Color {
   ACCENT = '#17453f',
   BRIGHT_ACCENT = '#6dcabe',
   DARK_ACCENT = '#03251f',
+  GOLD = '#FFD700',
 }
 
 export default Color;
