@@ -32,7 +32,6 @@ export const styles = StyleSheet.create({
   },
   panelSelector: {
     flexDirection: 'row',
-    // justifyContent: 'space-between',
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
     gap: spacing.sm,
@@ -276,7 +275,12 @@ export const styles = StyleSheet.create({
   orderbookLoadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.xxl,
+    height: 460,
+  },
+  tradesLoadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 460,
   },
   errorContainer: {
     backgroundColor: Color.BG_3,
@@ -369,14 +373,14 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   tickerName: {
-    fontSize: fontSizes.xxl,
+    fontSize: fontSizes.xl,
     color: Color.FG_1,
     fontWeight: '600',
     paddingTop: spacing.xs,
   },
   leverageBadge: {
     backgroundColor: Color.ACCENT,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xs,
     paddingVertical: 2,
     borderRadius: 4,
     marginLeft: spacing.sm,
@@ -397,7 +401,7 @@ export const styles = StyleSheet.create({
     // backgroundColor: Color.BG_2,
   },
   currentPrice: {
-    fontSize: fontSizes.xl,
+    fontSize: fontSizes.lg,
     color: Color.FG_1,
     fontWeight: '600',
     paddingTop: spacing.xs,
@@ -750,7 +754,7 @@ export const styles = StyleSheet.create({
   },
   tradeSide: {
     fontSize: fontSizes.xs,
-    fontWeight: 'bold',
+    fontWeight: '600',
     paddingHorizontal: spacing.xs,
     paddingVertical: 2,
     borderRadius: 3,
@@ -782,9 +786,9 @@ export const styles = StyleSheet.create({
     color: Color.FG_3,
   },
   tradeCardPrice: {
-    fontSize: fontSizes.md,
+    fontSize: 15,
     color: Color.FG_1,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginBottom: spacing.xs,
   },
   tradeCardSize: {
@@ -838,7 +842,7 @@ export const styles = StyleSheet.create({
   orderCoin: {
     color: Color.FG_1,
     fontSize: 17,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   orderSide: {
     fontSize: fontSizes.xs,
@@ -879,6 +883,86 @@ export const styles = StyleSheet.create({
     borderBottomColor: Color.BG_1,
     borderBottomWidth: 1,
     width: '100%',
+  },
+  
+  // Fixed Height Containers for All Panels
+  chartFixedContainer: {
+    minHeight: 400,
+  },
+  orderbookFixedContainer: {
+    minHeight: 400,
+  },
+  obHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  obSplitContainer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+  },
+  obColumn: {
+    flex: 1,
+  },
+  obColumnHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  obColHeaderText: {
+    fontSize: fontSizes.xs,
+    color: Color.FG_3,
+    fontWeight: '600',
+  },
+  obRowSplit: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  obPxSplit: {
+    fontSize: fontSizes.xs,
+    fontWeight: '500',
+  },
+  obPxBid: {
+    color: Color.BRIGHT_ACCENT,
+  },
+  obPxAsk: {
+    color: Color.RED,
+  },
+  obSzSplit: {
+    fontSize: fontSizes.xs,
+    color: Color.FG_3,
+  },
+  obDepthBidSplit: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 255, 148, 0.12)',
+  },
+  obDepthAskSplit: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 59, 59, 0.15)',
+  },
+  
+  // Fixed Trades Container
+  tradesFixedContainer: {
+    minHeight: 460,
+  },
+  tradesScrollContainer: {
+    maxHeight: 400,
   },
 });
 

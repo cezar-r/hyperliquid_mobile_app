@@ -123,7 +123,7 @@ export default function ChartScreen(): React.JSX.Element {
   const [intervalLoaded, setIntervalLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [panel, setPanel] = useState<'orderbook' | 'trades'>('orderbook');
+  const [panel, setPanel] = useState<'chart' | 'orderbook' | 'trades'>('chart');
   const [tickSize, setTickSize] = useState<number | null>(null);
   const [showTickDropdown, setShowTickDropdown] = useState(false);
   const [showOrderTicket, setShowOrderTicket] = useState(false);
@@ -919,108 +919,84 @@ export default function ChartScreen(): React.JSX.Element {
         contentContainerStyle={styles.content}
       >
 
-        <View style={styles.chartIntervalHeader}>
-          {INTERVALS.map((int) => (
-            <TouchableOpacity
-              key={int}
-              onPress={() => handleIntervalChange(int)}
-              style={styles.chartIntervalButton}
-            >
-              <Text
-                style={[
-                  styles.chartIntervalText,
-                  interval === int && styles.chartIntervalTextActive,
-                ]}
+        {panel === 'chart' && (
+          <View style={styles.chartFixedContainer}>
+            <View style={styles.chartIntervalHeader}>
+              {INTERVALS.map((int) => (
+                <TouchableOpacity
+                  key={int}
+                  onPress={() => handleIntervalChange(int)}
+                  style={styles.chartIntervalButton}
+                >
+                  <Text
+                    style={[
+                      styles.chartIntervalText,
+                      interval === int && styles.chartIntervalTextActive,
+                    ]}
+                  >
+                    {int.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                onPress={handleToggleStar}
+                style={styles.starButton}
+                activeOpacity={0.7}
               >
-                {int.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity
-            onPress={handleToggleStar}
-            style={styles.starButton}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons 
-              name={isStarred ? "star" : "star-border"} 
-              size={22} 
-              color={isStarred ? Color.GOLD : Color.FG_1}
-            />
-          </TouchableOpacity>
-        </View>
+                <MaterialIcons 
+                  name={isStarred ? "star" : "star-border"} 
+                  size={22} 
+                  color={isStarred ? Color.GOLD : Color.FG_1}
+                />
+              </TouchableOpacity>
+            </View>
 
-        {isLoading && (
-          <View style={styles.loadingContainer}>
-            <Image 
-              source={require('../../assets/blob_green.gif')} 
-              style={styles.loadingGif}
-            />
+            {isLoading && (
+              <View style={styles.loadingContainer}>
+                <Image 
+                  source={require('../../assets/blob_green.gif')} 
+                  style={styles.loadingGif}
+                />
+              </View>
+            )}
+
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>⚠️ {error}</Text>
+              </View>
+            )}
+
+            {!isLoading && !error && candles.length > 0 && (
+              <View style={styles.chartContainer}>
+                <LightweightChartBridge ref={chartRef} candles={lwcCandles} smaPeriod={20} height={400} />
+              </View>
+            )}
+
+            {!isLoading && !error && candles.length === 0 && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No data available</Text>
+                <Text style={styles.emptySubtext}>
+                  Try selecting a different interval or coin
+                </Text>
+              </View>
+            )}
           </View>
         )}
-
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>⚠️ {error}</Text>
-          </View>
-        )}
-
-        {!isLoading && !error && candles.length > 0 && (
-          <View style={styles.chartContainer}>
-            <LightweightChartBridge ref={chartRef} candles={lwcCandles} smaPeriod={20} height={400} />
-          </View>
-        )}
-
-        {!isLoading && !error && candles.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No data available</Text>
-            <Text style={styles.emptySubtext}>
-              Try selecting a different interval or coin
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.separator} />
-
-        {/* Orderbook / Trades toggle panel */}
-        <View>
-          <View style={styles.panelSelector}>
-            <TouchableOpacity
-              style={[styles.intervalButton, panel === 'orderbook' && styles.intervalButtonActive]}
-              onPress={() => setPanel('orderbook')}
-            >
-              <Text style={[styles.intervalText, panel === 'orderbook' && styles.intervalTextActive]}>Order Book</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.intervalButton, panel === 'trades' && styles.intervalButtonActive]}
-              onPress={() => setPanel('trades')}
-            >
-              <Text style={[styles.intervalText, panel === 'trades' && styles.intervalTextActive]}>Trades</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.separatorContainer}>
-            <View style={[styles.separatorSegment, panel === 'orderbook' && styles.separatorActive]} />
-            <View style={[styles.separatorSegment, panel === 'trades' && styles.separatorActive]} />
-          </View>
-        </View>
 
         {panel === 'orderbook' && (
-          <View style={styles.chartContainer}>
+          <View style={styles.orderbookFixedContainer}>
             {state.orderbook ? (
               <View>
-                <View style={styles.obHeader}>
-                  <Text style={styles.obColTextPrice}>Price</Text>
-                  <View style={styles.obColumnsWithDropdown}>
-                    <TouchableOpacity 
-                      style={styles.tickDropdownButton}
-                      onPress={() => setShowTickDropdown(true)}
-                    >
-                      <Text style={styles.tickDropdownValue}>
-                        {tickSize ? tickSizeOptions.find(opt => opt.value === tickSize)?.label : 'Auto'}
-                      </Text>
-                      <Text style={styles.tickDropdownArrow}>▼</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.obColTextSize}>Size</Text>
-                  </View>
+                <View style={styles.obHeaderRow}>
+                  <TouchableOpacity 
+                    style={styles.tickDropdownButton}
+                    onPress={() => setShowTickDropdown(true)}
+                  >
+                    <Text style={styles.tickDropdownValue}>
+                      {tickSize ? tickSizeOptions.find(opt => opt.value === tickSize)?.label : 'Auto'}
+                    </Text>
+                    <Text style={styles.tickDropdownArrow}>▼</Text>
+                  </TouchableOpacity>
                 </View>
 
                 <Modal
@@ -1063,50 +1039,67 @@ export default function ChartScreen(): React.JSX.Element {
                   </TouchableOpacity>
                 </Modal>
 
-                {(() => {
-                  // ASKS - sorted descending by price (highest first)
-                  const askLevels = [...state.orderbook.levels[1]]
-                    .sort((a, b) => parseFloat(b.px) - parseFloat(a.px))
-                    .slice(0, 15);
-                  // Cumulative depth accumulates from bottom up (lowest ask to highest)
-                  const askCumulativeDepths = askLevels.map((_, idx) => 
-                    askLevels.slice(idx).reduce((sum, l) => sum + parseFloat(l.sz || '0'), 0)
-                  );
-                  const maxAskDepth = Math.max(...askCumulativeDepths, 1);
+                {/* Two-column layout for orderbook */}
+                <View style={styles.obSplitContainer}>
+                  {/* Left column - BIDS (descending) */}
+                  <View style={styles.obColumn}>
+                    <View style={styles.obColumnHeader}>
+                      <Text style={styles.obColHeaderText}>Price</Text>
+                      <Text style={styles.obColHeaderText}>Size</Text>
+                    </View>
+                    {(() => {
+                      // BIDS - sorted descending by price (highest first)
+                      const bidLevels = [...state.orderbook.levels[0]]
+                        .sort((a, b) => parseFloat(b.px) - parseFloat(a.px))
+                        .slice(0, 15);
+                      const bidCumulativeDepths = bidLevels.map((_, idx) => 
+                        bidLevels.slice(0, idx + 1).reduce((sum, l) => sum + parseFloat(l.sz || '0'), 0)
+                      );
+                      const maxBidDepth = Math.max(...bidCumulativeDepths, 1);
 
-                  return askLevels.map((l, idx) => {
-                    const depth = Math.min(1, askCumulativeDepths[idx] / maxAskDepth);
-                    return (
-                      <View key={`ask-${idx}`} style={styles.obRow}>
-                        <View style={[styles.obDepthAsk, { width: `${Math.round(depth * 100)}%` }]} />
-                        <Text style={styles.obPx}>{formatPrice(l.px)}</Text>
-                        <Text style={styles.obSz}>{l.sz}</Text>
-                      </View>
-                    );
-                  });
-                })()}
+                      return bidLevels.map((l, idx) => {
+                        const depth = Math.min(1, bidCumulativeDepths[idx] / maxBidDepth);
+                        return (
+                          <View key={`bid-${idx}`} style={styles.obRowSplit}>
+                            <View style={[styles.obDepthBidSplit, { width: `${Math.round(depth * 100)}%` }]} />
+                            <Text style={[styles.obPxSplit, styles.obPxBid]}>{formatPrice(l.px)}</Text>
+                            <Text style={styles.obSzSplit}>{l.sz}</Text>
+                          </View>
+                        );
+                      });
+                    })()}
+                  </View>
 
-                {(() => {
-                  // BIDS - sorted descending by price (highest first)
-                  const bidLevels = [...state.orderbook.levels[0]]
-                    .sort((a, b) => parseFloat(b.px) - parseFloat(a.px))
-                    .slice(0, 15);
-                  const bidCumulativeDepths = bidLevels.map((_, idx) => 
-                    bidLevels.slice(0, idx + 1).reduce((sum, l) => sum + parseFloat(l.sz || '0'), 0)
-                  );
-                  const maxBidDepth = Math.max(...bidCumulativeDepths, 1);
+                  {/* Right column - ASKS (ascending) */}
+                  <View style={styles.obColumn}>
+                    <View style={styles.obColumnHeader}>
+                      <Text style={styles.obColHeaderText}>Price</Text>
+                      <Text style={styles.obColHeaderText}>Size</Text>
+                    </View>
+                    {(() => {
+                      // ASKS - sorted ascending by price (lowest first)
+                      const askLevels = [...state.orderbook.levels[1]]
+                        .sort((a, b) => parseFloat(a.px) - parseFloat(b.px))
+                        .slice(0, 15);
+                      // Cumulative depth accumulates from top down
+                      const askCumulativeDepths = askLevels.map((_, idx) => 
+                        askLevels.slice(0, idx + 1).reduce((sum, l) => sum + parseFloat(l.sz || '0'), 0)
+                      );
+                      const maxAskDepth = Math.max(...askCumulativeDepths, 1);
 
-                  return bidLevels.map((l, idx) => {
-                    const depth = Math.min(1, bidCumulativeDepths[idx] / maxBidDepth);
-                    return (
-                      <View key={`bid-${idx}`} style={styles.obRow}>
-                        <View style={[styles.obDepthBid, { width: `${Math.round(depth * 100)}%` }]} />
-                        <Text style={styles.obPx}>{formatPrice(l.px)}</Text>
-                        <Text style={styles.obSz}>{l.sz}</Text>
-                      </View>
-                    );
-                  });
-                })()}
+                      return askLevels.map((l, idx) => {
+                        const depth = Math.min(1, askCumulativeDepths[idx] / maxAskDepth);
+                        return (
+                          <View key={`ask-${idx}`} style={styles.obRowSplit}>
+                            <View style={[styles.obDepthAskSplit, { width: `${Math.round(depth * 100)}%` }]} />
+                            <Text style={[styles.obPxSplit, styles.obPxAsk]}>{formatPrice(l.px)}</Text>
+                            <Text style={styles.obSzSplit}>{l.sz}</Text>
+                          </View>
+                        );
+                      });
+                    })()}
+                  </View>
+                </View>
               </View>
             ) : (
               <View style={styles.orderbookLoadingContainer}>
@@ -1120,7 +1113,7 @@ export default function ChartScreen(): React.JSX.Element {
         )}
 
         {panel === 'trades' && (
-          <View style={styles.chartContainer}>
+          <View style={styles.tradesFixedContainer}>
             {state.recentTrades.length > 0 ? (
               <View>
                 <View style={styles.tradesHeader}>
@@ -1128,36 +1121,72 @@ export default function ChartScreen(): React.JSX.Element {
                   <Text style={styles.obColText}>Size</Text>
                   <Text style={styles.obColText}>Time</Text>
                 </View>
-                {state.recentTrades.slice(0, 32).map((t, idx) => {
-                  const tradeTime = new Date(t.time);
-                  const timeStr = `${String(tradeTime.getHours()).padStart(2, '0')}:${String(tradeTime.getMinutes()).padStart(2, '0')}:${String(tradeTime.getSeconds()).padStart(2, '0')}`;
-                  const isBuy = t.side === 'B'; // B = Bid (buy), A = Ask (sell)
-                  
-                  return (
-                    <View key={`trade-${idx}-${t.tid}`} style={styles.tradeRow}>
-                      <Text style={[styles.tradePrice, isBuy ? styles.tradePriceBid : styles.tradePriceAsk]}>
-                        {formatPrice(t.px)}
-                      </Text>
-                      <Text style={styles.tradeSize}>
-                        {t.sz}
-                      </Text>
-                      <View style={styles.tradeTimeContainer}>
-                        <Text style={styles.tradeTime}>{timeStr}</Text>
-                        <TouchableOpacity
-                          onPress={() => Linking.openURL(`https://app.hyperliquid.xyz/explorer/tx/${t.hash}`)}
-                        >
-                          <Text style={styles.tradeExplorerLink}>↗</Text>
-                        </TouchableOpacity>
+                <ScrollView style={styles.tradesScrollContainer}>
+                  {state.recentTrades.slice(0, 32).map((t, idx) => {
+                    const tradeTime = new Date(t.time);
+                    const timeStr = `${String(tradeTime.getHours()).padStart(2, '0')}:${String(tradeTime.getMinutes()).padStart(2, '0')}:${String(tradeTime.getSeconds()).padStart(2, '0')}`;
+                    const isBuy = t.side === 'B'; // B = Bid (buy), A = Ask (sell)
+                    
+                    return (
+                      <View key={`trade-${idx}-${t.tid}`} style={styles.tradeRow}>
+                        <Text style={[styles.tradePrice, isBuy ? styles.tradePriceBid : styles.tradePriceAsk]}>
+                          {formatPrice(t.px)}
+                        </Text>
+                        <Text style={styles.tradeSize}>
+                          {t.sz}
+                        </Text>
+                        <View style={styles.tradeTimeContainer}>
+                          <Text style={styles.tradeTime}>{timeStr}</Text>
+                          <TouchableOpacity
+                            onPress={() => Linking.openURL(`https://app.hyperliquid.xyz/explorer/tx/${t.hash}`)}
+                          >
+                            <Text style={styles.tradeExplorerLink}>↗</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
-                    </View>
-                  );
-                })}
+                    );
+                  })}
+                </ScrollView>
               </View>
             ) : (
-              <Text style={styles.subtitle}>Loading trades...</Text>
+              <View style={styles.tradesLoadingContainer}>
+                <Image 
+                  source={require('../../assets/blob_green.gif')} 
+                  style={styles.loadingGif}
+                />
+              </View>
             )}
           </View>
         )}
+
+        {/* Three-way toggle panel */}
+        <View>
+          <View style={styles.panelSelector}>
+            <TouchableOpacity
+              style={[styles.intervalButton, panel === 'chart' && styles.intervalButtonActive]}
+              onPress={() => setPanel('chart')}
+            >
+              <Text style={[styles.intervalText, panel === 'chart' && styles.intervalTextActive]}>Chart</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.intervalButton, panel === 'orderbook' && styles.intervalButtonActive]}
+              onPress={() => setPanel('orderbook')}
+            >
+              <Text style={[styles.intervalText, panel === 'orderbook' && styles.intervalTextActive]}>Order Book</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.intervalButton, panel === 'trades' && styles.intervalButtonActive]}
+              onPress={() => setPanel('trades')}
+            >
+              <Text style={[styles.intervalText, panel === 'trades' && styles.intervalTextActive]}>Trades</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.separatorContainer}>
+            <View style={[styles.separatorSegment, panel === 'chart' && styles.separatorActive]} />
+            <View style={[styles.separatorSegment, panel === 'orderbook' && styles.separatorActive]} />
+            <View style={[styles.separatorSegment, panel === 'trades' && styles.separatorActive]} />
+          </View>
+        </View>
 
 
         {/* Position / Balances */}
