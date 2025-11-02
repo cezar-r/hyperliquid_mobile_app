@@ -128,6 +128,8 @@ export interface SpotMarket {
   szDecimals: number;
   isCanonical?: boolean;
   apiName?: string; // Format: @{index}, used by API for spot orders
+  baseToken?: string; // Base token name (e.g., "HYPE")
+  baseTokenIndex?: number; // Base token index
 }
 
 export interface AssetContext {

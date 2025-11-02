@@ -6,7 +6,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import { getDisplayTicker } from '../lib/formatting';
+import { getDisplayTicker, resolveSpotTicker } from '../lib/formatting';
 import { styles } from './styles/HistoryScreen.styles';
 import type { UserFill, LedgerUpdate } from '../types';
 import Color from '../styles/colors';
@@ -52,8 +52,13 @@ export default function HistoryScreen(): React.JSX.Element {
   // For swipe animation
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  // Helper to check if a fill is a spot trade
+  // Helper to check if a fill is a spot trade (handles both base token name and API format)
   const isSpotFill = useCallback((coin: string) => {
+    // Check if coin is in API format (@{index})
+    if (coin.startsWith('@')) {
+      return wsState.spotMarkets.some(m => m.apiName === coin);
+    }
+    // Otherwise check against base token names
     return wsState.spotMarkets.some(m => m.name.split('/')[0] === coin);
   }, [wsState.spotMarkets]);
 
@@ -348,7 +353,9 @@ export default function HistoryScreen(): React.JSX.Element {
                   {allTrades.length > 0 ? (
                     <View style={styles.recentTradesContainer}>
                       {allTrades.map((fill: UserFill, idx: number) => {
-                        const displayCoin = isSpotFill(fill.coin) ? getDisplayTicker(fill.coin) : fill.coin;
+                        const displayCoin = isSpotFill(fill.coin)
+                          ? resolveSpotTicker(fill.coin, wsState.spotMarkets)
+                          : fill.coin;
                         return (
                         <View key={`fill-${idx}`}>
                           <View style={styles.tradeCard}>

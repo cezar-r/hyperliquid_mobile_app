@@ -8,7 +8,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker } from '../lib/formatting';
+import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker, resolveSpotTicker } from '../lib/formatting';
 import { styles } from './styles/PortfolioScreen.styles';
 import type { PerpPosition, UserFill } from '../types';
 import Color from '../styles/colors';
@@ -212,8 +212,13 @@ export default function PortfolioScreen(): React.JSX.Element {
     return fills;
   }, [account.data?.userFills, timeFilter, marketFilter, wsState.perpMarkets, wsState.spotMarkets]);
 
-  // Helper to check if a fill is a spot trade
+  // Helper to check if a fill is a spot trade (handles both base token name and API format)
   const isSpotFill = useCallback((coin: string) => {
+    // Check if coin is in API format (@{index})
+    if (coin.startsWith('@')) {
+      return wsState.spotMarkets.some(m => m.apiName === coin);
+    }
+    // Otherwise check against base token names
     return wsState.spotMarkets.some(m => m.name.split('/')[0] === coin);
   }, [wsState.spotMarkets]);
 
@@ -1290,7 +1295,9 @@ export default function PortfolioScreen(): React.JSX.Element {
                         Recent Trades ({filteredFills.length})
                       </Text>
                       {filteredFills.slice(0, tradesDisplayLimit).map((fill: UserFill, idx: number) => {
-                        const displayCoin = isSpotFill(fill.coin) ? getDisplayTicker(fill.coin) : fill.coin;
+                        const displayCoin = isSpotFill(fill.coin) 
+                          ? resolveSpotTicker(fill.coin, wsState.spotMarkets)
+                          : fill.coin;
                         return (
                         <View key={`fill-${idx}`}>
                           <View style={styles.tradeCard}>

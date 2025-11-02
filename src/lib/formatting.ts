@@ -130,6 +130,27 @@ export function getDisplayTicker(ticker: string): string {
 }
 
 /**
+ * Resolve spot ticker from API format (@{index}) or base token name to display format
+ * @param coin - Either API format (@107) or base token name (HYPE)
+ * @param spotMarkets - Array of spot markets
+ * @returns Display ticker with mapping applied (e.g., "HYPE" or "BTC" for "UBTC")
+ */
+export function resolveSpotTicker(coin: string, spotMarkets: any[]): string {
+  // If coin starts with @, it's API format - look up by apiName
+  if (coin.startsWith('@')) {
+    const market = spotMarkets.find(m => m.apiName === coin);
+    if (market) {
+      // Return the base token name with mapping applied
+      const baseToken = market.baseToken || market.name.split('/')[0];
+      return getDisplayTicker(baseToken);
+    }
+  }
+  
+  // Otherwise, it's already a token name - just apply mapping
+  return getDisplayTicker(coin);
+}
+
+/**
  * Format number with commas (e.g., 1234.56 → 1,234.56)
  */
 export function formatWithCommas(value: number, decimals: number = 2): string {

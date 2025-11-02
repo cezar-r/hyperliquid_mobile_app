@@ -10,8 +10,9 @@ import {
   Keyboard,
   Animated,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useWebSocket } from '../contexts/WebSocketContext';
@@ -81,37 +82,51 @@ export default function SearchScreen(): React.JSX.Element {
   const [perpAscending, setPerpAscending] = useState(false);
   const [spotAscending, setSpotAscending] = useState(false);
   
-  // Store starred filter state per market type
+  // Global starred filter state (applies to both perp and spot)
   const [showStarredOnly, setShowStarredOnly] = useState(false);
-  const [perpShowStarredOnly, setPerpShowStarredOnly] = useState(false);
-  const [spotShowStarredOnly, setSpotShowStarredOnly] = useState(false);
   const [starredTickers, setStarredTickers] = useState<string[]>([]);
   
   // For swipe animation
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  // Restore sort and starred filter when market type changes
+  // Load star filter preference from AsyncStorage on mount
+  React.useEffect(() => {
+    const loadStarFilterPreference = async () => {
+      try {
+        const starFilter = await AsyncStorage.getItem('search_star_filter');
+        if (starFilter !== null) {
+          setShowStarredOnly(starFilter === 'true');
+        }
+      } catch (error) {
+        console.error('[SearchScreen] Failed to load star filter preference:', error);
+      }
+    };
+    
+    loadStarFilterPreference();
+  }, []);
+
+  // Restore sort preferences when market type changes
   React.useEffect(() => {
     if (wsState.marketType === 'perp') {
       setCurrentSort(perpSort);
       setIsAscending(perpAscending);
-      setShowStarredOnly(perpShowStarredOnly);
     } else {
       setCurrentSort(spotSort);
       setIsAscending(spotAscending);
-      setShowStarredOnly(spotShowStarredOnly);
     }
-  }, [wsState.marketType, perpSort, spotSort, perpAscending, spotAscending, perpShowStarredOnly, spotShowStarredOnly]);
+  }, [wsState.marketType, perpSort, spotSort, perpAscending, spotAscending]);
 
-  // Load starred tickers when market type changes
-  React.useEffect(() => {
-    const loadStarredTickers = async () => {
-      const starred = await getStarredTickers(wsState.marketType);
-      setStarredTickers(starred);
-    };
-    
-    loadStarredTickers();
-  }, [wsState.marketType]);
+  // Load starred tickers when screen comes into focus or market type changes
+  useFocusEffect(
+    useCallback(() => {
+      const loadStarredTickers = async () => {
+        const starred = await getStarredTickers(wsState.marketType);
+        setStarredTickers(starred);
+      };
+      
+      loadStarredTickers();
+    }, [wsState.marketType])
+  );
 
   // Debug logging for spot markets (reduced)
   React.useEffect(() => {
@@ -315,13 +330,11 @@ export default function SearchScreen(): React.JSX.Element {
     const newState = !showStarredOnly;
     setShowStarredOnly(newState);
     
-    // Save to market type specific state
-    if (wsState.marketType === 'perp') {
-      setPerpShowStarredOnly(newState);
-    } else {
-      setSpotShowStarredOnly(newState);
-    }
-  }, [showStarredOnly, wsState.marketType]);
+    // Persist to AsyncStorage
+    AsyncStorage.setItem('search_star_filter', String(newState)).catch((error) => {
+      console.error('[SearchScreen] Failed to save star filter preference:', error);
+    });
+  }, [showStarredOnly]);
 
   const handleClearSearch = useCallback(() => {
     setSearchQuery('');
