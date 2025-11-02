@@ -788,376 +788,78 @@ export default function PortfolioScreen(): React.JSX.Element {
                         {totalPnL >= 0 ? '+' : ''}${formatNumber(totalPnL, 2)} {timeFilter}
                       </Text>
                     )}
-                    
-                    {/* Equity Breakdown */}
-                    {showEquityBreakdown && (
-                      <View style={styles.equityBreakdownContainer}>
-                        {(showPerps || marketFilter === 'All Markets') && perpAccountValue > 0 && (
-                          <View style={styles.equityRow}>
-                            <Text style={styles.equityLabel}>Perp</Text>
-                            <Text style={styles.equityValue}>${formatNumber(perpAccountValue, 2)}</Text>
-                          </View>
-                        )}
-                        {(showSpot || marketFilter === 'All Markets') && spotTotalValue > 0 && (
-                          <View style={styles.equityRow}>
-                            <Text style={styles.equityLabel}>Spot</Text>
-                            <Text style={styles.equityValue}>${formatNumber(spotTotalValue, 2)}</Text>
-                          </View>
-                        )}
-                        {(showStaking && (marketFilter === 'All Markets' || marketFilter !== 'Staking')) && stakingValue > 0 && (
-                          <View style={styles.equityRow}>
-                            <Text style={styles.equityLabel}>Staking</Text>
-                            <Text style={styles.equityValue}>${formatNumber(stakingValue, 2)}</Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
                   </View>
 
-                  {/* Conditional rendering based on market filter */}
-                  {marketFilter === 'Perp' ? (
+                  {/* Unified layout for all non-staking markets */}
+                  {marketFilter !== 'Staking' && (
                     <>
-                      {/* Perp Positions - render first when Perp filter is selected */}
-                      {showPerps && sortedPerpPositions.length > 0 && (
-                        <View style={styles.positionsContainer}>
-                          <View style={styles.ordersHeaderRow}>
-                            <Text style={styles.sectionLabel}>
-                              Perps ({sortedPerpPositions.length})
-                            </Text>
-                            <TouchableOpacity onPress={handleCloseAllPositions}>
-                              <Text style={styles.cancelAllText}>Close All</Text>
-                            </TouchableOpacity>
-                          </View>
-                          {sortedPerpPositions.map((item, idx) => {
-                            const positionSize = parseFloat(item.position.szi);
-                            const isLong = positionSize > 0;
-                            const leverage = item.position.leverage?.value || 1;
-                            const price = item.price ? parseFloat(item.price) : 0;
-                            
-                            // Calculate 24h change
-                            const prevDayPx = item.assetContext?.prevDayPx || price;
-                            const priceChange = price - prevDayPx;
-                            const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
-                            
-                            // Format TP/SL display
-                            const tpDisplay = item.position.tpPrice ? item.position.tpPrice.toFixed(2) : '--';
-                            const slDisplay = item.position.slPrice ? item.position.slPrice.toFixed(2) : '--';
-                            
-                            return (
-                              <View key={`perp-${item.position.coin}`}>
-                                <TouchableOpacity
-                                  style={styles.positionCell}
-                                  onPress={() => handleNavigateToChart(item.position.coin, 'perp')}
-                                >
-                                  <View style={styles.leftSide}>
-                                    <View style={styles.tickerContainer}>
-                                      <Text style={styles.ticker}>{item.position.coin}</Text>
-                                      <Text style={[
-                                        styles.leverage,
-                                        { color: isLong ? Color.BRIGHT_ACCENT : Color.RED }
-                                      ]}>
-                                        {leverage}x
-                                      </Text>
-                                    </View>
-                                    <View style={styles.priceContainer}>
-                                      <Text style={styles.size}>${formatNumber(price)}</Text>
-                                      <Text style={[
-                                        styles.priceChange,
-                                        { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
-                                      ]}>
-                                        {formatPercent(priceChangePct)}
-                                      </Text>
-                                      <TouchableOpacity 
-                                        style={{ flexDirection: 'row', alignItems: 'center' }}
-                                        onPress={(e) => {
-                                          e.stopPropagation();
-                                          setEditingTPSL(item.position);
-                                        }}
-                                      >
-                                        <Text style={styles.tpslInline}>TP/SL {tpDisplay}/{slDisplay}</Text>
-                                        <MaterialIcons name="edit" size={14} color={Color.BRIGHT_ACCENT} style={styles.editTpslIcon} />
-                                      </TouchableOpacity>
-                                    </View>
-                                  </View>
-                                  <View style={styles.rightSide}>
-                                    <Text style={styles.price}>${formatNumber(item.marginUsed, 2)}</Text>
-                                    <Text style={[
-                                      styles.pnl,
-                                      { color: item.pnl.pnl >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
-                                    ]}>
-                                      {item.pnl.pnl >= 0 ? '+' : '-'}${formatNumber(Math.abs(item.pnl.pnl), 2)}
-                                    </Text>
-                                  </View>
-                                </TouchableOpacity>
-                                <View style={styles.cellSeparator} />
+                      {/* Action Buttons (Deposit/Withdraw/Transfer) */}
+                      <View style={styles.accountDetailsContainer}>
+                        <View style={styles.actionButtonsContainer}>
+                          <TouchableOpacity 
+                            style={styles.depositButton}
+                            onPress={() => setDepositModalVisible(true)}
+                          >
+                            <Text style={styles.depositButtonText}>Deposit</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={styles.withdrawButton}
+                            onPress={() => setWithdrawModalVisible(true)}
+                          >
+                            <Text style={styles.withdrawButtonText}>Withdraw</Text>
+                          </TouchableOpacity>
+                        </View>
+                        
+                        {/* Perp <-> Spot Transfer Button */}
+                        <View style={styles.transferContainer}>
+                          <TouchableOpacity 
+                            style={styles.transferButton}
+                            onPress={() => setPerpSpotTransferVisible(true)}
+                          >
+                            <Text style={styles.transferButtonText}>Perp ↔ Spot Transfer</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                      
+                      <View style={styles.separator} />
+                      
+                      {/* Equity Breakdown */}
+                      {showEquityBreakdown && (
+                        <View style={styles.accountDetailsContainer}>
+                          <View style={styles.equityBreakdownContainer}>
+                            {(showPerps || marketFilter === 'All Markets') && perpAccountValue > 0 && (
+                              <View style={styles.equityRow}>
+                                <Text style={styles.equityLabel}>Perp</Text>
+                                <Text style={styles.equityValue}>${formatNumber(perpAccountValue, 2)}</Text>
                               </View>
-                            );
-                          })}
+                            )}
+                            {(showSpot || marketFilter === 'All Markets') && spotTotalValue > 0 && (
+                              <View style={styles.equityRow}>
+                                <Text style={styles.equityLabel}>Spot</Text>
+                                <Text style={styles.equityValue}>${formatNumber(spotTotalValue, 2)}</Text>
+                              </View>
+                            )}
+                            {(showStaking && marketFilter === 'All Markets') && stakingValue > 0 && (
+                              <View style={styles.equityRow}>
+                                <Text style={styles.equityLabel}>Staking</Text>
+                                <Text style={styles.equityValue}>${formatNumber(stakingValue, 2)}</Text>
+                              </View>
+                            )}
+                            {account.data.perpMarginSummary.withdrawable && (
+                              <View style={styles.equityRow}>
+                                <Text style={styles.equityLabel}>Withdrawable</Text>
+                                <Text style={styles.equityValue}>
+                                  ${parseFloat(account.data.perpMarginSummary.withdrawable).toFixed(2)}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
                         </View>
                       )}
-
-                      {/* Account Details - render second when Perp filter is selected */}
-                      {showPerps && (
-                        <>
-                          <View style={styles.accountDetailsContainer}>
-                            <Text style={styles.accountDetailsTitle}>Account Details</Text>
-                          
-                          {account.data.perpMarginSummary.accountValue && (
-                            <View style={styles.detailRow}>
-                              <Text style={styles.detailLabel}>Perp Account Value</Text>
-                              <Text style={styles.detailValue}>
-                                ${parseFloat(account.data.perpMarginSummary.accountValue).toFixed(2)}
-                              </Text>
-                            </View>
-                          )}
-                          
-                          {account.data.perpMarginSummary.withdrawable && (
-                            <View style={styles.detailRow}>
-                              <Text style={styles.detailLabel}>Withdrawable</Text>
-                              <Text style={styles.detailValue}>
-                                ${parseFloat(account.data.perpMarginSummary.withdrawable).toFixed(2)}
-                              </Text>
-                            </View>
-                          )}
-                          
-                          {account.data.perpMarginSummary.totalMarginUsed && (
-                            <View style={styles.detailRow}>
-                              <Text style={styles.detailLabel}>Margin Used</Text>
-                              <Text style={styles.detailValue}>
-                                ${parseFloat(account.data.perpMarginSummary.totalMarginUsed).toFixed(2)}
-                              </Text>
-                            </View>
-                          )}
-                          
-                            <View style={styles.separator} />
-                            
-                            {/* Deposit and Withdraw Buttons */}
-                            <View style={styles.actionButtonsContainer}>
-                              <TouchableOpacity 
-                                style={styles.depositButton}
-                                onPress={() => setDepositModalVisible(true)}
-                              >
-                                <Text style={styles.depositButtonText}>Deposit</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity 
-                                style={styles.withdrawButton}
-                                onPress={() => setWithdrawModalVisible(true)}
-                              >
-                                <Text style={styles.withdrawButtonText}>Withdraw</Text>
-                              </TouchableOpacity>
-                            </View>
-                            
-                            {/* Perp <-> Spot Transfer Button */}
-                            <View style={styles.transferContainer}>
-                              <TouchableOpacity 
-                                style={styles.transferButton}
-                                onPress={() => setPerpSpotTransferVisible(true)}
-                              >
-                                <Text style={styles.transferButtonText}>Perp ↔ Spot Transfer</Text>
-                              </TouchableOpacity>
-                            </View>
-                            
-                            <View style={styles.separator} />
-                          </View>
-                        </>
-                      )}
-                    </>
-                  ) : marketFilter === 'Spot' ? (
-                    <>
-                      {/* Spot Balances - render first when Spot filter is selected */}
-                      {showSpot && sortedSpotBalances.length > 0 && (
-                        <View style={styles.positionsContainer}>
-                          <Text style={styles.sectionLabel}>
-                            Balances ({sortedSpotBalances.length})
-                          </Text>
-                          {sortedSpotBalances.map((item) => {
-                            const price = item.price ? parseFloat(item.price) : 0;
-                            
-                            // Calculate 24h change
-                            const prevDayPx = item.assetContext?.prevDayPx || price;
-                            const priceChange = price - prevDayPx;
-                            const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
-                            
-                            // Find the spot market for this coin to get the full pair name
-                            const spotMarket = wsState.spotMarkets.find(m => m.name.split('/')[0] === item.balance.coin);
-                            const displayName = spotMarket ? getDisplayTicker(spotMarket.name) : item.balance.coin;
-                            
-                            return (
-                              <View key={`spot-${item.balance.coin}`}>
-                                <TouchableOpacity
-                                  style={styles.positionCell}
-                                  onPress={() => {
-                                    // Don't navigate for USDC
-                                    if (item.balance.coin === 'USDC') return;
-                                    // Pass the full market name for spot (e.g., "UBTC/USDC")
-                                    handleNavigateToChart(spotMarket?.name || item.balance.coin, 'spot');
-                                  }}
-                                >
-                                  <View style={styles.leftSide}>
-                                    <View style={styles.tickerContainer}>
-                                      <Text style={styles.ticker}>{displayName}</Text>
-                                    </View>
-                                    <View style={styles.priceContainer}>
-                                      <Text style={styles.size}>${formatNumber(price)}</Text>
-                                      <Text style={[
-                                        styles.priceChange,
-                                        { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED }
-                                      ]}>
-                                        {formatPercent(priceChangePct)}
-                                      </Text>
-                                    </View>
-                                  </View>
-                                  <View style={styles.rightSide}>
-                                    <Text style={styles.price}>${formatNumber(item.usdValue, 2)}</Text>
-                                    <Text style={[styles.pnl, { color: Color.FG_3 }]}>
-                                      {formatNumber(item.total, 4)} {getDisplayTicker(item.balance.coin)}
-                                    </Text>
-                                  </View>
-                                </TouchableOpacity>
-                                <View style={styles.cellSeparator} />
-                              </View>
-                            );
-                          })}
-                        </View>
-                      )}
-
-                      {/* Account Details - render second when Spot filter is selected */}
-                      {showSpot && (
-                        <>
-                          <View style={styles.accountDetailsContainer}>
-                            <Text style={styles.accountDetailsTitle}>Account Details</Text>
-                          
-                          {account.data.perpMarginSummary.accountValue && (
-                            <View style={styles.detailRow}>
-                              <Text style={styles.detailLabel}>Perp Account Value</Text>
-                              <Text style={styles.detailValue}>
-                                ${parseFloat(account.data.perpMarginSummary.accountValue).toFixed(2)}
-                              </Text>
-                            </View>
-                          )}
-                          
-                          {account.data.perpMarginSummary.withdrawable && (
-                            <View style={styles.detailRow}>
-                              <Text style={styles.detailLabel}>Withdrawable</Text>
-                              <Text style={styles.detailValue}>
-                                ${parseFloat(account.data.perpMarginSummary.withdrawable).toFixed(2)}
-                              </Text>
-                            </View>
-                          )}
-                          
-                          {account.data.perpMarginSummary.totalMarginUsed && (
-                            <View style={styles.detailRow}>
-                              <Text style={styles.detailLabel}>Margin Used</Text>
-                              <Text style={styles.detailValue}>
-                                ${parseFloat(account.data.perpMarginSummary.totalMarginUsed).toFixed(2)}
-                              </Text>
-                            </View>
-                          )}
-                          
-                            <View style={styles.separator} />
-                            
-                            {/* Deposit and Withdraw Buttons */}
-                            <View style={styles.actionButtonsContainer}>
-                              <TouchableOpacity 
-                                style={styles.depositButton}
-                                onPress={() => setDepositModalVisible(true)}
-                              >
-                                <Text style={styles.depositButtonText}>Deposit</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity 
-                                style={styles.withdrawButton}
-                                onPress={() => setWithdrawModalVisible(true)}
-                              >
-                                <Text style={styles.withdrawButtonText}>Withdraw</Text>
-                              </TouchableOpacity>
-                            </View>
-                            
-                            {/* Perp <-> Spot Transfer Button */}
-                            <View style={styles.transferContainer}>
-                              <TouchableOpacity 
-                                style={styles.transferButton}
-                                onPress={() => setPerpSpotTransferVisible(true)}
-                              >
-                                <Text style={styles.transferButtonText}>Perp ↔ Spot Transfer</Text>
-                              </TouchableOpacity>
-                            </View>
-                            
-                            <View style={styles.separator} />
-                          </View>
-                        </>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {/* Default order: Account Details → Perps → Spot Balances */}
-                      {/* Account Details */}
-                      {(showPerps || showSpot || marketFilter === 'Perp+Spot' || marketFilter === 'All Markets') && (
-                        <>
-                          <View style={styles.separator} />
-                          <View style={styles.accountDetailsContainer}>
-                            <Text style={styles.accountDetailsTitle}>Account Details</Text>
-                          
-                          {account.data.perpMarginSummary.accountValue && (
-                            <View style={styles.detailRow}>
-                              <Text style={styles.detailLabel}>Perp Account Value</Text>
-                              <Text style={styles.detailValue}>
-                                ${parseFloat(account.data.perpMarginSummary.accountValue).toFixed(2)}
-                              </Text>
-                            </View>
-                          )}
-                          
-                          {account.data.perpMarginSummary.withdrawable && (
-                            <View style={styles.detailRow}>
-                              <Text style={styles.detailLabel}>Withdrawable</Text>
-                              <Text style={styles.detailValue}>
-                                ${parseFloat(account.data.perpMarginSummary.withdrawable).toFixed(2)}
-                              </Text>
-                            </View>
-                          )}
-                          
-                          {account.data.perpMarginSummary.totalMarginUsed && (
-                            <View style={styles.detailRow}>
-                              <Text style={styles.detailLabel}>Margin Used</Text>
-                              <Text style={styles.detailValue}>
-                                ${parseFloat(account.data.perpMarginSummary.totalMarginUsed).toFixed(2)}
-                              </Text>
-                            </View>
-                          )}
-                          
-                            <View style={styles.separator} />
-                            
-                            {/* Deposit and Withdraw Buttons */}
-                            <View style={styles.actionButtonsContainer}>
-                              <TouchableOpacity 
-                                style={styles.depositButton}
-                                onPress={() => setDepositModalVisible(true)}
-                              >
-                                <Text style={styles.depositButtonText}>Deposit</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity 
-                                style={styles.withdrawButton}
-                                onPress={() => setWithdrawModalVisible(true)}
-                              >
-                                <Text style={styles.withdrawButtonText}>Withdraw</Text>
-                              </TouchableOpacity>
-                            </View>
-                            
-                            {/* Perp <-> Spot Transfer Button */}
-                            <View style={styles.transferContainer}>
-                              <TouchableOpacity 
-                                style={styles.transferButton}
-                                onPress={() => setPerpSpotTransferVisible(true)}
-                              >
-                                <Text style={styles.transferButtonText}>Perp ↔ Spot Transfer</Text>
-                              </TouchableOpacity>
-                            </View>
-                            
-                            <View style={styles.separator} />
-                          </View>
-                        </>
-                      )}
-
-                      {/* Open Positions */}
+                      
+                      <View style={styles.separator} />
+                      
+                      {/* Perp Positions */}
                       {showPerps && sortedPerpPositions.length > 0 && (
                         <View style={styles.positionsContainer}>
                           <View style={styles.ordersHeaderRow}>

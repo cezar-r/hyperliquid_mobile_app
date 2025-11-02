@@ -37,7 +37,7 @@ export const styles = StyleSheet.create({
   },
   panelTextActive: {
     color: Color.FG_1,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   separatorContainer: {
     flexDirection: 'row',
@@ -60,8 +60,8 @@ export const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   balanceAmount: {
-    fontSize: 48,
-    fontWeight: 'bold',
+    fontSize: 52,
+    fontWeight: '700',
     paddingTop: 12,
     paddingBottom: 6,
   },
@@ -153,7 +153,7 @@ export const styles = StyleSheet.create({
   ticker: {
     color: Color.FG_1,
     fontSize: 17,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   leverage: {
     fontSize: 16,
@@ -178,7 +178,7 @@ export const styles = StyleSheet.create({
     color: Color.FG_1,
     fontSize: 16,
     marginBottom: 0,
-    fontWeight: 'bold'
+    fontWeight: '600'
   },
   pnl: {
     fontSize: 12,

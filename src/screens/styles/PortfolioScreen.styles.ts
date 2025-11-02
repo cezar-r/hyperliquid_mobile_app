@@ -65,7 +65,7 @@ export const styles = StyleSheet.create({
   },
   marketDropdownItemTextActive: {
     color: Color.BRIGHT_ACCENT,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   dropdownBackdrop: {
     position: 'absolute',
@@ -114,7 +114,7 @@ export const styles = StyleSheet.create({
   },
   timeFilterTextActive: {
     color: Color.FG_1,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   timeSeparatorContainer: {
     flexDirection: 'row',
@@ -143,7 +143,7 @@ export const styles = StyleSheet.create({
   volumeValue: {
     fontSize: fontSizes.lg,
     color: Color.BRIGHT_ACCENT,
-    fontWeight: '700',
+    fontWeight: '600',
   },
 
   // Portfolio Value Component
@@ -179,6 +179,7 @@ export const styles = StyleSheet.create({
   equityBreakdownContainer: {
     marginTop: spacing.sm,
     width: '100%',
+    paddingBottom: spacing.md,
   },
   equityRow: {
     flexDirection: 'row',
@@ -332,7 +333,7 @@ export const styles = StyleSheet.create({
   ticker: {
     color: Color.FG_1,
     fontSize: 17,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   leverage: {
     fontSize: 16,
@@ -357,7 +358,7 @@ export const styles = StyleSheet.create({
     color: Color.FG_1,
     fontSize: 16,
     marginBottom: 0,
-    fontWeight: 'bold'
+    fontWeight: '600'
   },
   pnl: {
     fontSize: 12,
@@ -428,7 +429,7 @@ export const styles = StyleSheet.create({
   delegateButtonText: {
     fontSize: fontSizes.md,
     color: Color.BG_2,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   delegationsContainer: {
     marginTop: spacing.lg,
@@ -456,7 +457,7 @@ export const styles = StyleSheet.create({
   delegationValidator: {
     fontSize: fontSizes.md,
     color: Color.BRIGHT_ACCENT,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   delegationAmount: {
     fontSize: fontSizes.md,
@@ -533,7 +534,7 @@ export const styles = StyleSheet.create({
   orderCoin: {
     color: Color.FG_1,
     fontSize: 17,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   orderSide: {
     fontSize: fontSizes.xs,
@@ -604,7 +605,7 @@ export const styles = StyleSheet.create({
   tradeCoin: {
     fontSize: fontSizes.md,
     color: Color.FG_1,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   tradeSide: {
     fontSize: fontSizes.xs,
@@ -626,9 +627,9 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   tradePrice: {
-    fontSize: fontSizes.md,
+    fontSize: 15,
     color: Color.FG_1,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginBottom: spacing.xs,
   },
   tradeSize: {
