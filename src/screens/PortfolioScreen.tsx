@@ -44,8 +44,14 @@ function calculatePositionPnL(position: PerpPosition, currentPrice: string | num
 }
 
 // Helper to format numbers
-function formatNumber(num: number, decimals: number = 2): string {
-  return num.toFixed(decimals);
+function formatNumber(num: number, maxDecimals: number = 5): string {
+  if (typeof num !== 'number' || !Number.isFinite(num)) {
+    return '0';
+  }
+  return num.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: maxDecimals,
+  });
 }
 
 // Helper to format percentage
@@ -780,7 +786,7 @@ export default function PortfolioScreen(): React.JSX.Element {
                   {/* Portfolio Value */}
                   <View style={styles.portfolioValueContainer}>
                     <Animated.Text style={[styles.portfolioValue, { color: textColor }]}>${formatNumber(totalValue, 2)}</Animated.Text>
-                    {showPnL && totalPnL !== 0 && (
+                    {showPnL && (
                       <Text style={[
                         styles.portfolioPnL,
                         totalPnL >= 0 ? styles.pnlPositive : styles.pnlNegative
@@ -874,6 +880,9 @@ export default function PortfolioScreen(): React.JSX.Element {
                             const positionSize = parseFloat(item.position.szi);
                             const isLong = positionSize > 0;
                             const leverage = item.position.leverage?.value || 1;
+                            const leverageType = item.position.leverage?.type 
+                              ? item.position.leverage.type.charAt(0).toUpperCase() + item.position.leverage.type.slice(1)
+                              : 'Cross';
                             const price = item.price ? parseFloat(item.price) : 0;
                             
                             // Calculate 24h change
@@ -899,6 +908,9 @@ export default function PortfolioScreen(): React.JSX.Element {
                                         { color: isLong ? Color.BRIGHT_ACCENT : Color.RED }
                                       ]}>
                                         {leverage}x
+                                      </Text>
+                                      <Text style={styles.leverageTypeBadge}>
+                                        {leverageType}
                                       </Text>
                                     </View>
                                     <View style={styles.priceContainer}>
@@ -984,7 +996,7 @@ export default function PortfolioScreen(): React.JSX.Element {
                                   <View style={styles.rightSide}>
                                     <Text style={styles.price}>${formatNumber(item.usdValue, 2)}</Text>
                                     <Text style={[styles.pnl, { color: Color.FG_3 }]}>
-                                      {formatNumber(item.total, 4)} {getDisplayTicker(item.balance.coin)}
+                                      {item.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {getDisplayTicker(item.balance.coin)}
                                     </Text>
                                   </View>
                                 </TouchableOpacity>
@@ -1312,8 +1324,8 @@ export default function PortfolioScreen(): React.JSX.Element {
                               )}
                             </View>
                             <View style={styles.tradeRightSide}>
-                              <Text style={styles.tradePrice}>${formatNumber(parseFloat(fill.px), 2)}</Text>
-                              <Text style={styles.tradeSize}>{fill.sz}</Text>
+                              <Text style={styles.tradePrice}>${formatNumber(parseFloat(fill.px))}</Text>
+                              <Text style={styles.tradeSize}>{parseFloat(fill.sz).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}</Text>
                             </View>
                           </View>
                           <View style={styles.cellSeparator} />

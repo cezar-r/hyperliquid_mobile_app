@@ -129,3 +129,13 @@ export function getDisplayTicker(ticker: string): string {
   return (SPOT_TICKER_MAP as Record<string, string>)[ticker] || ticker;
 }
 
+/**
+ * Format number with commas (e.g., 1234.56 → 1,234.56)
+ */
+export function formatWithCommas(value: number, decimals: number = 2): string {
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+

@@ -19,7 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Slider from '@react-native-community/slider';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import { formatSize, floatToWire } from '../lib/formatting';
+import { formatSize, floatToWire, formatWithCommas } from '../lib/formatting';
 import { styles } from './styles/OrderTicket.styles';
 import Color from '../styles/colors';
 
@@ -450,7 +450,7 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
             {/* Price Input */}
             <View style={styles.inputGroup}>
               <View style={styles.inputLabel}>
-                <Text style={styles.inputLabelText}>Price (USDC)</Text>
+                <Text style={styles.inputLabelText}>{coin} Price (USDC)</Text>
                 {orderType === 'market' && <Text style={styles.inputLabelBadge}>~Market</Text>}
               </View>
               <TextInput
@@ -465,7 +465,7 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
               {currentPrice && orderType === 'limit' && (
                 <TouchableOpacity style={styles.useMarketButton} onPress={() => setPrice(currentPrice)}>
                   <Text style={styles.useMarketButtonText}>
-                    Use Market: ${currentPrice}
+                    Use Market: ${formatWithCommas(parseFloat(currentPrice), 2)}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -475,7 +475,11 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
             <View style={styles.inputGroup}>
               <View style={styles.inputLabel}>
                 <Text style={styles.inputLabelText}>Size ({coin.split('/')[0]})</Text>
-                {sizePercent > 0 && <Text style={styles.inputLabelBadge}>{sizePercent}% of balance</Text>}
+                <Text style={styles.inputLabelBadge}>
+                  Tradeable: {side === 'buy' 
+                    ? `$${formatWithCommas(usdcBalance, 2)}` 
+                    : `${formatWithCommas(tokenBalance, 4)} ${coin.split('/')[0]}`}
+                </Text>
               </View>
               <TextInput
                 style={styles.textInput}
@@ -530,12 +534,12 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
                   {side === 'buy' ? 'USDC Balance:' : `${coin.split('/')[0]} Balance:`}
                 </Text>
                 <Text style={styles.summaryValue}>
-                  {side === 'buy' ? `$${usdcBalance.toFixed(2)}` : `${tokenBalance.toFixed(4)}`}
+                  {side === 'buy' ? `$${formatWithCommas(usdcBalance, 2)}` : `${formatWithCommas(tokenBalance, 4)}`}
                 </Text>
               </View>
               <View style={[styles.summaryRow, styles.summaryRowLast]}>
                 <Text style={styles.summaryLabel}>{side === 'buy' ? 'Cost:' : 'Proceeds:'}</Text>
-                <Text style={styles.summaryValue}>${orderStats.costDisplay}</Text>
+                <Text style={styles.summaryValue}>${formatWithCommas(parseFloat(orderStats.costDisplay), 2)}</Text>
               </View>
             </View>
 
@@ -611,7 +615,7 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Price:</Text>
-                    <Text style={styles.detailValue}>${price}</Text>
+                    <Text style={styles.detailValue}>${formatWithCommas(parseFloat(price), 2)}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Size:</Text>
@@ -621,7 +625,7 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
                   </View>
                   <View style={[styles.detailRow, styles.detailRowLast]}>
                     <Text style={styles.detailLabel}>{side === 'buy' ? 'Total Cost:' : 'Total Proceeds:'}</Text>
-                    <Text style={styles.detailValue}>${orderStats.costDisplay}</Text>
+                    <Text style={styles.detailValue}>${formatWithCommas(parseFloat(orderStats.costDisplay), 2)}</Text>
                   </View>
                 </View>
                 <View style={styles.confirmActions}>

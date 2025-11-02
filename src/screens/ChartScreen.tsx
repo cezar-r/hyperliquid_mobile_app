@@ -87,8 +87,14 @@ function formatPercentage(value: number | string, decimals: number = 2): string 
 }
 
 // Helper function to format numbers
-function formatNumber(num: number, decimals: number = 2): string {
-  return num.toFixed(decimals);
+function formatNumber(num: number, maxDecimals: number = 5): string {
+  if (typeof num !== 'number' || !Number.isFinite(num)) {
+    return '0';
+  }
+  return num.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: maxDecimals,
+  });
 }
 
 // Helper function to calculate unrealized PnL
@@ -1200,6 +1206,9 @@ export default function ChartScreen(): React.JSX.Element {
                 const positionSize = parseFloat(perpPosition.szi);
                 const isLong = positionSize > 0;
                 const leverage = perpPosition.leverage?.value || 1;
+                const leverageType = perpPosition.leverage?.type 
+                  ? perpPosition.leverage.type.charAt(0).toUpperCase() + perpPosition.leverage.type.slice(1)
+                  : 'Cross';
                 const price = currentPrice ? (typeof currentPrice === 'string' ? parseFloat(currentPrice) : currentPrice) : 0;
                 const { pnl, pnlPercent } = currentPrice != null 
                   ? calculateUnrealizedPnL(perpPosition, currentPrice)
@@ -1230,6 +1239,9 @@ export default function ChartScreen(): React.JSX.Element {
                             { color: isLong ? Color.BRIGHT_ACCENT : Color.RED }
                           ]}>
                             {leverage}x
+                          </Text>
+                          <Text style={styles.leverageTypeBadge}>
+                            {leverageType}
                           </Text>
                         </View>
                         <View style={styles.priceContainer}>
@@ -1322,7 +1334,7 @@ export default function ChartScreen(): React.JSX.Element {
                           <View style={styles.rightSide}>
                             <Text style={styles.price}>${formatNumber(usdValue, 2)}</Text>
                             <Text style={[styles.pnl, { color: Color.FG_3 }]}>
-                              {formatNumber(balance, 4)} {getDisplayTicker(b.coin)}
+                              {balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {getDisplayTicker(b.coin)}
                             </Text>
                           </View>
                         </View>
@@ -1462,8 +1474,8 @@ export default function ChartScreen(): React.JSX.Element {
                       )}
                     </View>
                     <View style={styles.tradeRightSide}>
-                      <Text style={styles.tradeCardPrice}>${formatNumber(parseFloat(fill.px), 2)}</Text>
-                      <Text style={styles.tradeCardSize}>{fill.sz}</Text>
+                      <Text style={styles.tradeCardPrice}>${formatNumber(parseFloat(fill.px))}</Text>
+                      <Text style={styles.tradeCardSize}>{parseFloat(fill.sz).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}</Text>
                     </View>
                   </View>
                   <View style={styles.cellSeparator} />

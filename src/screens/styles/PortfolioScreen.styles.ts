@@ -162,10 +162,10 @@ export const styles = StyleSheet.create({
     fontSize: 42,
     color: Color.FG_1,
     fontWeight: '700',
-    marginBottom: spacing.xs,
+    // marginBottom: spacing.xs,
   },
   portfolioPnL: {
-    fontSize: fontSizes.lg,
+    fontSize: fontSizes.md,
     fontWeight: '600',
   },
   pnlPositive: {
@@ -339,6 +339,16 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 0,
     fontWeight: 'bold',
+  },
+  leverageTypeBadge: {
+    fontSize: 10,
+    color: Color.BRIGHT_ACCENT,
+    backgroundColor: Color.ACCENT,
+    borderWidth: 1,
+    borderColor: Color.BG_3,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
+    borderRadius: 4,
   },
   priceContainer: {
     flexDirection: 'row',

@@ -383,7 +383,7 @@ export default function HistoryScreen(): React.JSX.Element {
                             </View>
                             <View style={styles.tradeRightSide}>
                               <Text style={styles.tradePrice}>${formatPrice(parseFloat(fill.px))}</Text>
-                              <Text style={styles.tradeSize}>{fill.sz}</Text>
+                              <Text style={styles.tradeSize}>{parseFloat(fill.sz).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}</Text>
                             </View>
                           </View>
                           <View style={styles.cellSeparator} />

@@ -13,6 +13,7 @@ export const enum Color {
   BRIGHT_ACCENT = '#6dcabe',
   DARK_ACCENT = '#03251f',
   GOLD = '#FFD700',
+  PURPLE = '#ba41f2',
 }
 
 export default Color;

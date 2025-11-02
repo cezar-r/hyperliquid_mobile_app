@@ -19,7 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Slider from '@react-native-community/slider';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import { formatPrice, formatSize } from '../lib/formatting';
+import { formatPrice, formatSize, formatWithCommas } from '../lib/formatting';
 import { styles } from './styles/OrderTicket.styles';
 import Color from '../styles/colors';
 
@@ -651,7 +651,7 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
             {/* Price Input */}
             <View style={styles.inputGroup}>
               <View style={styles.inputLabel}>
-                <Text style={styles.inputLabelText}>Price (USD)</Text>
+                <Text style={styles.inputLabelText}>{coin} Price (USD)</Text>
                 {orderType === 'market' && <Text style={styles.inputLabelBadge}>~Market</Text>}
               </View>
               <TextInput
@@ -669,7 +669,7 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
                   onPress={() => setPrice(currentPrice)}
                 >
                   <Text style={styles.useMarketButtonText}>
-                    Use Market: ${parseFloat(currentPrice).toFixed(2)}
+                    Use Market: ${formatWithCommas(parseFloat(currentPrice), 2)}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -679,7 +679,7 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
             <View style={styles.inputGroup}>
               <View style={styles.inputLabel}>
                 <Text style={styles.inputLabelText}>Margin Required (USD)</Text>
-                {sizePercent > 0 && <Text style={styles.inputLabelBadge}>{sizePercent}% of balance</Text>}
+                <Text style={styles.inputLabelBadge}>Tradeable: ${formatWithCommas(tradeableBalance, 2)}</Text>
               </View>
               <TextInput
                 style={styles.textInput}
@@ -858,11 +858,11 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
             <View style={styles.orderSummary}>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Tradeable Balance:</Text>
-                <Text style={styles.summaryValue}>${tradeableBalance.toFixed(2)}</Text>
+                <Text style={styles.summaryValue}>${formatWithCommas(tradeableBalance, 2)}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Margin Required:</Text>
-                <Text style={styles.summaryValue}>${orderStats.marginRequiredDisplay}</Text>
+                <Text style={styles.summaryValue}>${formatWithCommas(parseFloat(orderStats.marginRequiredDisplay), 2)}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Token Size:</Text>
@@ -870,7 +870,7 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
               </View>
               <View style={[styles.summaryRow, styles.summaryRowLast]}>
                 <Text style={styles.summaryLabel}>Position Size:</Text>
-                <Text style={styles.summaryValue}>${orderStats.orderSize}</Text>
+                <Text style={styles.summaryValue}>${formatWithCommas(parseFloat(orderStats.orderSize), 2)}</Text>
               </View>
             </View>
 
@@ -953,7 +953,7 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Price:</Text>
-                    <Text style={styles.detailValue}>${price}</Text>
+                    <Text style={styles.detailValue}>${formatWithCommas(parseFloat(price), 2)}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Token Size:</Text>
@@ -961,11 +961,11 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Margin Required:</Text>
-                    <Text style={styles.detailValue}>${orderStats.marginRequiredDisplay}</Text>
+                    <Text style={styles.detailValue}>${formatWithCommas(parseFloat(orderStats.marginRequiredDisplay), 2)}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Position Size:</Text>
-                    <Text style={styles.detailValue}>${orderStats.orderSize}</Text>
+                    <Text style={styles.detailValue}>${formatWithCommas(parseFloat(orderStats.orderSize), 2)}</Text>
                   </View>
                   <View style={[styles.detailRow, styles.detailRowLast]}>
                     <Text style={styles.detailLabel}>Leverage:</Text>
