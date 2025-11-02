@@ -11,6 +11,9 @@ export async function fetchPerpMarkets(
 ): Promise<{ markets: PerpMarket[]; contexts: Record<string, any> }> {
   try {
     const [meta, assetCtxs] = await infoClient.metaAndAssetCtxs();
+
+    // console.log(JSON.stringify(meta, null, 2));
+    // console.log(JSON.stringify(assetCtxs, null, 2));
     
     const markets = meta.universe.map((market: any, index: number) => ({
       name: market.name,
@@ -43,6 +46,8 @@ export async function fetchSpotMarkets(
     const tokenMap = new Map(
       spotMeta.tokens.map((t: any) => [t.index, t])
     );
+
+    // console.log(JSON.stringify(spotMeta, null, 2));
     
     const markets = spotMeta.universe.map((market: any) => {
       const baseTokenId = market.tokens[0];

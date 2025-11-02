@@ -112,6 +112,9 @@ export function WebSocketProvider({
           spotCount: spotMarkets.length,
         });
 
+        // console.log(JSON.stringify(perpMarkets, null, 2));
+
+
         // Subscribe to perp asset contexts
         const perpSubs = await Promise.all(
           perpMarkets.map(async (market) => {

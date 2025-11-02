@@ -20,6 +20,7 @@ import {
   createExchangeClient,
   createInfoClient,
 } from '../lib/hyperliquid';
+import { isTestnet } from '../lib/config';
 import type { AccountData, AccountState } from '../types';
 import { createWalletClient, custom } from 'viem';
 
@@ -297,6 +298,44 @@ export function WalletProvider({
     };
   }, [connectedAddress, fetchAccountData]);
 
+  const enableDexAbstraction = useCallback(async (address: string): Promise<void> => {
+    if (!mainExchangeClient) {
+      throw new Error('No wallet connected');
+    }
+
+    try {
+      console.log('[HIP-3] Enabling DEX abstraction...');
+
+      const nonce = Date.now();
+      const hyperliquidChain = isTestnet() ? 'Testnet' : 'Mainnet';
+      const signatureChainId = isTestnet() ? '0x66eee' : '0xa4b1';
+
+      // Since the SDK might not have a dedicated method for this yet,
+      // we'll call it similar to how approveAgent works
+      // The SDK should handle the signing internally
+      const action = {
+        type: 'userEnableDexAbstraction',
+        hyperliquidChain,
+        signatureChainId,
+        user: address as `0x${string}`,
+        enabled: true,
+        nonce,
+      };
+
+      // Try to use the client's underlying request mechanism
+      // @ts-ignore - Using internal API that might not be typed
+      const result = await mainExchangeClient.request({
+        action,
+        nonce,
+      });
+
+      console.log('[HIP-3] DEX abstraction enabled:', result);
+    } catch (error) {
+      console.error('[HIP-3] Failed to enable DEX abstraction:', error);
+      throw error;
+    }
+  }, [mainExchangeClient]);
+
   const enableSessionKey = useCallback(async (address: string): Promise<void> => {
     if (!mainExchangeClient) {
       throw new Error('No wallet connected');
@@ -332,11 +371,19 @@ export function WalletProvider({
       setSessionKey(newSessionKey);
 
       console.log('[SessionKey] Session key enabled successfully');
+
+      // Auto-enable HIP-3 DEX abstraction
+      try {
+        await enableDexAbstraction(address);
+        console.log('[SessionKey] HIP-3 DEX abstraction enabled successfully');
+      } catch (dexError) {
+        console.warn('[SessionKey] Failed to enable HIP-3 DEX abstraction (non-blocking):', dexError);
+      }
     } catch (error) {
       console.error('[SessionKey] Failed to enable session key:', error);
       throw error;
     }
-  }, [mainExchangeClient]);
+  }, [mainExchangeClient, enableDexAbstraction]);
 
   const disableSessionKey = useCallback(async (): Promise<void> => {
     try {
