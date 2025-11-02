@@ -2,13 +2,14 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Animated, SafeAreaView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAccount } from '@reown/appkit-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { formatPrice, formatSize, getDisplayTicker } from '../lib/formatting';
+import { getStarredTickers } from '../lib/starredTickers';
 import { styles } from './styles/HomeScreen.styles';
 import type { PerpPosition, SpotBalance } from '../types';
 import Color from '../styles/colors';
@@ -51,6 +52,22 @@ function formatPercent(num: number, decimals: number = 2): string {
   return `${sign}${(num * 100).toFixed(decimals)}%`;
 }
 
+// Helper to format large numbers (for volume display)
+function formatLargeNumber(num: number | undefined | null): string {
+  if (typeof num !== 'number' || !Number.isFinite(num)) {
+    return '$0.00';
+  }
+  
+  if (num >= 1_000_000_000) {
+    return `$${(num / 1_000_000_000).toFixed(2)}B`;
+  } else if (num >= 1_000_000) {
+    return `$${(num / 1_000_000).toFixed(2)}M`;
+  } else if (num >= 1_000) {
+    return `$${(num / 1_000).toFixed(2)}K`;
+  }
+  return `$${num.toFixed(2)}`;
+}
+
 export default function HomeScreen(): React.JSX.Element {
   const { address } = useAccount();
   const { account, exchangeClient, refetchAccount } = useWallet();
@@ -59,6 +76,10 @@ export default function HomeScreen(): React.JSX.Element {
   const [closingPosition, setClosingPosition] = useState<string | null>(null);
   const [marketFilter, setMarketFilter] = useState<MarketFilter>('Perp+Spot');
   const [editingTPSL, setEditingTPSL] = useState<PerpPosition | null>(null);
+  
+  // For starred tickers
+  const [starredPerpTickers, setStarredPerpTickers] = useState<string[]>([]);
+  const [starredSpotTickers, setStarredSpotTickers] = useState<string[]>([]);
   
   // For balance animation
   const [previousBalance, setPreviousBalance] = useState<number | null>(null);
@@ -82,6 +103,23 @@ export default function HomeScreen(): React.JSX.Element {
     };
     loadMarketFilter();
   }, []);
+
+  // Load starred tickers when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadStarredTickers = async () => {
+        try {
+          const perpStarred = await getStarredTickers('perp');
+          const spotStarred = await getStarredTickers('spot');
+          setStarredPerpTickers(perpStarred);
+          setStarredSpotTickers(spotStarred);
+        } catch (error) {
+          console.error('[HomeScreen] Error loading starred tickers:', error);
+        }
+      };
+      loadStarredTickers();
+    }, [])
+  );
 
   // Helper to get next/previous filter (circular navigation)
   const getNextFilter = (current: MarketFilter, direction: 'left' | 'right'): MarketFilter => {
@@ -253,6 +291,87 @@ export default function HomeScreen(): React.JSX.Element {
       })
       .sort((a, b) => b.usdValue - a.usdValue);
   }, [account.data?.spotBalances, wsState.prices, wsState.assetContexts]);
+
+  // Prepare starred tickers with data
+  const starredTickersData = useMemo(() => {
+    const perpData: Array<{
+      name: string;
+      price: number;
+      priceChange: number;
+      volume: number;
+      leverage: number;
+      marketType: 'perp';
+    }> = [];
+    
+    const spotData: Array<{
+      name: string;
+      displayName: string;
+      price: number;
+      priceChange: number;
+      volume: number;
+      marketType: 'spot';
+    }> = [];
+
+    // Process perp starred tickers
+    if ((marketFilter === 'Perp' || marketFilter === 'Perp+Spot') && starredPerpTickers.length > 0) {
+      starredPerpTickers.forEach(ticker => {
+        const ctx = wsState.assetContexts[ticker];
+        const price = ctx?.markPx || 0;
+        const prevPrice = ctx?.prevDayPx || price;
+        const priceChange = prevPrice > 0 ? (price - prevPrice) / prevPrice : 0;
+        const volume = ctx?.dayNtlVlm || 0;
+        const market = wsState.perpMarkets.find(m => m.name === ticker);
+        const leverage = market?.maxLeverage || 1;
+
+        if (price > 0 && volume > 0) {
+          perpData.push({
+            name: ticker,
+            price,
+            priceChange,
+            volume,
+            leverage,
+            marketType: 'perp',
+          });
+        }
+      });
+    }
+
+    // Process spot starred tickers
+    if ((marketFilter === 'Spot' || marketFilter === 'Perp+Spot') && starredSpotTickers.length > 0) {
+      starredSpotTickers.forEach(ticker => {
+        const ctx = wsState.assetContexts[ticker];
+        const price = parseFloat(wsState.prices[ticker] || '0');
+        const prevPrice = ctx?.prevDayPx || price;
+        const priceChange = prevPrice > 0 ? (price - prevPrice) / prevPrice : 0;
+        const volume = ctx?.dayNtlVlm || 0;
+        const displayName = getDisplayTicker(ticker);
+
+        if (price > 0 && volume > 0) {
+          spotData.push({
+            name: ticker,
+            displayName,
+            price,
+            priceChange,
+            volume,
+            marketType: 'spot',
+          });
+        }
+      });
+    }
+
+    // Sort by volume descending
+    perpData.sort((a, b) => b.volume - a.volume);
+    spotData.sort((a, b) => b.volume - a.volume);
+
+    return { perpData, spotData };
+  }, [
+    marketFilter,
+    starredPerpTickers,
+    starredSpotTickers,
+    wsState.assetContexts,
+    wsState.prices,
+    wsState.perpMarkets,
+  ]);
 
   // Navigate to chart detail - Set coin/market first, then navigate (like SearchScreen does)
   const handleNavigateToChart = (coin: string, market: 'perp' | 'spot') => {
@@ -707,6 +826,116 @@ export default function HomeScreen(): React.JSX.Element {
                     </View>
                   );
                 })}
+              </View>
+            )}
+
+            {/* Starred Tickers Section */}
+            {(starredTickersData.perpData.length > 0 || starredTickersData.spotData.length > 0) && (
+              <View style={styles.starredSection}>
+                {/* Starred Perp Tickers */}
+                {starredTickersData.perpData.length > 0 && (
+                  <View>
+                    {marketFilter === 'Perp+Spot' && (
+                      <View style={styles.sectionLabelWithIcon}>
+                        <MaterialIcons name="star" size={16} color={Color.GOLD} style={styles.starIcon} />
+                        <Text style={styles.sectionLabel}>Starred Perps</Text>
+                      </View>
+                    )}
+                    {marketFilter === 'Perp' && (
+                      <View style={styles.sectionLabelWithIcon}>
+                        <MaterialIcons name="star" size={16} color={Color.GOLD} style={styles.starIcon} />
+                        <Text style={styles.sectionLabel}>Starred</Text>
+                      </View>
+                    )}
+                    {starredTickersData.perpData.map((item) => (
+                      <View key={`starred-perp-${item.name}`}>
+                        <TouchableOpacity
+                          style={styles.positionCell}
+                          onPress={() => handleNavigateToChart(item.name, 'perp')}
+                        >
+                          <View style={styles.leftSide}>
+                            <View style={styles.tickerContainer}>
+                              <Text style={styles.ticker}>{item.name}</Text>
+                              <Text style={[styles.leverage, { color: Color.BRIGHT_ACCENT }]}>
+                                {item.leverage}x
+                              </Text>
+                            </View>
+                            <View style={styles.priceContainer}>
+                              <Text style={[styles.size, { color: Color.FG_3 }]}>
+                                {formatLargeNumber(item.volume)}
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={styles.rightSide}>
+                            <Text style={styles.price}>
+                              ${formatNumber(item.price)}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.priceChange,
+                                { color: item.priceChange >= 0 ? Color.BRIGHT_ACCENT : Color.RED },
+                              ]}
+                            >
+                              {formatPercent(item.priceChange)}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                        <View style={styles.separator} />
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Starred Spot Tickers */}
+                {starredTickersData.spotData.length > 0 && (
+                  <View style={marketFilter === 'Perp+Spot' && starredTickersData.perpData.length > 0 ? styles.spotSection : undefined}>
+                    {marketFilter === 'Perp+Spot' && (
+                      <View style={[styles.sectionLabelWithIcon, { paddingTop: 6 }]}>
+                        <MaterialIcons name="star" size={16} color={Color.GOLD} style={styles.starIcon} />
+                        <Text style={[styles.balancesLabel, { marginBottom: 0, paddingTop: 0 }]}>Starred Spot</Text>
+                      </View>
+                    )}
+                    {marketFilter === 'Spot' && (
+                      <View style={styles.sectionLabelWithIcon}>
+                        <MaterialIcons name="star" size={16} color={Color.GOLD} style={styles.starIcon} />
+                        <Text style={styles.sectionLabel}>Starred</Text>
+                      </View>
+                    )}
+                    {starredTickersData.spotData.map((item) => (
+                      <View key={`starred-spot-${item.name}`}>
+                        <TouchableOpacity
+                          style={styles.positionCell}
+                          onPress={() => handleNavigateToChart(item.name, 'spot')}
+                        >
+                          <View style={styles.leftSide}>
+                            <View style={styles.tickerContainer}>
+                              <Text style={styles.ticker}>{item.displayName}</Text>
+                            </View>
+                            <View style={styles.priceContainer}>
+                              <Text style={[styles.size, { color: Color.FG_3 }]}>
+                                {formatLargeNumber(item.volume)}
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={styles.rightSide}>
+                            <Text style={styles.price}>
+                              ${formatNumber(item.price)}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.priceChange,
+                                { color: item.priceChange >= 0 ? Color.BRIGHT_ACCENT : Color.RED },
+                              ]}
+                            >
+                              {formatPercent(item.priceChange)}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                        <View style={styles.separator} />
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
             )}
 

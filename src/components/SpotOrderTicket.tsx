@@ -20,6 +20,7 @@ import Slider from '@react-native-community/slider';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { formatSize, floatToWire, formatWithCommas } from '../lib/formatting';
+import { getSkipOpenOrderConfirmations } from '../lib/confirmations';
 import { styles } from './styles/OrderTicket.styles';
 import Color from '../styles/colors';
 
@@ -246,7 +247,7 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
     setSizePercent(0);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError(null);
     
     if (!price || !size) {
@@ -262,7 +263,13 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
       return;
     }
     
-    setShowConfirmation(true);
+    // Check if confirmations should be skipped
+    const skipConfirmations = await getSkipOpenOrderConfirmations();
+    if (skipConfirmations) {
+      handleConfirmOrder();
+    } else {
+      setShowConfirmation(true);
+    }
   };
 
   const handleConfirmOrder = async () => {

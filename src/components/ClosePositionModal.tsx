@@ -19,6 +19,7 @@ import Slider from '@react-native-community/slider';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder } from '../lib/formatting';
+import { getSkipClosePositionConfirmations } from '../lib/confirmations';
 import { styles } from './styles/ClosePositionModal.styles';
 import { Color } from '../styles/colors';
 import type { PerpPosition } from '../types';
@@ -137,16 +138,23 @@ export default function ClosePositionModal({
     return null;
   }, [percentage]);
 
-  // Handle submit (go to confirm)
-  const handleSubmit = () => {
+  // Handle submit (go to confirm or execute directly)
+  const handleSubmit = async () => {
     const validationError = validateForm();
     if (validationError) {
       setError(validationError);
       return;
     }
 
-    setStep('confirm');
     setError(null);
+    
+    // Check if confirmations should be skipped
+    const skipConfirmations = await getSkipClosePositionConfirmations();
+    if (skipConfirmations) {
+      executeClose();
+    } else {
+      setStep('confirm');
+    }
   };
 
   // Execute the close order

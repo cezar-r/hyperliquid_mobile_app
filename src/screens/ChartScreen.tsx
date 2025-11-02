@@ -30,6 +30,7 @@ import { styles } from './styles/ChartScreen.styles';
 import Color from '../styles/colors';
 
 const INTERVALS: CandleInterval[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
+const SHOW_TRADES_KEY = '@show_trades_on_chart';
 
 interface ChartData {
   timestamp: number;
@@ -139,6 +140,7 @@ export default function ChartScreen(): React.JSX.Element {
   const [editingTPSL, setEditingTPSL] = useState<any | null>(null);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
+  const [showTradesOnChart, setShowTradesOnChart] = useState(false);
 
   // Chart ref for markers and price lines
   const chartRef = useRef<LightweightChartBridgeRef>(null);
@@ -211,6 +213,22 @@ export default function ChartScreen(): React.JSX.Element {
     };
     
     loadSavedInterval();
+  }, []);
+
+  // Load show trades preference on mount
+  useEffect(() => {
+    const loadShowTradesPreference = async () => {
+      try {
+        const value = await AsyncStorage.getItem(SHOW_TRADES_KEY);
+        if (value !== null) {
+          setShowTradesOnChart(value === 'true');
+        }
+      } catch (error) {
+        console.error('[ChartScreen] Failed to load show trades preference:', error);
+      }
+    };
+    
+    loadShowTradesPreference();
   }, []);
 
   // Set default tick size to minimum when options change
@@ -538,9 +556,9 @@ export default function ChartScreen(): React.JSX.Element {
   useEffect(() => {
     if (!chartRef.current || !selectedCoin || candles.length === 0) return;
 
-    // Prepare buy/sell markers from user fills
+    // Prepare buy/sell markers from user fills (only if enabled)
     const markers: ChartMarker[] = [];
-    if (userFills && userFills.length > 0) {
+    if (showTradesOnChart && userFills && userFills.length > 0) {
       // Get time range of visible candles
       const minTime = Math.min(...candles.map(c => c.timestamp));
       const maxTime = Math.max(...candles.map(c => c.timestamp));
@@ -581,6 +599,23 @@ export default function ChartScreen(): React.JSX.Element {
           lineWidth: 1,
           lineStyle: 'dashed',
           title: `Liq`,
+        });
+      }
+    }
+
+    // Add entry price line for perp positions
+    if (marketType === 'perp' && perpPosition && perpPosition.entryPx) {
+      const entryPrice = typeof perpPosition.entryPx === 'string' 
+        ? parseFloat(perpPosition.entryPx) 
+        : perpPosition.entryPx;
+      
+      if (!isNaN(entryPrice) && entryPrice > 0) {
+        priceLines.push({
+          price: entryPrice,
+          color: Color.FG_1,  // White color for neutral entry price
+          lineWidth: 1,
+          lineStyle: 'dashed',
+          title: `Entry`,
         });
       }
     }
@@ -681,6 +716,7 @@ export default function ChartScreen(): React.JSX.Element {
     account.data?.openOrders,
     marketType,
     state.spotMarkets,
+    showTradesOnChart,
   ]);
 
   // Handle close position

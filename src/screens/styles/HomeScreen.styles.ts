@@ -81,11 +81,22 @@ export const styles = StyleSheet.create({
     // marginTop: 8,
   },
 
+  sectionLabelWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+
+  starIcon: {
+    marginRight: 4,
+    marginBottom: 4,
+  },
+
   balancesLabel: {
     fontSize: 15,
     color: Color.FG_3,
     fontWeight: '600',
-    marginBottom: 1,
+    // marginBottom: 1,
     paddingTop: 6,
   },
 
@@ -105,6 +116,11 @@ export const styles = StyleSheet.create({
   // Spot Section Spacing
   spotSection: {
     marginTop: 20,
+  },
+
+  // Starred Section Spacing
+  starredSection: {
+    marginTop: 24,
   },
 
   // Position Cell Container

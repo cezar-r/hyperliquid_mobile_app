@@ -20,6 +20,7 @@ import Slider from '@react-native-community/slider';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { formatPrice, formatSize, formatWithCommas } from '../lib/formatting';
+import { getSkipOpenOrderConfirmations } from '../lib/confirmations';
 import { styles } from './styles/OrderTicket.styles';
 import Color from '../styles/colors';
 
@@ -281,7 +282,7 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!exchangeClient) {
       setError('Wallet not connected');
       return;
@@ -326,7 +327,14 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
     }
 
     setError(null);
-    setShowConfirmation(true);
+    
+    // Check if confirmations should be skipped
+    const skipConfirmations = await getSkipOpenOrderConfirmations();
+    if (skipConfirmations) {
+      confirmOrder();
+    } else {
+      setShowConfirmation(true);
+    }
   };
 
   const confirmOrder = async () => {
