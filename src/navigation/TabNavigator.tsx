@@ -40,26 +40,27 @@ function TabIcon({
   const [iconColor, setIconColor] = useState(focused ? Color.BRIGHT_ACCENT : Color.FG_3);
   
   useEffect(() => {
-    if (focused) {
-      // Compress then expand animation
-      Animated.sequence([
-        Animated.timing(scaleAnim, {
-          toValue: 0.85,
-          duration: 75,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1.0,
-          duration: 75,
-          useNativeDriver: true,
-        }),
-      ]).start();
+    // Compress then expand animation (triggers on both focus and unfocus)
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.9,
+        duration: 75,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1.0,
+        duration: 75,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
-      // Delay color change to halfway through animation (150ms)
+    if (focused) {
+      // Delay color change to halfway through animation
       setTimeout(() => {
         setIconColor(Color.BRIGHT_ACCENT);
       }, 38);
     } else {
+      // Immediate color change for unfocused
       setIconColor(Color.FG_3);
     }
   }, [focused, scaleAnim]);
