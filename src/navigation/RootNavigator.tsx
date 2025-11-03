@@ -5,6 +5,7 @@ import { useAccount, useProvider } from '@reown/appkit-react-native';
 import { useWallet } from '../contexts/WalletContext';
 import { WebSocketProvider } from '../contexts/WebSocketContext';
 import { loadSessionKey } from '../lib/sessionKey';
+import SplashScreen from '../screens/SplashScreen';
 import ConnectScreen from '../screens/ConnectScreen';
 import EnableSessionKeyScreen from '../screens/EnableSessionKeyScreen';
 import ChartScreen from '../screens/ChartScreen';
@@ -72,7 +73,15 @@ export default function RootNavigator(): React.JSX.Element {
   }, [isConnected, address, provider]);
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator 
+      screenOptions={{ headerShown: false }}
+      initialRouteName="Splash"
+    >
+      <Stack.Screen 
+        name="Splash" 
+        component={SplashScreen}
+        options={{ gestureEnabled: false }}
+      />
       <Stack.Screen name="Connect" component={ConnectScreen} />
       <Stack.Screen
         name="EnableSessionKey"

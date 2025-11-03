@@ -3,6 +3,10 @@ import Color from '../../styles/colors';
 import { fontSizes } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 
+// Fixed height for chart, orderbook, and trades containers
+// Includes: interval header (~36px) + chart (400px) = 436px
+const CHART_CONTAINER_HEIGHT = 436;
+
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -88,6 +92,7 @@ export const styles = StyleSheet.create({
   chartContainer: {
     // backgroundColor: Color.BG_3,
     borderRadius: 12,
+    height: 400, // Match the LightweightChartBridge height
     // padding: spacing.md,
     // marginBottom: spacing.lg,
   },
@@ -126,14 +131,17 @@ export const styles = StyleSheet.create({
   },
   obColText: {
     color: Color.FG_3,
+    // fontSize: fontSizes.sm,
   },
   obColTextPrice: {
     color: Color.FG_3,
     marginLeft: 0,
+    // fontSize: fontSizes.sm,
   },
   obColTextSize: {
     color: Color.FG_3,
     marginRight: 0,
+    // fontSize: fontSizes.sm,
   },
   obRow: {
     flexDirection: 'row',
@@ -163,21 +171,19 @@ export const styles = StyleSheet.create({
   tradesHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
   },
   tradeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.xs - 2, // Reduced padding to fit more rows
     paddingHorizontal: spacing.md,
   },
   tradePrice: {
     flex: 1,
-    fontSize: fontSizes.sm,
+    fontSize: fontSizes.xs,
   },
   tradePriceBid: {
     color: Color.BRIGHT_ACCENT,
@@ -187,7 +193,7 @@ export const styles = StyleSheet.create({
   },
   tradeSize: {
     flex: 1,
-    fontSize: fontSizes.sm,
+    fontSize: fontSizes.xs,
     color: Color.FG_1,
     textAlign: 'center',
   },
@@ -199,11 +205,11 @@ export const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   tradeTime: {
-    fontSize: fontSizes.sm,
+    fontSize: fontSizes.xs,
     color: Color.FG_3,
   },
   tradeExplorerLink: {
-    fontSize: fontSizes.sm,
+    fontSize: fontSizes.xs,
     color: Color.BRIGHT_ACCENT,
   },
   obDropdown: {
@@ -274,7 +280,7 @@ export const styles = StyleSheet.create({
   loadingContainer: {
     backgroundColor: '#0b0f13',
     borderRadius: 12,
-    height: 400,
+    height: 400, // Just the chart height, not including interval header
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -285,12 +291,12 @@ export const styles = StyleSheet.create({
   orderbookLoadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: 460,
+    height: CHART_CONTAINER_HEIGHT,
   },
   tradesLoadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: 460,
+    height: CHART_CONTAINER_HEIGHT,
   },
   errorContainer: {
     backgroundColor: Color.BG_3,
@@ -298,7 +304,9 @@ export const styles = StyleSheet.create({
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: '#FF4444',
-    marginVertical: spacing.lg,
+    height: 400, // Match chart height to fit in container
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   errorText: {
     fontSize: fontSizes.md,
@@ -311,7 +319,7 @@ export const styles = StyleSheet.create({
     padding: spacing.xxl,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: spacing.xl,
+    height: 400, // Match chart height to fit in container
   },
   emptyText: {
     fontSize: fontSizes.lg,
@@ -907,10 +915,10 @@ export const styles = StyleSheet.create({
   
   // Fixed Height Containers for All Panels
   chartFixedContainer: {
-    minHeight: 400,
+    height: CHART_CONTAINER_HEIGHT,
   },
   orderbookFixedContainer: {
-    minHeight: 400,
+    height: CHART_CONTAINER_HEIGHT,
   },
   obHeaderRow: {
     flexDirection: 'row',
@@ -979,10 +987,10 @@ export const styles = StyleSheet.create({
   
   // Fixed Trades Container
   tradesFixedContainer: {
-    minHeight: 460,
+    height: CHART_CONTAINER_HEIGHT,
   },
   tradesScrollContainer: {
-    maxHeight: 400,
+    maxHeight: CHART_CONTAINER_HEIGHT - 30, // Subtract header space (~30px for header)
   },
 });
 

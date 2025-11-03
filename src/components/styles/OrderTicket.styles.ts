@@ -8,7 +8,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: Color.BG_1,
+    backgroundColor: "#0b0f13",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     height: '100%',
@@ -138,7 +138,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   inputLabelText: {
-    fontSize: 14,
+    fontSize: 12,
     color: Color.FG_3,
   },
   inputLabelBadge: {
@@ -152,7 +152,7 @@ export const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 15,
     color: Color.FG_1,
-    fontSize: 16,
+    fontSize: 14,
     borderWidth: 1,
     borderColor: Color.BG_3,
   },
@@ -236,7 +236,7 @@ export const styles = StyleSheet.create({
     marginBottom: 0,
   },
   tpslTitle: {
-    fontSize: 15,
+    fontSize: 14,
     color: Color.FG_1,
     fontWeight: '600',
   },
@@ -391,7 +391,7 @@ export const styles = StyleSheet.create({
   },
   submitButtonText: {
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '600',
     color: Color.FG_1,
   },
   

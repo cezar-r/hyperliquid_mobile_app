@@ -863,24 +863,24 @@ export default function HomeScreen(): React.JSX.Element {
             )}
 
             {/* Staking Balance */}
-            {marketFilter === 'Account' && account.data?.stakingSummary && (
-              <View style={styles.spotSection}>
-                {(() => {
-                  const totalStaked = parseFloat(account.data.stakingSummary.delegated || '0') + 
-                                     parseFloat(account.data.stakingSummary.undelegated || '0');
+            {marketFilter === 'Account' && account.data?.stakingDelegations && account.data.stakingDelegations.length > 0 && (
+              <View style={styles.stakingSection}>
+                <Text style={styles.sectionLabel}>Staking</Text>
+                {account.data.stakingDelegations.map((delegation, idx) => {
+                  const delegationAmount = parseFloat(delegation.amount);
                   const hypePrice = wsState.prices['HYPE'] ? parseFloat(wsState.prices['HYPE']) : 0;
-                  const usdValue = totalStaked * hypePrice;
+                  const usdValue = delegationAmount * hypePrice;
 
                   return (
-                    <View>
+                    <View key={`staking-${idx}`}>
                       <View style={styles.positionCell}>
                         <View style={styles.leftSide}>
                           <View style={styles.tickerContainer}>
-                            <Text style={styles.ticker}>Staked</Text>
+                            <Text style={styles.ticker}>HYPE Foundation 1</Text>
                           </View>
                           <View style={styles.priceContainer}>
                             <Text style={styles.size}>
-                              {totalStaked.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} HYPE
+                              {delegationAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} HYPE
                             </Text>
                           </View>
                         </View>
@@ -894,7 +894,7 @@ export default function HomeScreen(): React.JSX.Element {
                       <View style={styles.separator} />
                     </View>
                   );
-                })()}
+                })}
               </View>
             )}
 

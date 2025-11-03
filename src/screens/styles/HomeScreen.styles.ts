@@ -128,9 +128,14 @@ export const styles = StyleSheet.create({
     marginTop: 20,
   },
 
+  // Staking Section Spacing
+  stakingSection: {
+    marginTop: 28,
+  },
+
   // Starred Section Spacing
   starredSection: {
-    marginTop: 24,
+    marginTop: 32,
   },
 
   // Position Cell Container
@@ -178,11 +183,11 @@ export const styles = StyleSheet.create({
   },
   ticker: {
     color: Color.FG_1,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '600',
   },
   leverage: {
-    fontSize: 16,
+    fontSize: 15,
     marginBottom: 0,
     fontWeight: 'bold',
   },
@@ -212,7 +217,7 @@ export const styles = StyleSheet.create({
   },
   price: {
     color: Color.FG_1,
-    fontSize: 16,
+    fontSize: 15,
     marginBottom: 0,
     fontWeight: '600'
   },

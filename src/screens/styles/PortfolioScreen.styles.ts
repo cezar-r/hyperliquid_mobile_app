@@ -151,7 +151,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   volumeValue: {
-    fontSize: fontSizes.lg,
+    fontSize: 16,
     color: Color.BRIGHT_ACCENT,
     fontWeight: '600',
   },
@@ -249,7 +249,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   depositButtonText: {
-    fontSize: fontSizes.md,
+    fontSize: 15,
     color: Color.BG_2,
     fontWeight: '600',
   },
@@ -263,7 +263,7 @@ export const styles = StyleSheet.create({
     borderColor: Color.ACCENT,
   },
   withdrawButtonText: {
-    fontSize: fontSizes.md,
+    fontSize: 15,
     color: Color.FG_1,
     fontWeight: '600',
   },
@@ -282,7 +282,7 @@ export const styles = StyleSheet.create({
     borderColor: Color.ACCENT,
   },
   transferButtonText: {
-    fontSize: fontSizes.md,
+    fontSize: 15,
     color: Color.BRIGHT_ACCENT,
     fontWeight: '600',
   },
@@ -342,11 +342,11 @@ export const styles = StyleSheet.create({
   },
   ticker: {
     color: Color.FG_1,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '600',
   },
   leverage: {
-    fontSize: 16,
+    fontSize: 15,
     marginBottom: 0,
     fontWeight: 'bold',
   },
@@ -376,7 +376,7 @@ export const styles = StyleSheet.create({
   },
   price: {
     color: Color.FG_1,
-    fontSize: 16,
+    fontSize: 15,
     marginBottom: 0,
     fontWeight: '600'
   },
@@ -412,7 +412,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   stakingValue: {
-    fontSize: fontSizes.md,
+    fontSize: 15,
     color: Color.BRIGHT_ACCENT,
     fontWeight: '700',
     marginBottom: spacing.xs,
