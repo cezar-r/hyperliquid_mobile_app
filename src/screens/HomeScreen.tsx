@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Animated, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Animated, SafeAreaView, InteractionManager } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAccount } from '@reown/appkit-react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -15,6 +15,8 @@ import { styles } from './styles/HomeScreen.styles';
 import type { PerpPosition, SpotBalance } from '../types';
 import Color from '../styles/colors';
 import TPSLEditModal from '../components/TPSLEditModal';
+import SkeletonScreen from '../components/SkeletonScreen';
+import DepositModal from '../components/DepositModal';
 
 type MarketFilter = 'Perp' | 'Spot' | 'Account';
 
@@ -77,6 +79,10 @@ export default function HomeScreen(): React.JSX.Element {
   const [closingPosition, setClosingPosition] = useState<string | null>(null);
   const [marketFilter, setMarketFilter] = useState<MarketFilter>('Account');
   const [editingTPSL, setEditingTPSL] = useState<PerpPosition | null>(null);
+  const [depositModalVisible, setDepositModalVisible] = useState(false);
+  
+  // For skeleton loading
+  const [isReady, setIsReady] = useState(false);
   
   // For starred tickers
   const [starredPerpTickers, setStarredPerpTickers] = useState<string[]>([]);
@@ -92,6 +98,15 @@ export default function HomeScreen(): React.JSX.Element {
   
   // For market filter sliding line animation
   const filterLinePosition = useRef(new Animated.Value(0)).current;
+
+  // Defer rendering until navigation is complete
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setIsReady(true);
+    });
+
+    return () => task.cancel();
+  }, []);
 
   // Load saved market filter on mount
   useEffect(() => {
@@ -629,6 +644,10 @@ export default function HomeScreen(): React.JSX.Element {
     .activeOffsetX([-10, 10])
     .failOffsetY([-20, 20]);
 
+  if (!isReady) {
+    return <SkeletonScreen />;
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.contentContainer}>
@@ -689,6 +708,14 @@ export default function HomeScreen(): React.JSX.Element {
               <Animated.Text style={[styles.balanceAmount, { color: textColor }]}>
                 ${formatNumber(displayedBalance, 2)}
               </Animated.Text>
+              {marketFilter === 'Account' && displayedBalance === 0 && (
+                <TouchableOpacity 
+                  style={styles.depositTextButton}
+                  onPress={() => setDepositModalVisible(true)}
+                >
+                  <Text style={styles.depositButtonText}>Deposit</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
         {account.isLoading && (
@@ -1042,6 +1069,12 @@ export default function HomeScreen(): React.JSX.Element {
           currentPrice={parseFloat(wsState.prices[editingTPSL.coin] || editingTPSL.entryPx)}
         />
       )}
+
+      {/* Deposit Modal */}
+      <DepositModal 
+        visible={depositModalVisible} 
+        onClose={() => setDepositModalVisible(false)} 
+      />
     </SafeAreaView>
   );
 }

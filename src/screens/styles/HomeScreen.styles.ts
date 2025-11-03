@@ -268,5 +268,18 @@ export const styles = StyleSheet.create({
     color: Color.FG_3,
     textAlign: 'center',
   },
+
+  // Deposit Button (text button below balance)
+  depositTextButton: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  depositButtonText: {
+    fontSize: fontSizes.sm,
+    color: Color.BRIGHT_ACCENT,
+    fontWeight: '600',
+  },
 });
 

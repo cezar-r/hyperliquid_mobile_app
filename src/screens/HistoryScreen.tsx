@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, SafeAreaView, Animated } from 'react-native';
+import { View, Text, ScrollView, Image, TouchableOpacity, SafeAreaView, Animated, InteractionManager } from 'react-native';
 import { useAccount } from '@reown/appkit-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -11,6 +11,7 @@ import { playToggleHaptic } from '../lib/haptics';
 import { styles } from './styles/HistoryScreen.styles';
 import type { UserFill, LedgerUpdate } from '../types';
 import Color from '../styles/colors';
+import SkeletonScreen from '../components/SkeletonScreen';
 
 type ViewFilter = 'Trades' | 'Ledger';
 
@@ -44,6 +45,9 @@ export default function HistoryScreen(): React.JSX.Element {
   const { account, infoClient } = useWallet();
   const { state: wsState } = useWebSocket();
   
+  // For skeleton loading
+  const [isReady, setIsReady] = useState(false);
+  
   // Filter states
   const [viewFilter, setViewFilter] = useState<ViewFilter>('Trades');
   const [ledgerUpdates, setLedgerUpdates] = useState<LedgerUpdate[]>([]);
@@ -55,6 +59,15 @@ export default function HistoryScreen(): React.JSX.Element {
   
   // For view filter sliding line animation
   const filterLinePosition = useRef(new Animated.Value(0)).current;
+
+  // Defer rendering until navigation is complete
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setIsReady(true);
+    });
+
+    return () => task.cancel();
+  }, []);
 
   // Helper to check if a fill is a spot trade (handles both base token name and API format)
   const isSpotFill = useCallback((coin: string) => {
@@ -297,6 +310,10 @@ export default function HistoryScreen(): React.JSX.Element {
         return null;
     }
   };
+
+  if (!isReady) {
+    return <SkeletonScreen />;
+  }
 
   return (
     <SafeAreaView style={styles.container}>

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, SafeAreaView, Alert, Animated } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, SafeAreaView, Alert, Animated, InteractionManager } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAccount } from '@reown/appkit-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -22,6 +22,7 @@ import TransferFromStakingModal from '../components/TransferFromStakingModal';
 import DelegateModal from '../components/DelegateModal';
 import UndelegateModal from '../components/UndelegateModal';
 import TPSLEditModal from '../components/TPSLEditModal';
+import SkeletonScreen from '../components/SkeletonScreen';
 
 type MarketFilter = 'Perp' | 'Spot' | 'Staking' | 'Perp+Spot' | 'Account';
 type TimeFilter = '24h' | '7d' | '30d' | 'All Time';
@@ -85,6 +86,9 @@ export default function PortfolioScreen(): React.JSX.Element {
   const { state: wsState, selectCoin, setMarketType } = useWebSocket();
   const navigation = useNavigation<any>();
   
+  // For skeleton loading
+  const [isReady, setIsReady] = useState(false);
+  
   // Modal states
   const [depositModalVisible, setDepositModalVisible] = useState(false);
   const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
@@ -112,6 +116,15 @@ export default function PortfolioScreen(): React.JSX.Element {
   
   // For time filter sliding line animation
   const timeLinePosition = useRef(new Animated.Value(0)).current;
+
+  // Defer rendering until navigation is complete
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setIsReady(true);
+    });
+
+    return () => task.cancel();
+  }, []);
 
   // Load saved filters on mount
   useEffect(() => {
@@ -691,6 +704,10 @@ export default function PortfolioScreen(): React.JSX.Element {
     })
     .activeOffsetX([-10, 10])
     .failOffsetY([-20, 20]);
+
+  if (!isReady) {
+    return <SkeletonScreen />;
+  }
 
   return (
     <SafeAreaView style={styles.container}>

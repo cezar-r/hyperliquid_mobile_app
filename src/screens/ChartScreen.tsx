@@ -10,6 +10,7 @@ import {
   Animated,
   Alert,
   Image,
+  InteractionManager,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -29,6 +30,7 @@ import { playToggleHaptic, playMarketActionHaptic } from '../lib/haptics';
 import type { Candle, CandleInterval } from '../types';
 import { styles } from './styles/ChartScreen.styles';
 import Color from '../styles/colors';
+import SkeletonScreen from '../components/SkeletonScreen';
 
 const INTERVALS: CandleInterval[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
 const SHOW_TRADES_KEY = '@show_trades_on_chart';
@@ -126,6 +128,9 @@ export default function ChartScreen(): React.JSX.Element {
   const { account, exchangeClient, refetchAccount } = useWallet();
   const { selectedCoin, marketType, spotMarkets } = state;
 
+  // For skeleton loading
+  const [isReady, setIsReady] = useState(false);
+
   const [candles, setCandles] = useState<ChartData[]>([]);
   const [interval, setInterval] = useState<CandleInterval | null>(null);
   const [intervalLoaded, setIntervalLoaded] = useState(false);
@@ -153,6 +158,15 @@ export default function ChartScreen(): React.JSX.Element {
   
   // For panel sliding line animation
   const panelLinePosition = useRef(new Animated.Value(0)).current;
+
+  // Defer rendering until navigation is complete
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setIsReady(true);
+    });
+
+    return () => task.cancel();
+  }, []);
 
   // Get current asset's market data for szDecimals
   const perpMarket = marketType === 'perp'
@@ -895,6 +909,10 @@ export default function ChartScreen(): React.JSX.Element {
       ]
     );
   };
+
+  if (!isReady) {
+    return <SkeletonScreen />;
+  }
 
   return (
     <View style={styles.container}>

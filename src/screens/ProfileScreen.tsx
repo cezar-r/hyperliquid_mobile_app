@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, SafeAreaView, InteractionManager } from 'react-native';
 import { useAccount, useAppKit } from '@reown/appkit-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import { Octicons } from '@expo/vector-icons';
 import { styles } from './styles/ProfileScreen.styles';
 import Color from '../styles/colors';
+import SkeletonScreen from '../components/SkeletonScreen';
 
 const SHOW_TRADES_KEY = '@show_trades_on_chart';
 const SKIP_OPEN_ORDER_CONFIRMATIONS_KEY = '@skip_open_order_confirmations';
@@ -17,6 +18,18 @@ export default function ProfileScreen(): React.JSX.Element {
   const [showTradesOnChart, setShowTradesOnChart] = useState(false);
   const [skipOpenOrderConfirmations, setSkipOpenOrderConfirmations] = useState(false);
   const [skipClosePositionConfirmations, setSkipClosePositionConfirmations] = useState(false);
+  
+  // For skeleton loading
+  const [isReady, setIsReady] = useState(false);
+
+  // Defer rendering until navigation is complete
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setIsReady(true);
+    });
+
+    return () => task.cancel();
+  }, []);
 
   const handleDisconnect = () => {
     Alert.alert(
@@ -99,6 +112,10 @@ export default function ProfileScreen(): React.JSX.Element {
       console.error('Failed to save skip close position confirmations preference:', error);
     }
   };
+
+  if (!isReady) {
+    return <SkeletonScreen />;
+  }
 
   return (
     <SafeAreaView style={styles.container}>

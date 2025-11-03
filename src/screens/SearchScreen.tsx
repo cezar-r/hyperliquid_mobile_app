@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   Keyboard,
   Animated,
+  InteractionManager,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,7 @@ import { getStarredTickers } from '../lib/starredTickers';
 import { playToggleHaptic, playNavToChartHaptic } from '../lib/haptics';
 import { styles } from './styles/SearchScreen.styles';
 import Color from '../styles/colors';
+import SkeletonScreen from '../components/SkeletonScreen';
 
 // Sort types enum
 enum SortType {
@@ -77,6 +79,9 @@ export default function SearchScreen(): React.JSX.Element {
   const [currentSort, setCurrentSort] = useState<SortType>(SortType.VOLUME);
   const [isAscending, setIsAscending] = useState(false);
   
+  // For skeleton loading
+  const [isReady, setIsReady] = useState(false);
+  
   // Store sort preferences per market type
   const [perpSort, setPerpSort] = useState<SortType>(SortType.VOLUME);
   const [spotSort, setSpotSort] = useState<SortType>(SortType.VOLUME);
@@ -92,6 +97,15 @@ export default function SearchScreen(): React.JSX.Element {
   
   // For market type sliding line animation
   const marketLinePosition = useRef(new Animated.Value(0)).current;
+
+  // Defer rendering until navigation is complete
+  React.useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setIsReady(true);
+    });
+
+    return () => task.cancel();
+  }, []);
 
   // Load star filter preference from AsyncStorage on mount
   React.useEffect(() => {
@@ -551,6 +565,10 @@ export default function SearchScreen(): React.JSX.Element {
     })
     .activeOffsetX([-10, 10])
     .failOffsetY([-20, 20]);
+
+  if (!isReady) {
+    return <SkeletonScreen />;
+  }
 
   return (
     <SafeAreaView style={styles.container}>
