@@ -42,6 +42,7 @@ export const styles = StyleSheet.create({
   separatorContainer: {
     flexDirection: 'row',
     height: 1,
+    position: 'relative',
   },
   separatorSegment: {
     flex: 1,
@@ -50,6 +51,15 @@ export const styles = StyleSheet.create({
   },
   separatorActive: {
     backgroundColor: Color.BRIGHT_ACCENT,
+  },
+  slidingSeparator: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '50%', // 1/2 of the total width
+    height: 1,
+    backgroundColor: Color.BRIGHT_ACCENT,
+    borderRadius: 3,
   },
 
   // Search Bar

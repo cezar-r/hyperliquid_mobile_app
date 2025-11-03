@@ -119,6 +119,7 @@ export const styles = StyleSheet.create({
   timeSeparatorContainer: {
     flexDirection: 'row',
     height: 1,
+    position: 'relative',
   },
   timeSeparatorSegment: {
     flex: 1,
@@ -127,6 +128,15 @@ export const styles = StyleSheet.create({
   },
   timeSeparatorActive: {
     backgroundColor: Color.BRIGHT_ACCENT,
+  },
+  timeSlidingSeparator: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '25%', // 1/4 of the total width
+    height: 1,
+    backgroundColor: Color.BRIGHT_ACCENT,
+    borderRadius: 3,
   },
 
   // Trading Volume Display

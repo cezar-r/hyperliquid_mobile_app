@@ -149,6 +149,9 @@ export default function ChartScreen(): React.JSX.Element {
   const previousPrice = useRef<number | null>(null);
   const priceDirection = useRef<'up' | 'down' | null>(null);
   const colorAnimation = useRef(new Animated.Value(0)).current;
+  
+  // For panel sliding line animation
+  const panelLinePosition = useRef(new Animated.Value(0)).current;
 
   // Get current asset's market data for szDecimals
   const perpMarket = marketType === 'perp'
@@ -230,6 +233,20 @@ export default function ChartScreen(): React.JSX.Element {
     
     loadShowTradesPreference();
   }, []);
+
+  // Animate panel line position when panel changes
+  useEffect(() => {
+    const panels = ['chart', 'orderbook', 'trades'];
+    const index = panels.indexOf(panel);
+    const screenWidth = require('react-native').Dimensions.get('window').width;
+    const segmentWidth = screenWidth / 3;
+    
+    Animated.timing(panelLinePosition, {
+      toValue: index * segmentWidth,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+  }, [panel, panelLinePosition]);
 
   // Set default tick size to minimum when options change
   useEffect(() => {
@@ -1224,9 +1241,14 @@ export default function ChartScreen(): React.JSX.Element {
             </TouchableOpacity>
           </View>
           <View style={styles.separatorContainer}>
-            <View style={[styles.separatorSegment, panel === 'chart' && styles.separatorActive]} />
-            <View style={[styles.separatorSegment, panel === 'orderbook' && styles.separatorActive]} />
-            <View style={[styles.separatorSegment, panel === 'trades' && styles.separatorActive]} />
+            <Animated.View
+              style={[
+                styles.slidingSeparator,
+                {
+                  transform: [{ translateX: panelLinePosition }],
+                },
+              ]}
+            />
           </View>
         </View>
 

@@ -43,6 +43,7 @@ export const styles = StyleSheet.create({
   separatorContainer: {
     flexDirection: 'row',
     height: 1,
+    position: 'relative',
   },
   separatorSegment: {
     flex: 1,
@@ -51,6 +52,15 @@ export const styles = StyleSheet.create({
   },
   separatorActive: {
     backgroundColor: Color.BRIGHT_ACCENT,
+  },
+  slidingSeparator: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '33.33%', // 1/3 of the total width
+    height: 1,
+    backgroundColor: Color.BRIGHT_ACCENT,
+    borderRadius: 3,
   },
   intervalButton: {
     flex: 1,

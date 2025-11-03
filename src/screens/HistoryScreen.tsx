@@ -51,6 +51,9 @@ export default function HistoryScreen(): React.JSX.Element {
   
   // For swipe animation
   const slideAnim = useRef(new Animated.Value(0)).current;
+  
+  // For view filter sliding line animation
+  const filterLinePosition = useRef(new Animated.Value(0)).current;
 
   // Helper to check if a fill is a spot trade (handles both base token name and API format)
   const isSpotFill = useCallback((coin: string) => {
@@ -76,6 +79,21 @@ export default function HistoryScreen(): React.JSX.Element {
     };
     loadFilter();
   }, []);
+
+  // Animate filter line position when view filter changes
+  useEffect(() => {
+    const index = viewFilter === 'Trades' ? 0 : 1;
+    const screenWidth = require('react-native').Dimensions.get('window').width;
+    const paddingHorizontal = 16; // spacing.md
+    const availableWidth = screenWidth - (paddingHorizontal * 2);
+    const segmentWidth = availableWidth / 2;
+    
+    Animated.timing(filterLinePosition, {
+      toValue: index * segmentWidth,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+  }, [viewFilter, filterLinePosition]);
 
   // Fetch ledger updates when viewing Ledger tab
   useEffect(() => {
@@ -306,14 +324,14 @@ export default function HistoryScreen(): React.JSX.Element {
             </TouchableOpacity>
           </View>
           <View style={styles.separatorContainer}>
-            <View style={[
-              styles.separatorSegment,
-              viewFilter === 'Trades' && styles.separatorActive
-            ]} />
-            <View style={[
-              styles.separatorSegment,
-              viewFilter === 'Ledger' && styles.separatorActive
-            ]} />
+            <Animated.View
+              style={[
+                styles.slidingSeparator,
+                {
+                  transform: [{ translateX: filterLinePosition }],
+                },
+              ]}
+            />
           </View>
         </View>
 

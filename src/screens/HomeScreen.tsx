@@ -15,7 +15,7 @@ import type { PerpPosition, SpotBalance } from '../types';
 import Color from '../styles/colors';
 import TPSLEditModal from '../components/TPSLEditModal';
 
-type MarketFilter = 'Perp' | 'Spot' | 'Perp+Spot';
+type MarketFilter = 'Perp' | 'Spot' | 'Account';
 
 const MARKET_FILTER_KEY = 'hl_home_market_filter';
 
@@ -74,7 +74,7 @@ export default function HomeScreen(): React.JSX.Element {
   const { state: wsState, selectCoin, setMarketType } = useWebSocket();
   const navigation = useNavigation<any>();
   const [closingPosition, setClosingPosition] = useState<string | null>(null);
-  const [marketFilter, setMarketFilter] = useState<MarketFilter>('Perp+Spot');
+  const [marketFilter, setMarketFilter] = useState<MarketFilter>('Account');
   const [editingTPSL, setEditingTPSL] = useState<PerpPosition | null>(null);
   
   // For starred tickers
@@ -88,13 +88,16 @@ export default function HomeScreen(): React.JSX.Element {
   
   // For swipe animation
   const slideAnim = useRef(new Animated.Value(0)).current;
+  
+  // For market filter sliding line animation
+  const filterLinePosition = useRef(new Animated.Value(0)).current;
 
   // Load saved market filter on mount
   useEffect(() => {
     const loadMarketFilter = async () => {
       try {
         const savedFilter = await AsyncStorage.getItem(MARKET_FILTER_KEY);
-        if (savedFilter && (savedFilter === 'Perp' || savedFilter === 'Spot' || savedFilter === 'Perp+Spot')) {
+        if (savedFilter && (savedFilter === 'Perp' || savedFilter === 'Spot' || savedFilter === 'Account')) {
           setMarketFilter(savedFilter as MarketFilter);
         }
       } catch (error) {
@@ -121,9 +124,25 @@ export default function HomeScreen(): React.JSX.Element {
     }, [])
   );
 
+  // Animate filter line position when market filter changes
+  useEffect(() => {
+    const filters: MarketFilter[] = ['Perp', 'Spot', 'Account'];
+    const index = filters.indexOf(marketFilter);
+    const screenWidth = require('react-native').Dimensions.get('window').width;
+    const paddingHorizontal = 16; // spacing.md
+    const availableWidth = screenWidth - (paddingHorizontal * 2);
+    const segmentWidth = availableWidth / 3;
+    
+    Animated.timing(filterLinePosition, {
+      toValue: index * segmentWidth,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+  }, [marketFilter, filterLinePosition]);
+
   // Helper to get next/previous filter (circular navigation)
   const getNextFilter = (current: MarketFilter, direction: 'left' | 'right'): MarketFilter => {
-    const filters: MarketFilter[] = ['Perp', 'Spot', 'Perp+Spot'];
+    const filters: MarketFilter[] = ['Perp', 'Spot', 'Account'];
     const currentIndex = filters.indexOf(current);
     
     if (direction === 'left') {
@@ -189,12 +208,23 @@ export default function HomeScreen(): React.JSX.Element {
     return spotValue;
   }, [account.data?.spotBalances, wsState.prices]);
 
+  // Calculate staking value
+  const stakingValue = useMemo(() => {
+    if (!account.data?.stakingSummary) return 0;
+    
+    const totalStaked = parseFloat(account.data.stakingSummary.delegated || '0') + 
+                       parseFloat(account.data.stakingSummary.undelegated || '0');
+    const hypePrice = wsState.prices['HYPE'] ? parseFloat(wsState.prices['HYPE']) : 0;
+    
+    return totalStaked * hypePrice;
+  }, [account.data?.stakingSummary, wsState.prices]);
+
   // Calculate displayed balance based on filter
   const displayedBalance = useMemo(() => {
     if (marketFilter === 'Perp') return perpAccountValue;
     if (marketFilter === 'Spot') return spotTotalValue;
-    return perpAccountValue + spotTotalValue;
-  }, [marketFilter, perpAccountValue, spotTotalValue]);
+    return perpAccountValue + spotTotalValue + stakingValue;
+  }, [marketFilter, perpAccountValue, spotTotalValue, stakingValue]);
 
   // Animate balance changes - only when there's an actual change at 2 decimal places
   useEffect(() => {
@@ -313,7 +343,7 @@ export default function HomeScreen(): React.JSX.Element {
     }> = [];
 
     // Process perp starred tickers
-    if ((marketFilter === 'Perp' || marketFilter === 'Perp+Spot') && starredPerpTickers.length > 0) {
+    if ((marketFilter === 'Perp' || marketFilter === 'Account') && starredPerpTickers.length > 0) {
       starredPerpTickers.forEach(ticker => {
         const ctx = wsState.assetContexts[ticker];
         const price = ctx?.markPx || 0;
@@ -337,7 +367,7 @@ export default function HomeScreen(): React.JSX.Element {
     }
 
     // Process spot starred tickers
-    if ((marketFilter === 'Spot' || marketFilter === 'Perp+Spot') && starredSpotTickers.length > 0) {
+    if ((marketFilter === 'Spot' || marketFilter === 'Account') && starredSpotTickers.length > 0) {
       starredSpotTickers.forEach(ticker => {
         const ctx = wsState.assetContexts[ticker];
         const price = parseFloat(wsState.prices[ticker] || '0');
@@ -622,29 +652,25 @@ export default function HomeScreen(): React.JSX.Element {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.panelButton}
-              onPress={() => handleFilterChange('Perp+Spot')}
+              onPress={() => handleFilterChange('Account')}
             >
               <Text style={[
                 styles.panelText,
-                marketFilter === 'Perp+Spot' && styles.panelTextActive
+                marketFilter === 'Account' && styles.panelTextActive
               ]}>
-                Perp+Spot
+                Account
               </Text>
             </TouchableOpacity>
           </View>
           <View style={styles.separatorContainer}>
-            <View style={[
-              styles.separatorSegment,
-              marketFilter === 'Perp' && styles.separatorActive
-            ]} />
-            <View style={[
-              styles.separatorSegment,
-              marketFilter === 'Spot' && styles.separatorActive
-            ]} />
-            <View style={[
-              styles.separatorSegment,
-              marketFilter === 'Perp+Spot' && styles.separatorActive
-            ]} />
+            <Animated.View
+              style={[
+                styles.slidingSeparator,
+                {
+                  transform: [{ translateX: filterLinePosition }],
+                },
+              ]}
+            />
           </View>
         </View>
 
@@ -674,9 +700,9 @@ export default function HomeScreen(): React.JSX.Element {
         {!account.isLoading && !account.error && account.data && (
           <View style={styles.positionsContainer}>
             {/* Perp Positions + USDC Withdrawable */}
-            {(marketFilter === 'Perp' || marketFilter === 'Perp+Spot') && (
+            {(marketFilter === 'Perp' || marketFilter === 'Account') && (
               <View>
-                {marketFilter === 'Perp+Spot' && sortedPerpPositions.length > 0 && (
+                {marketFilter === 'Account' && sortedPerpPositions.length > 0 && (
                   <View style={styles.perpsHeaderRow}>
                     <Text style={styles.sectionLabel}>Perps</Text>
                     <TouchableOpacity onPress={handleCloseAll}>
@@ -685,7 +711,7 @@ export default function HomeScreen(): React.JSX.Element {
                   </View>
                 )}
                 
-                {marketFilter === 'Perp+Spot' && sortedPerpPositions.length === 0 && (
+                {marketFilter === 'Account' && sortedPerpPositions.length === 0 && (
                   <Text style={styles.sectionLabel}>Perps</Text>
                 )}
                 
@@ -773,9 +799,9 @@ export default function HomeScreen(): React.JSX.Element {
             )}
 
             {/* Spot Balances */}
-            {(marketFilter === 'Spot' || marketFilter === 'Perp+Spot') && sortedSpotBalances.length > 0 && (
-              <View style={marketFilter === 'Perp+Spot' ? styles.spotSection : undefined}>
-                {marketFilter === 'Perp+Spot' && (
+            {(marketFilter === 'Spot' || marketFilter === 'Account') && sortedSpotBalances.length > 0 && (
+              <View style={marketFilter === 'Account' ? styles.spotSection : undefined}>
+                {marketFilter === 'Account' && (
                   <Text style={styles.balancesLabel}>Balances</Text>
                 )}
                 {sortedSpotBalances.map((item) => {
@@ -829,13 +855,49 @@ export default function HomeScreen(): React.JSX.Element {
               </View>
             )}
 
+            {/* Staking Balance */}
+            {marketFilter === 'Account' && account.data?.stakingSummary && (
+              <View style={styles.spotSection}>
+                {(() => {
+                  const totalStaked = parseFloat(account.data.stakingSummary.delegated || '0') + 
+                                     parseFloat(account.data.stakingSummary.undelegated || '0');
+                  const hypePrice = wsState.prices['HYPE'] ? parseFloat(wsState.prices['HYPE']) : 0;
+                  const usdValue = totalStaked * hypePrice;
+
+                  return (
+                    <View>
+                      <View style={styles.positionCell}>
+                        <View style={styles.leftSide}>
+                          <View style={styles.tickerContainer}>
+                            <Text style={styles.ticker}>Staked</Text>
+                          </View>
+                          <View style={styles.priceContainer}>
+                            <Text style={styles.size}>
+                              {totalStaked.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} HYPE
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.rightSide}>
+                          <Text style={styles.price}>${formatNumber(usdValue, 2)}</Text>
+                          <Text style={[styles.pnl, { color: Color.FG_3 }]}>
+                            {hypePrice > 0 ? `$${formatNumber(hypePrice, 2)} / HYPE` : '--'}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.separator} />
+                    </View>
+                  );
+                })()}
+              </View>
+            )}
+
             {/* Starred Tickers Section */}
             {(starredTickersData.perpData.length > 0 || starredTickersData.spotData.length > 0) && (
               <View style={styles.starredSection}>
                 {/* Starred Perp Tickers */}
                 {starredTickersData.perpData.length > 0 && (
                   <View>
-                    {marketFilter === 'Perp+Spot' && (
+                    {marketFilter === 'Account' && (
                       <View style={styles.sectionLabelWithIcon}>
                         <MaterialIcons name="star" size={16} color={Color.GOLD} style={styles.starIcon} />
                         <Text style={styles.sectionLabel}>Starred Perps</Text>
@@ -888,8 +950,8 @@ export default function HomeScreen(): React.JSX.Element {
 
                 {/* Starred Spot Tickers */}
                 {starredTickersData.spotData.length > 0 && (
-                  <View style={marketFilter === 'Perp+Spot' && starredTickersData.perpData.length > 0 ? styles.spotSection : undefined}>
-                    {marketFilter === 'Perp+Spot' && (
+                  <View style={marketFilter === 'Account' && starredTickersData.perpData.length > 0 ? styles.spotSection : undefined}>
+                    {marketFilter === 'Account' && (
                       <View style={[styles.sectionLabelWithIcon, { paddingTop: 6 }]}>
                         <MaterialIcons name="star" size={16} color={Color.GOLD} style={styles.starIcon} />
                         <Text style={[styles.balancesLabel, { marginBottom: 0, paddingTop: 0 }]}>Starred Spot</Text>

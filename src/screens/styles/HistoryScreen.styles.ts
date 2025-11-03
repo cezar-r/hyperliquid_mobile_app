@@ -46,6 +46,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     height: 1,
     paddingHorizontal: spacing.md,
+    position: 'relative',
   },
   separatorSegment: {
     flex: 1,
@@ -54,6 +55,15 @@ export const styles = StyleSheet.create({
   },
   separatorActive: {
     backgroundColor: Color.BRIGHT_ACCENT,
+  },
+  slidingSeparator: {
+    position: 'absolute',
+    top: 0,
+    left: spacing.md,
+    width: '48%', // 1/2 of the available width minus padding
+    height: 1,
+    backgroundColor: Color.BRIGHT_ACCENT,
+    borderRadius: 3,
   },
 
   // Recent Trades Section

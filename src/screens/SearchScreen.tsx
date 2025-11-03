@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -88,6 +88,9 @@ export default function SearchScreen(): React.JSX.Element {
   
   // For swipe animation
   const slideAnim = useRef(new Animated.Value(0)).current;
+  
+  // For market type sliding line animation
+  const marketLinePosition = useRef(new Animated.Value(0)).current;
 
   // Load star filter preference from AsyncStorage on mount
   React.useEffect(() => {
@@ -115,6 +118,19 @@ export default function SearchScreen(): React.JSX.Element {
       setIsAscending(spotAscending);
     }
   }, [wsState.marketType, perpSort, spotSort, perpAscending, spotAscending]);
+
+  // Animate market type line position when market type changes
+  useEffect(() => {
+    const index = wsState.marketType === 'perp' ? 0 : 1;
+    const screenWidth = require('react-native').Dimensions.get('window').width;
+    const segmentWidth = screenWidth / 2;
+    
+    Animated.timing(marketLinePosition, {
+      toValue: index * segmentWidth,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+  }, [wsState.marketType, marketLinePosition]);
 
   // Load starred tickers when screen comes into focus or market type changes
   useFocusEffect(
@@ -569,16 +585,12 @@ export default function SearchScreen(): React.JSX.Element {
             </TouchableOpacity>
           </View>
           <View style={styles.separatorContainer}>
-            <View
+            <Animated.View
               style={[
-                styles.separatorSegment,
-                wsState.marketType === 'perp' && styles.separatorActive,
-              ]}
-            />
-            <View
-              style={[
-                styles.separatorSegment,
-                wsState.marketType === 'spot' && styles.separatorActive,
+                styles.slidingSeparator,
+                {
+                  transform: [{ translateX: marketLinePosition }],
+                },
               ]}
             />
           </View>

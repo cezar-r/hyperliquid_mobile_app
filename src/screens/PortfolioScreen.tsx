@@ -107,6 +107,9 @@ export default function PortfolioScreen(): React.JSX.Element {
   
   // For swipe animation
   const slideAnim = useRef(new Animated.Value(0)).current;
+  
+  // For time filter sliding line animation
+  const timeLinePosition = useRef(new Animated.Value(0)).current;
 
   // Load saved filters on mount
   useEffect(() => {
@@ -127,6 +130,20 @@ export default function PortfolioScreen(): React.JSX.Element {
     };
     loadFilters();
   }, []);
+
+  // Animate time filter line position when time filter changes
+  useEffect(() => {
+    const filters: TimeFilter[] = ['24h', '7d', '30d', 'All Time'];
+    const index = filters.indexOf(timeFilter);
+    const screenWidth = require('react-native').Dimensions.get('window').width;
+    const segmentWidth = screenWidth / 4;
+    
+    Animated.timing(timeLinePosition, {
+      toValue: index * segmentWidth,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+  }, [timeFilter, timeLinePosition]);
 
   // Save market filter when it changes
   const handleMarketFilterChange = async (filter: MarketFilter) => {
@@ -716,22 +733,14 @@ export default function PortfolioScreen(): React.JSX.Element {
               </TouchableOpacity>
             </View>
             <View style={styles.timeSeparatorContainer}>
-              <View style={[
-                styles.timeSeparatorSegment,
-                timeFilter === '24h' && styles.timeSeparatorActive
-              ]} />
-              <View style={[
-                styles.timeSeparatorSegment,
-                timeFilter === '7d' && styles.timeSeparatorActive
-              ]} />
-              <View style={[
-                styles.timeSeparatorSegment,
-                timeFilter === '30d' && styles.timeSeparatorActive
-              ]} />
-              <View style={[
-                styles.timeSeparatorSegment,
-                timeFilter === 'All Time' && styles.timeSeparatorActive
-              ]} />
+              <Animated.View
+                style={[
+                  styles.timeSlidingSeparator,
+                  {
+                    transform: [{ translateX: timeLinePosition }],
+                  },
+                ]}
+              />
             </View>
           </View>
 
