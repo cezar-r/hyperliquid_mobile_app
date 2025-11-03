@@ -1346,11 +1346,16 @@ export default function ChartScreen(): React.JSX.Element {
             )
           ) : (
             <>
-              {spotBalances.length > 0 ? (
-                spotBalances
-                  .filter((b: any) => parseFloat(b.total) > 0)
-                  .slice(0, 4)
-                  .map((b: any, idx: number) => {
+              {(() => {
+                // Extract base coin from selectedCoin (e.g., "BTC/USDC" -> "BTC")
+                const baseCoin = selectedCoin.split('/')[0];
+                
+                // Filter to only the balance for this specific coin
+                const filteredBalances = spotBalances
+                  .filter((b: any) => b.coin === baseCoin && parseFloat(b.total) > 0);
+                
+                return filteredBalances.length > 0 ? (
+                  filteredBalances.map((b: any, idx: number) => {
                     const balance = parseFloat(b.total);
                     let coinPrice, usdValue;
                     if (b.coin === 'USDC') {
@@ -1400,9 +1405,10 @@ export default function ChartScreen(): React.JSX.Element {
                       </View>
                     );
                   })
-              ) : (
-                <Text style={styles.subtitle}>No balances</Text>
-              )}
+                ) : (
+                  <Text style={styles.subtitle}>No balance for {baseCoin}</Text>
+                );
+              })()}
             </>
           )}
         </View>

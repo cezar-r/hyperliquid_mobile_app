@@ -12,6 +12,7 @@ import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, g
 import { styles } from './styles/PortfolioScreen.styles';
 import type { PerpPosition, UserFill } from '../types';
 import Color from '../styles/colors';
+import { spacing } from '../theme/spacing';
 import DepositModal from '../components/DepositModal';
 import WithdrawModal from '../components/WithdrawModal';
 import PerpSpotTransferModal from '../components/PerpSpotTransferModal';
@@ -21,7 +22,7 @@ import DelegateModal from '../components/DelegateModal';
 import UndelegateModal from '../components/UndelegateModal';
 import TPSLEditModal from '../components/TPSLEditModal';
 
-type MarketFilter = 'Perp' | 'Spot' | 'Staking' | 'Perp+Spot' | 'All Markets';
+type MarketFilter = 'Perp' | 'Spot' | 'Staking' | 'Perp+Spot' | 'Account';
 type TimeFilter = '24h' | '7d' | '30d' | 'All Time';
 
 const PORTFOLIO_MARKET_FILTER_KEY = 'hl_portfolio_market_filter';
@@ -95,7 +96,7 @@ export default function PortfolioScreen(): React.JSX.Element {
   const [editingTPSL, setEditingTPSL] = useState<PerpPosition | null>(null);
 
   // Filter states
-  const [marketFilter, setMarketFilter] = useState<MarketFilter>('All Markets');
+  const [marketFilter, setMarketFilter] = useState<MarketFilter>('Account');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24h');
   const [tradesDisplayLimit, setTradesDisplayLimit] = useState(10);
   const [marketDropdownVisible, setMarketDropdownVisible] = useState(false);
@@ -116,7 +117,7 @@ export default function PortfolioScreen(): React.JSX.Element {
     const loadFilters = async () => {
       try {
         const savedMarketFilter = await AsyncStorage.getItem(PORTFOLIO_MARKET_FILTER_KEY);
-        if (savedMarketFilter && ['Perp', 'Spot', 'Perp+Spot', 'Staking', 'All Markets'].includes(savedMarketFilter)) {
+        if (savedMarketFilter && ['Perp', 'Spot', 'Perp+Spot', 'Staking', 'Account'].includes(savedMarketFilter)) {
           setMarketFilter(savedMarketFilter as MarketFilter);
         }
         
@@ -224,7 +225,7 @@ export default function PortfolioScreen(): React.JSX.Element {
     } else if (marketFilter === 'Staking') {
       fills = []; // No fills for staking
     }
-    // 'All Markets' shows all fills
+    // 'Account' shows all fills
     
     return fills;
   }, [account.data?.userFills, timeFilter, marketFilter, wsState.perpMarkets, wsState.spotMarkets]);
@@ -327,7 +328,7 @@ export default function PortfolioScreen(): React.JSX.Element {
           uPnl += posPnl;
         }
       });
-    } else { // All
+    } else { // Account
       value = perpAccountValue + spotTotalValue + stakingValue;
       shouldShowPnL = true;
       // Calculate unrealized PnL for perp positions
@@ -488,7 +489,7 @@ export default function PortfolioScreen(): React.JSX.Element {
         return orderMarketType === 'spot';
       } else if (marketFilter === 'Perp+Spot') {
         return orderMarketType === 'perp' || orderMarketType === 'spot';
-      } else if (marketFilter === 'All Markets') {
+      } else if (marketFilter === 'Account') {
         return orderMarketType === 'perp' || orderMarketType === 'spot';
       } else if (marketFilter === 'Staking') {
         return false;
@@ -657,10 +658,10 @@ export default function PortfolioScreen(): React.JSX.Element {
   };
 
   // Check what to show based on market filter
-  const showPerps = ['Perp', 'Perp+Spot', 'All Markets'].includes(marketFilter);
-  const showSpot = ['Spot', 'Perp+Spot', 'All Markets'].includes(marketFilter);
-  const showStaking = ['Staking', 'All Markets'].includes(marketFilter);
-  const showEquityBreakdown = ['Perp+Spot', 'All Markets', 'Staking'].includes(marketFilter);
+  const showPerps = ['Perp', 'Perp+Spot', 'Account'].includes(marketFilter);
+  const showSpot = ['Spot', 'Perp+Spot', 'Account'].includes(marketFilter);
+  const showStaking = ['Staking', 'Account'].includes(marketFilter);
+  const showEquityBreakdown = ['Perp+Spot', 'Account', 'Staking'].includes(marketFilter);
 
   // Pan gesture for horizontal swipe (timeframes)
   const panGesture = Gesture.Pan()
@@ -798,7 +799,10 @@ export default function PortfolioScreen(): React.JSX.Element {
                   )}
 
                   {/* Portfolio Value */}
-                  <View style={styles.portfolioValueContainer}>
+                  <View style={[
+                    styles.portfolioValueContainer,
+                    marketFilter === 'Staking' && { paddingTop: spacing.md }
+                  ]}>
                     <Animated.Text style={[styles.portfolioValue, { color: textColor }]}>${formatNumber(totalValue, 2)}</Animated.Text>
                     {showPnL && (
                       <Text style={[
@@ -847,19 +851,19 @@ export default function PortfolioScreen(): React.JSX.Element {
                       {showEquityBreakdown && (
                         <View style={styles.accountDetailsContainer}>
                           <View style={styles.equityBreakdownContainer}>
-                            {(showPerps || marketFilter === 'All Markets') && perpAccountValue > 0 && (
+                            {(showPerps || marketFilter === 'Account') && perpAccountValue > 0 && (
                               <View style={styles.equityRow}>
                                 <Text style={styles.equityLabel}>Perp</Text>
                                 <Text style={styles.equityValue}>${formatNumber(perpAccountValue, 2)}</Text>
                               </View>
                             )}
-                            {(showSpot || marketFilter === 'All Markets') && spotTotalValue > 0 && (
+                            {(showSpot || marketFilter === 'Account') && spotTotalValue > 0 && (
                               <View style={styles.equityRow}>
                                 <Text style={styles.equityLabel}>Spot</Text>
                                 <Text style={styles.equityValue}>${formatNumber(spotTotalValue, 2)}</Text>
                               </View>
                             )}
-                            {(showStaking && marketFilter === 'All Markets') && stakingValue > 0 && (
+                            {(showStaking && marketFilter === 'Account') && stakingValue > 0 && (
                               <View style={styles.equityRow}>
                                 <Text style={styles.equityLabel}>Staking</Text>
                                 <Text style={styles.equityValue}>${formatNumber(stakingValue, 2)}</Text>
@@ -1052,7 +1056,7 @@ export default function PortfolioScreen(): React.JSX.Element {
                       const orderMarketType = getOrderMarketType(order.coin);
                       
                       // Debug logging
-                      if (marketFilter === 'All Markets') {
+                      if (marketFilter === 'Account') {
                         console.log('[PortfolioScreen] Order:', order.coin, 'Type:', orderMarketType);
                       }
                       
@@ -1062,8 +1066,8 @@ export default function PortfolioScreen(): React.JSX.Element {
                         return orderMarketType === 'spot';
                       } else if (marketFilter === 'Perp+Spot') {
                         return orderMarketType === 'perp' || orderMarketType === 'spot';
-                      } else if (marketFilter === 'All Markets') {
-                        // For 'All Markets', show both perp and spot orders
+                      } else if (marketFilter === 'Account') {
+                        // For 'Account', show both perp and spot orders
                         return orderMarketType === 'perp' || orderMarketType === 'spot';
                       } else if (marketFilter === 'Staking') {
                         return false; // No orders for staking
@@ -1172,7 +1176,7 @@ export default function PortfolioScreen(): React.JSX.Element {
                   {/* Staking Section */}
                   {showStaking && (
                     <View style={styles.stakingSection}>
-                      {marketFilter === 'All Markets' && (
+                      {marketFilter === 'Account' && (
                         <Text style={styles.sectionLabel}>Staking</Text>
                       )}
                       <View style={styles.stakingCard}>
@@ -1431,12 +1435,12 @@ export default function PortfolioScreen(): React.JSX.Element {
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.marketDropdownItem}
-              onPress={() => handleMarketFilterChange('All Markets')}
+              onPress={() => handleMarketFilterChange('Account')}
             >
               <Text style={[
                 styles.marketDropdownItemText,
-                marketFilter === 'All Markets' && styles.marketDropdownItemTextActive
-              ]}>All Markets</Text>
+                marketFilter === 'Account' && styles.marketDropdownItemTextActive
+              ]}>Account</Text>
             </TouchableOpacity>
           </View>
         </>
