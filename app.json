@@ -2,7 +2,7 @@
   "expo": {
     "name": "Hyperliquid Mobile",
     "slug": "hyperliquid-mobile-companion",
-    "version": "0.0.1",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -23,8 +23,15 @@
           "cbwallet",
           "uniswap",
           "rainbow",
+          "trust",
+          "metamask",
+          "coinbase",
+          "cbwallet",
+          "uniswap",
+          "rainbow",
           "trust"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -53,8 +60,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "your-project-id-here"
+        "projectId": "34c623ee-b870-403d-9c2a-6cd20eb4a625"
       }
-    }
+    },
+    "owner": "cezarrr"
   }
 }
