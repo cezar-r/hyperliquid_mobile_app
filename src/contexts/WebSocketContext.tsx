@@ -158,7 +158,11 @@ export function WebSocketProvider({
         const spotSubs = await Promise.all(
           spotMarkets.map(async (market) => {
             try {
-              const subscriptionCoin = `@${market.index}`;
+              // PURR/USDC uses its literal name, not @{index} format
+              const subscriptionCoin = market.name === 'PURR/USDC' 
+                ? 'PURR/USDC' 
+                : `@${market.index}`;
+              
               const sub = await client.activeSpotAssetCtx(
                 { coin: subscriptionCoin },
                 (data: any) => {

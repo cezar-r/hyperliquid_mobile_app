@@ -37,10 +37,12 @@ export default function RootNavigator(): React.JSX.Element {
   const { address, isConnected } = useAccount();
   const { provider } = useProvider();
   const { setupClients, clearClients } = useWallet();
+  const initializedAddressRef = React.useRef<string | null>(null);
 
   useEffect(() => {
     if (!isConnected) {
       clearClients();
+      initializedAddressRef.current = null;
       navigation.reset({ index: 0, routes: [{ name: 'Connect' }] });
     }
   }, [isConnected, navigation, clearClients]);
@@ -48,10 +50,17 @@ export default function RootNavigator(): React.JSX.Element {
   useEffect(() => {
     const initializeClients = async () => {
       if (isConnected && address && provider) {
+        // Prevent duplicate initialization for the same address
+        if (initializedAddressRef.current === address) {
+          console.log('[RootNavigator] Clients already initialized for:', address);
+          return;
+        }
+
         console.log('[RootNavigator] Setting up Hyperliquid clients...');
         try {
           const existingSessionKey = await loadSessionKey();
           await setupClients(address, provider, existingSessionKey);
+          initializedAddressRef.current = address;
           console.log('[RootNavigator] ✓ Clients initialized');
         } catch (error) {
           console.error('[RootNavigator] Failed to setup clients:', error);
@@ -60,7 +69,7 @@ export default function RootNavigator(): React.JSX.Element {
     };
 
     initializeClients();
-  }, [isConnected, address, provider, setupClients]);
+  }, [isConnected, address, provider]);
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>

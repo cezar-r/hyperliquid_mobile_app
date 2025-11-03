@@ -7,6 +7,7 @@ import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { getDisplayTicker, resolveSpotTicker } from '../lib/formatting';
+import { playToggleHaptic } from '../lib/haptics';
 import { styles } from './styles/HistoryScreen.styles';
 import type { UserFill, LedgerUpdate } from '../types';
 import Color from '../styles/colors';
@@ -141,6 +142,9 @@ export default function HistoryScreen(): React.JSX.Element {
 
   // Save view filter when it changes with animation
   const handleFilterChange = async (filter: ViewFilter, animated: boolean = false, direction?: 'left' | 'right') => {
+    // Play haptic feedback
+    playToggleHaptic();
+    
     if (animated && direction) {
       // Start slide animation
       const slideDistance = direction === 'left' ? -50 : 50;

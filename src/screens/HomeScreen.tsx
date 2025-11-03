@@ -10,6 +10,7 @@ import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { formatPrice, formatSize, getDisplayTicker } from '../lib/formatting';
 import { getStarredTickers } from '../lib/starredTickers';
+import { playToggleHaptic, playNavToChartHaptic } from '../lib/haptics';
 import { styles } from './styles/HomeScreen.styles';
 import type { PerpPosition, SpotBalance } from '../types';
 import Color from '../styles/colors';
@@ -156,6 +157,9 @@ export default function HomeScreen(): React.JSX.Element {
 
   // Save market filter when it changes with animation
   const handleFilterChange = async (filter: MarketFilter, animated: boolean = false, direction?: 'left' | 'right') => {
+    // Play haptic feedback
+    playToggleHaptic();
+    
     if (animated && direction) {
       // Start slide animation
       const slideDistance = direction === 'left' ? -50 : 50;
@@ -405,6 +409,9 @@ export default function HomeScreen(): React.JSX.Element {
 
   // Navigate to chart detail - Set coin/market first, then navigate (like SearchScreen does)
   const handleNavigateToChart = (coin: string, market: 'perp' | 'spot') => {
+    // Play haptic feedback
+    playNavToChartHaptic();
+    
     // Set market type first if different
     if (market !== wsState.marketType) {
       setMarketType(market);

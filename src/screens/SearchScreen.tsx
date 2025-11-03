@@ -19,6 +19,7 @@ import { useWebSocket } from '../contexts/WebSocketContext';
 import type { PerpMarket, SpotMarket } from '../types';
 import { getDisplayTicker } from '../lib/formatting';
 import { getStarredTickers } from '../lib/starredTickers';
+import { playToggleHaptic, playNavToChartHaptic } from '../lib/haptics';
 import { styles } from './styles/SearchScreen.styles';
 import Color from '../styles/colors';
 
@@ -309,6 +310,9 @@ export default function SearchScreen(): React.JSX.Element {
   }, [currentMarkets, wsState.assetContexts, wsState.marketType, wsState.prices, searchQuery, currentSort, isAscending, showStarredOnly, starredTickers]);
 
   const handleMarketSelect = useCallback((marketName: string): void => {
+    // Play haptic feedback
+    playNavToChartHaptic();
+    
     Keyboard.dismiss();
     selectCoin(marketName);
     navigation.navigate('ChartDetail');
@@ -316,6 +320,9 @@ export default function SearchScreen(): React.JSX.Element {
 
   const handleMarketTypeToggle = useCallback(
     (type: 'perp' | 'spot', animated: boolean = false, direction?: 'left' | 'right'): void => {
+      // Play haptic feedback
+      playToggleHaptic();
+      
       if (animated && direction) {
         // Start slide animation
         const slideDistance = direction === 'left' ? -50 : 50;

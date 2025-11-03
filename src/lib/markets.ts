@@ -95,7 +95,8 @@ export async function fetchSpotMarkets(
  * Resolves display coin name to WebSocket subscription format.
  * 
  * For perps: uses coin name directly (e.g., "BTC")
- * For spot: uses @{universeIndex} format (e.g., "@0" for PURR/USDC)
+ * For spot: uses @{universeIndex} format (e.g., "@107" for HYPE/USDC)
+ * Special case: PURR/USDC uses its literal name, not @{index} format
  * 
  * Note: This is for subscriptions only. For orders, use resolveOrderAsset().
  */
@@ -106,6 +107,11 @@ export function resolveSubscriptionCoin(
 ): string {
   if (marketType === 'perp') {
     return displayCoin;
+  }
+
+  // PURR/USDC is special - it uses its literal name, not @{index} format
+  if (displayCoin === 'PURR/USDC') {
+    return 'PURR/USDC';
   }
 
   const spotMarket = spotMarkets.find((m) => m.name === displayCoin);

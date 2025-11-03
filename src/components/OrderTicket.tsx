@@ -21,6 +21,7 @@ import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { formatPrice, formatSize, formatWithCommas } from '../lib/formatting';
 import { getSkipOpenOrderConfirmations } from '../lib/confirmations';
+import { playOrderTicketSelectionChangeHaptic, playSliderChangeHaptic, playOrderSubmitHaptic } from '../lib/haptics';
 import { styles } from './styles/OrderTicket.styles';
 import Color from '../styles/colors';
 
@@ -617,7 +618,10 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
                   styles.sideButton,
                   side === 'buy' && styles.sideButtonBuyActive,
                 ]}
-                onPress={() => setSide('buy')}
+                onPress={() => {
+                  playOrderTicketSelectionChangeHaptic();
+                  setSide('buy');
+                }}
               >
                 <Text style={[styles.sideButtonText, side === 'buy' && styles.sideButtonTextBuy]}>
                   Buy / Long
@@ -628,7 +632,10 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
                   styles.sideButton,
                   side === 'sell' && styles.sideButtonSellActive,
                 ]}
-                onPress={() => setSide('sell')}
+                onPress={() => {
+                  playOrderTicketSelectionChangeHaptic();
+                  setSide('sell');
+                }}
               >
                 <Text style={[styles.sideButtonText, side === 'sell' && styles.sideButtonTextSell]}>
                   Sell / Short
@@ -640,7 +647,10 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
             <View style={styles.orderTypeSelector}>
               <TouchableOpacity
                 style={[styles.typeButton, orderType === 'limit' && styles.typeButtonActive]}
-                onPress={() => handleOrderTypeChange('limit')}
+                onPress={() => {
+                  playOrderTicketSelectionChangeHaptic();
+                  handleOrderTypeChange('limit');
+                }}
               >
                 <Text style={[styles.typeButtonText, orderType === 'limit' && styles.typeButtonTextActive]}>
                   Limit
@@ -648,7 +658,10 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.typeButton, orderType === 'market' && styles.typeButtonActive]}
-                onPress={() => handleOrderTypeChange('market')}
+                onPress={() => {
+                  playOrderTicketSelectionChangeHaptic();
+                  handleOrderTypeChange('market');
+                }}
               >
                 <Text style={[styles.typeButtonText, orderType === 'market' && styles.typeButtonTextActive]}>
                   Market
@@ -703,7 +716,10 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
                 maximumValue={100}
                 step={5}
                 value={sizePercent}
-                onValueChange={handleSizePercentChange}
+                onValueChange={(value) => {
+                  playSliderChangeHaptic();
+                  handleSizePercentChange(value);
+                }}
                 minimumTrackTintColor={Color.BRIGHT_ACCENT}
                 maximumTrackTintColor={Color.BG_3}
                 thumbTintColor={Color.BRIGHT_ACCENT}
@@ -729,7 +745,10 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
                 maximumValue={assetInfo.maxLeverage}
                 step={1}
                 value={Math.min(leverage, assetInfo.maxLeverage)}
-                onValueChange={setLeverage}
+                onValueChange={(value) => {
+                  playSliderChangeHaptic();
+                  setLeverage(value);
+                }}
                 minimumTrackTintColor={Color.BRIGHT_ACCENT}
                 maximumTrackTintColor={Color.BG_3}
                 thumbTintColor={Color.BRIGHT_ACCENT}
@@ -740,7 +759,10 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
             <View style={styles.marginTypeSelector}>
               <TouchableOpacity
                 style={[styles.marginButton, marginType === 'cross' && styles.marginButtonActive]}
-                onPress={() => setMarginType('cross')}
+                onPress={() => {
+                  playOrderTicketSelectionChangeHaptic();
+                  setMarginType('cross');
+                }}
               >
                 <Text style={[styles.marginButtonText, marginType === 'cross' && styles.marginButtonTextActive]}>
                   Cross
@@ -748,7 +770,10 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.marginButton, marginType === 'isolated' && styles.marginButtonActive]}
-                onPress={() => setMarginType('isolated')}
+                onPress={() => {
+                  playOrderTicketSelectionChangeHaptic();
+                  setMarginType('isolated');
+                }}
               >
                 <Text style={[styles.marginButtonText, marginType === 'isolated' && styles.marginButtonTextActive]}>
                   Isolated
@@ -899,7 +924,10 @@ export default function OrderTicket({ visible, onClose, defaultSide }: OrderTick
                 (isSubmitting || !price || !marginRequired || !exchangeClient ||
                   parseFloat(orderStats.marginRequiredDisplay) > tradeableBalance) && styles.submitButtonDisabled
               ]}
-              onPress={handleSubmit}
+              onPress={() => {
+                playOrderSubmitHaptic();
+                handleSubmit();
+              }}
               disabled={
                 isSubmitting || 
                 !price || 

@@ -25,6 +25,7 @@ import { resolveSubscriptionCoin } from '../lib/markets';
 import { generateTickSizeOptions, calculateMantissa, calculateNSigFigs } from '../lib/tickSize';
 import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker } from '../lib/formatting';
 import { isTickerStarred, toggleStarredTicker } from '../lib/starredTickers';
+import { playToggleHaptic, playMarketActionHaptic } from '../lib/haptics';
 import type { Candle, CandleInterval } from '../types';
 import { styles } from './styles/ChartScreen.styles';
 import Color from '../styles/colors';
@@ -1223,19 +1224,28 @@ export default function ChartScreen(): React.JSX.Element {
           <View style={styles.panelSelector}>
             <TouchableOpacity
               style={[styles.intervalButton, panel === 'chart' && styles.intervalButtonActive]}
-              onPress={() => setPanel('chart')}
+              onPress={() => {
+                playToggleHaptic();
+                setPanel('chart');
+              }}
             >
               <Text style={[styles.intervalText, panel === 'chart' && styles.intervalTextActive]}>Chart</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.intervalButton, panel === 'orderbook' && styles.intervalButtonActive]}
-              onPress={() => setPanel('orderbook')}
+              onPress={() => {
+                playToggleHaptic();
+                setPanel('orderbook');
+              }}
             >
               <Text style={[styles.intervalText, panel === 'orderbook' && styles.intervalTextActive]}>Order Book</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.intervalButton, panel === 'trades' && styles.intervalButtonActive]}
-              onPress={() => setPanel('trades')}
+              onPress={() => {
+                playToggleHaptic();
+                setPanel('trades');
+              }}
             >
               <Text style={[styles.intervalText, panel === 'trades' && styles.intervalTextActive]}>Trades</Text>
             </TouchableOpacity>
@@ -1331,7 +1341,10 @@ export default function ChartScreen(): React.JSX.Element {
                     </View>
                     
                     <TouchableOpacity
-                      onPress={() => setShowCloseModal(true)}
+                      onPress={() => {
+                        playMarketActionHaptic();
+                        setShowCloseModal(true);
+                      }}
                       style={styles.marketCloseButton}
                     >
                       <Text style={styles.marketCloseText}>

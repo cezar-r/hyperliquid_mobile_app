@@ -21,6 +21,7 @@ import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { formatSize, floatToWire, formatWithCommas } from '../lib/formatting';
 import { getSkipOpenOrderConfirmations } from '../lib/confirmations';
+import { playOrderTicketSelectionChangeHaptic, playSliderChangeHaptic, playOrderSubmitHaptic } from '../lib/haptics';
 import { styles } from './styles/OrderTicket.styles';
 import Color from '../styles/colors';
 
@@ -418,7 +419,10 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
             <View style={styles.sideSelector}>
               <TouchableOpacity
                 style={[styles.sideButton, side === 'buy' && styles.sideButtonBuyActive]}
-                onPress={() => setSide('buy')}
+                onPress={() => {
+                  playOrderTicketSelectionChangeHaptic();
+                  setSide('buy');
+                }}
               >
                 <Text style={[styles.sideButtonText, side === 'buy' && styles.sideButtonTextBuy]}>
                   Buy
@@ -426,7 +430,10 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.sideButton, side === 'sell' && styles.sideButtonSellActive]}
-                onPress={() => setSide('sell')}
+                onPress={() => {
+                  playOrderTicketSelectionChangeHaptic();
+                  setSide('sell');
+                }}
               >
                 <Text style={[styles.sideButtonText, side === 'sell' && styles.sideButtonTextSell]}>
                   Sell
@@ -438,7 +445,10 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
             <View style={styles.orderTypeSelector}>
               <TouchableOpacity
                 style={[styles.typeButton, orderType === 'limit' && styles.typeButtonActive]}
-                onPress={() => handleOrderTypeChange('limit')}
+                onPress={() => {
+                  playOrderTicketSelectionChangeHaptic();
+                  handleOrderTypeChange('limit');
+                }}
               >
                 <Text style={[styles.typeButtonText, orderType === 'limit' && styles.typeButtonTextActive]}>
                   Limit
@@ -446,7 +456,10 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.typeButton, orderType === 'market' && styles.typeButtonActive]}
-                onPress={() => handleOrderTypeChange('market')}
+                onPress={() => {
+                  playOrderTicketSelectionChangeHaptic();
+                  handleOrderTypeChange('market');
+                }}
               >
                 <Text style={[styles.typeButtonText, orderType === 'market' && styles.typeButtonTextActive]}>
                   Market
@@ -502,7 +515,10 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
                 maximumValue={100}
                 step={5}
                 value={sizePercent}
-                onValueChange={handleSizePercentChange}
+                onValueChange={(value) => {
+                  playSliderChangeHaptic();
+                  handleSizePercentChange(value);
+                }}
                 minimumTrackTintColor={Color.BRIGHT_ACCENT}
                 maximumTrackTintColor={Color.BG_3}
                 thumbTintColor={Color.BRIGHT_ACCENT}
@@ -570,7 +586,10 @@ export default function SpotOrderTicket({ visible, onClose, defaultSide }: SpotO
                   (side === 'sell' && parseFloat(size) > tokenBalance)) &&
                   styles.submitButtonDisabled,
               ]}
-              onPress={handleSubmit}
+              onPress={() => {
+                playOrderSubmitHaptic();
+                handleSubmit();
+              }}
               disabled={
                 isSubmitting ||
                 !price ||

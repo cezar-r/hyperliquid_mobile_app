@@ -27,7 +27,7 @@ import { createWalletClient, custom } from 'viem';
 const WALLET_DISCONNECTED_KEY = 'hl_wallet_disconnected';
 
 interface WalletContextValue {
-  infoClient: hl.InfoClient | null;
+  infoClient: hl.InfoClient;
   mainExchangeClient: hl.ExchangeClient | null;
   exchangeClient: hl.ExchangeClient | null;
   sessionKey: SessionKey | null;
@@ -51,7 +51,12 @@ export function WalletProvider({
 }: {
   children: React.ReactNode;
 }): React.JSX.Element {
-  const [infoClient, setInfoClient] = useState<hl.InfoClient | null>(null);
+  const [infoClient] = useState<hl.InfoClient>(() => {
+    const transport = createHttpTransport();
+    const client = createInfoClient(transport);
+    console.log('[Phase 3] InfoClient initialized');
+    return client;
+  });
   const [mainExchangeClient, setMainExchangeClient] =
     useState<hl.ExchangeClient | null>(null);
   const [exchangeClient, setExchangeClient] =
@@ -65,17 +70,10 @@ export function WalletProvider({
     error: null,
   });
 
-  useEffect(() => {
-    const transport = createHttpTransport();
-    const client = createInfoClient(transport);
-    setInfoClient(client);
-    console.log('[Phase 3] InfoClient initialized');
-  }, []);
-
   const fetchAccountData = useCallback(
     async (userAddress: string, silent: boolean = false) => {
       if (!infoClient) {
-        console.error('[Phase 3] InfoClient not initialized');
+        console.warn('[Phase 3] InfoClient not initialized (defensive check)');
         return;
       }
 

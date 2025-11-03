@@ -9,6 +9,7 @@ import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker, resolveSpotTicker } from '../lib/formatting';
+import { playToggleHaptic, playNavToChartHaptic } from '../lib/haptics';
 import { styles } from './styles/PortfolioScreen.styles';
 import type { PerpPosition, UserFill } from '../types';
 import Color from '../styles/colors';
@@ -148,6 +149,9 @@ export default function PortfolioScreen(): React.JSX.Element {
 
   // Save market filter when it changes
   const handleMarketFilterChange = async (filter: MarketFilter) => {
+    // Play haptic feedback
+    playToggleHaptic();
+    
     setMarketFilter(filter);
     setMarketDropdownVisible(false);
     try {
@@ -173,6 +177,9 @@ export default function PortfolioScreen(): React.JSX.Element {
 
   // Save time filter when it changes with animation
   const handleTimeFilterChange = async (filter: TimeFilter, animated: boolean = false, direction?: 'left' | 'right') => {
+    // Play haptic feedback
+    playToggleHaptic();
+    
     if (animated && direction) {
       // Start slide animation
       const slideDistance = direction === 'left' ? -50 : 50;
@@ -447,6 +454,9 @@ export default function PortfolioScreen(): React.JSX.Element {
 
   // Navigate to chart detail
   const handleNavigateToChart = (coin: string, market: 'perp' | 'spot') => {
+    // Play haptic feedback
+    playNavToChartHaptic();
+    
     if (market !== wsState.marketType) {
       setMarketType(market);
     }

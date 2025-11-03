@@ -11,6 +11,7 @@ import HistoryScreen from '../screens/HistoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import Color from '../styles/colors';
 import { styles } from './TabNavigator.styles';
+import { playNavbarHaptic } from '../lib/haptics';
 
 export type TabParamList = {
   Home: undefined;
@@ -140,7 +141,7 @@ export default function TabNavigator(): React.JSX.Element {
 
                   const onPress = () => {
                     // Trigger light haptic feedback
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid);
+                    playNavbarHaptic();
                     
                     const event = navigation.emit({
                       type: 'tabPress',
