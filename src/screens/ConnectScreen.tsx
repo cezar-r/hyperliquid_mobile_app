@@ -5,7 +5,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppKit, useAccount } from '@reown/appkit-react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { styles } from './styles/ConnectScreen.styles';
-import { isTestnet } from '../lib/config';
 import { loadSessionKey } from '../lib/sessionKey';
 
 type NavigationProp = NativeStackNavigationProp<any>;
