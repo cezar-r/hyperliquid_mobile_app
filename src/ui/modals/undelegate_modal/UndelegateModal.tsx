@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useWallet } from '../../../contexts/WalletContext';
 import { styles } from './styles/UndelegateModal.styles';
-import { ModalHeader, ValidatorInfoContainer, InputContainer, PendingStep, SuccessStep, ErrorStep } from '../shared/components';
+import { ModalHeader, ValidatorInfoContainer, AvailableContainer, InputContainer, StakingConfirmStep, PendingStep, SuccessStep, ErrorStep } from '../shared/components';
 import { fontSizes } from '../../shared/styles/typography';
 import { Color } from '../../shared/styles/colors';
 
@@ -157,10 +157,11 @@ export default function UndelegateModal({
                   variant="undelegate"
                 />
 
-                <View style={styles.balanceRow}>
-                  <Text style={styles.balanceLabel}>Delegated Amount:</Text>
-                  <Text style={styles.balanceValue}>{maxAmount.toFixed(6)} HYPE</Text>
-                </View>
+                <AvailableContainer
+                  label="Delegated Amount:"
+                  amount={`${maxAmount.toFixed(6)} HYPE`}
+                  variant="normal"
+                />
 
                 <InputContainer
                   label="Amount to Undelegate"
@@ -195,35 +196,18 @@ export default function UndelegateModal({
               <ModalHeader title="Confirm Undelegation" onClose={onClose} />
 
               <View style={styles.body}>
-                <View style={styles.confirmSection}>
-                  <View style={styles.confirmRow}>
-                    <Text style={styles.confirmLabel}>Amount:</Text>
-                    <Text style={styles.confirmValue}>{amountNum.toFixed(6)} HYPE</Text>
-                  </View>
-                  <View style={styles.confirmRow}>
-                    <Text style={styles.confirmLabel}>Validator:</Text>
-                    <Text style={styles.confirmValue}>{VALIDATOR_NAME}</Text>
-                  </View>
-                  <View style={styles.confirmRow}>
-                    <Text style={styles.confirmLabel}>Action:</Text>
-                    <Text style={styles.confirmValue}>Undelegate</Text>
-                  </View>
-                </View>
-
-                <View style={styles.warningBox}>
-                  <Text style={styles.warningText}>
-                    ⚠️ Undelegated tokens will be locked for 7-14 days before becoming available to withdraw.
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.footer}>
-                <TouchableOpacity style={styles.cancelButton} onPress={() => setStep('form')}>
-                  <Text style={styles.cancelButtonText}>Back</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} onPress={handleExecute}>
-                  <Text style={styles.confirmButtonText}>Undelegate</Text>
-                </TouchableOpacity>
+                <StakingConfirmStep
+                  details={[
+                    { label: 'Amount:', value: `${amountNum.toFixed(6)} HYPE` },
+                    { label: 'Validator:', value: VALIDATOR_NAME },
+                    { label: 'Action:', value: 'Undelegate' },
+                  ]}
+                  warningText="⚠️ Undelegated tokens will be locked for 7-14 days before becoming available to withdraw."
+                  onBack={() => setStep('form')}
+                  onConfirm={handleExecute}
+                  confirmText="Undelegate"
+                  variant="danger"
+                />
               </View>
             </View>
           )}

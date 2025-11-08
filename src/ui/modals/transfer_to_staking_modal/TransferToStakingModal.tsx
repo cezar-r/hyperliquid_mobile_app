@@ -9,12 +9,10 @@ import {
   Platform,
 } from 'react-native';
 import { useWallet } from '../../../contexts/WalletContext';
-import { styles } from './styles/DelegateModal.styles';
-import { ModalHeader, ValidatorInfoContainer, AvailableContainer, InputContainer, StakingConfirmStep, PendingStep, SuccessStep, ErrorStep } from '../shared/components';
-import { fontSizes } from '../../shared/styles/typography';
-import { Color } from '../../shared/styles/colors';
+import { styles } from './styles/TransferToStakingModal.styles';
+import { ModalHeader, AvailableContainer, InputContainer, StakingConfirmStep, PendingStep, SuccessStep, ErrorStep } from '../shared/components';
 
-interface DelegateModalProps {
+interface TransferToStakingModalProps {
   visible: boolean;
   onClose: () => void;
   maxAmount: number;
@@ -22,14 +20,11 @@ interface DelegateModalProps {
 
 type Step = 'form' | 'confirm' | 'pending' | 'success' | 'error';
 
-const DEFAULT_VALIDATOR = '0x5ac99df645f3414876c816caa18b2d234024b487';
-const VALIDATOR_NAME = 'HYPE Foundation 1';
-
-export default function DelegateModal({
+export default function TransferToStakingModal({
   visible,
   onClose,
   maxAmount,
-}: DelegateModalProps): React.JSX.Element {
+}: TransferToStakingModalProps): React.JSX.Element {
   const { mainExchangeClient, refetchAccount } = useWallet();
   const [amount, setAmount] = useState('');
   const [step, setStep] = useState<Step>('form');
@@ -60,6 +55,7 @@ export default function DelegateModal({
   }, [visible, slideAnim]);
 
   const handleAmountChange = (value: string) => {
+    // Allow only numbers and decimal point
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       setAmount(value);
       setError(null);
@@ -88,26 +84,24 @@ export default function DelegateModal({
     setError(null);
 
     try {
+      // Convert amount to wei (multiply by 1e8)
       const wei = Math.floor(amountNum * 1e8);
 
-      console.log('[Staking] Delegating:', { amount: amountNum, wei, validator: DEFAULT_VALIDATOR });
+      console.log('[Staking] Transferring to staking:', { amount: amountNum, wei });
 
-      const result = await mainExchangeClient.tokenDelegate({
-        validator: DEFAULT_VALIDATOR as `0x${string}`,
-        wei,
-        isUndelegate: false,
-      });
+      const result = await mainExchangeClient.cDeposit({ wei });
 
-      console.log('[Staking] Delegation result:', result);
+      console.log('[Staking] Transfer to staking result:', result);
 
       setStep('success');
 
+      // Refetch account data after a delay
       setTimeout(() => {
         refetchAccount();
       }, 3000);
     } catch (err: any) {
-      console.error('[Staking] Delegation failed:', err);
-      setError(err.message || 'Delegation failed');
+      console.error('[Staking] Transfer to staking failed:', err);
+      setError(err.message || 'Transfer failed');
       setStep('error');
     }
   };
@@ -143,21 +137,15 @@ export default function DelegateModal({
           {/* Form Step */}
           {step === 'form' && (
             <View style={styles.content}>
-              <ModalHeader title="Delegate to Validator" onClose={onClose} />
+              <ModalHeader title="Transfer to Staking" onClose={onClose} />
 
               <View style={styles.body}>
                 <Text style={styles.description}>
-                  Delegate your HYPE to a validator to earn staking rewards and help secure the network.
+                  Transfer HYPE from your spot balance to your staking balance. You can then delegate to validators to earn rewards.
                 </Text>
 
-                <ValidatorInfoContainer
-                  validatorName={VALIDATOR_NAME}
-                  validatorAddress={DEFAULT_VALIDATOR}
-                  variant="delegate"
-                />
-
                 <AvailableContainer
-                  label="Available to Delegate:"
+                  label="Available in Spot:"
                   amount={`${maxAmount.toFixed(6)} HYPE`}
                 />
 
@@ -191,19 +179,19 @@ export default function DelegateModal({
           {/* Confirm Step */}
           {step === 'confirm' && (
             <View style={styles.content}>
-              <ModalHeader title="Confirm Delegation" onClose={onClose} />
+              <ModalHeader title="Confirm Transfer" onClose={onClose} />
 
               <View style={styles.body}>
                 <StakingConfirmStep
                   details={[
                     { label: 'Amount:', value: `${amountNum.toFixed(6)} HYPE` },
-                    { label: 'Validator:', value: VALIDATOR_NAME },
-                    { label: 'Action:', value: 'Delegate' },
+                    { label: 'From:', value: 'Spot Balance' },
+                    { label: 'To:', value: 'Staking Balance' },
                   ]}
-                  warningText="⚠️ Once delegated, you will start earning rewards. To withdraw, you must first undelegate (7-14 day lock period)."
+                  warningText="⚠️ Once transferred, you must delegate to validators to earn rewards."
                   onBack={() => setStep('form')}
                   onConfirm={handleExecute}
-                  confirmText="Delegate"
+                  confirmText="Confirm Transfer"
                 />
               </View>
             </View>
@@ -217,7 +205,7 @@ export default function DelegateModal({
               <View style={styles.body}>
                 <PendingStep
                   title=""
-                  description={`Delegating ${amountNum.toFixed(6)} HYPE...`}
+                  description={`Transferring ${amountNum.toFixed(6)} HYPE to staking...`}
                   footerText="Please confirm the transaction in your wallet"
                 />
               </View>
@@ -227,12 +215,12 @@ export default function DelegateModal({
           {/* Success Step */}
           {step === 'success' && (
             <View style={styles.content}>
-              <ModalHeader title="Delegation Successful!" onClose={onClose} />
+              <ModalHeader title="Transfer Successful!" onClose={onClose} />
 
               <View style={styles.body}>
                 <SuccessStep
                   title=""
-                  description={`Successfully delegated ${amountNum.toFixed(6)} HYPE\nYou will start earning rewards`}
+                  description={`Successfully transferred ${amountNum.toFixed(6)} HYPE to staking balance\nYou can now delegate to validators to earn rewards`}
                   onClose={onClose}
                 />
               </View>
@@ -242,7 +230,7 @@ export default function DelegateModal({
           {/* Error Step */}
           {step === 'error' && (
             <View style={styles.content}>
-              <ModalHeader title="Delegation Failed" onClose={onClose} />
+              <ModalHeader title="Transfer Failed" onClose={onClose} />
 
               <View style={styles.body}>
                 <ErrorStep

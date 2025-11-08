@@ -36,24 +36,6 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     lineHeight: 20,
   },
-  balanceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: Color.BG_3,
-    padding: spacing.md,
-    borderRadius: 8,
-    marginBottom: spacing.lg,
-  },
-  balanceLabel: {
-    fontSize: fontSizes.sm,
-    color: Color.FG_3,
-  },
-  balanceValue: {
-    fontSize: fontSizes.md,
-    color: Color.FG_1,
-    fontWeight: '600',
-  },
   errorText: {
     fontSize: fontSizes.sm,
     color: Color.RED,
@@ -93,39 +75,6 @@ export const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.5,
-  },
-  confirmSection: {
-    backgroundColor: Color.BG_3,
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-  },
-  confirmRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  confirmLabel: {
-    fontSize: fontSizes.sm,
-    color: Color.FG_3,
-  },
-  confirmValue: {
-    fontSize: fontSizes.md,
-    color: Color.FG_1,
-    fontWeight: '600',
-  },
-  warningBox: {
-    backgroundColor: Color.BG_3,
-    borderRadius: 8,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: Color.RED,
-  },
-  warningText: {
-    fontSize: fontSizes.sm,
-    color: Color.FG_2,
-    lineHeight: 20,
   },
 });
 

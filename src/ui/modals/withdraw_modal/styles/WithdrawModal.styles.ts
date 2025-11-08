@@ -47,7 +47,7 @@ export const styles = StyleSheet.create({
     lineHeight: 18,
   },
   warningBold: {
-    fontWeight: '700',
+    fontWeight: '600',
   },
   errorMessage: {
     backgroundColor: Color.DARK_RED,
