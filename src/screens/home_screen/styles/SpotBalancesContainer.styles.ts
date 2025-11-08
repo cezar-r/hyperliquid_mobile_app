@@ -7,6 +7,7 @@ export const styles = StyleSheet.create({
     color: Color.FG_3,
     fontWeight: '600',
     paddingTop: 6,
+    marginTop: 16,
   },
   spotSection: {
     marginTop: 20,
