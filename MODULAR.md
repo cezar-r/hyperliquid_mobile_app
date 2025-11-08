@@ -1,0 +1,213 @@
+### Cells
+
+- Position Cells
+    - Variants
+        - Perp
+            - Default
+                - Ticker
+                - Leverage Amount
+                - Leveragr Type
+                - Ticker Price
+                - Ticker Price % Change
+                - Margin In Position
+                - PnL
+                - PnL % (to be added)
+            - Default (with TP/SL)
+                - Same as default but with tp/sl 
+            - Default (Expanded)
+                - Same as default with tp/sl but also with:
+                    - entry price
+                    - funding paid
+                    - share icon
+            - USDC
+                - Ticker (USDC)
+                - "Withdrawable"
+                - Amount $
+        - Spot
+            - Ticker
+            - Ticker Price
+            - Ticker Price % Change
+            - $ Amount
+            - Ticket Size Amount
+        - Staking
+            - Delegator
+            - HYPE amount
+            - $ amount staked
+            - $ / HYPE
+        - Open Orders
+            - Ticker
+            - Direction
+            - Ticker $ Limit Price
+            - Ticker Limit Size
+- Ticker Cell
+    - Variants
+        - Perp
+            - Ticker
+            - Leverage
+            - {vol, funding, open interest}
+        - Spot
+    - Each variant can have different info displayed inside
+- Recent Trades Cell
+    - Ticker
+    - Direction
+    - PNL (isSell)
+    - Date
+    - $ Amount
+    - Ticker Size amount
+- Ledger Cell
+    - LederTransactionTypeCell
+        - Withdrawal
+        - Deposit
+        - Transfer
+    - Amount
+    - Sublabel
+    - Date
+
+## Components
+- Cells
+- Buttons (transfer, depo, disconnect, connect, buy, sell, etc)
+    - Full Width or Half Width
+    - Text Content
+    - Text Color
+    - Haptic type
+    - Styles
+        - Active text color
+        - Unactive text color
+        - Active background color
+        - Unactive background color
+        - Active border color
+        - Unactive border color
+- Section Toggle
+    - List of labels
+- Cell Section Headers (like in home, portfolio )
+    - Text content
+- Filter Buttons (as in search)
+    - Label
+    - isStar
+- Info serction (order summary in orderticket, summary in deposit)
+    - List of 
+        - Label
+        - Value
+- Page specific:
+    - Home
+        - Balance
+        - Deposit text button
+    - Portfolio
+        - Dropdown
+        - Balance Section
+            - Trading volume label
+            - Trading volume
+            - Balance
+            - PnL
+        - Info row text
+        - Staking elements
+            - Staking Cells
+                - Label
+                - Value
+                - Sublabel
+            - Active delegators container
+                - Delegator name
+                - Address
+                - Amount
+                - Undelegate button
+            
+    - Search
+        - Search bar
+        - Filter button row
+    - Profile
+        - Wallet copy/paste
+        - Settings
+            - Label
+            - Checkbox
+    - Deposit/withdraw modal
+        - Input row
+        - "Max button"
+        - Warning section
+        - X button
+    - Perp/spot transfer modal
+        - Input row
+        - "Max button"
+        - Warning section
+        - X button
+    - Transfer to staking modal
+        - Info text
+        - Amount in spot cell
+        - Input row
+        - "Max button"
+        - X button
+    - Delegate/Undelegate modal
+        - Info text
+        - Validator name
+        - Amount delgated cell
+        - Input row
+        - "Max button"
+        - X button
+    - TP/SL modal
+        - tp/sl input label
+        - tp/sl input field
+        - tp/sl % text
+        - tp/sl warning
+    - PerpOrderTicket
+        - toggle buttons
+            - Buy/Long Sell/Short Buttons
+            - Limit/Market Buttons
+            - cross/isolated buttons
+        - Ticker price "input" label
+        - Ticker price (may or may not be input)
+        - Use market text button
+        - margin required label
+        - margin required input field
+        - tradeable text
+        - slider
+        - leverage label
+        - max leverage text
+        - tp/sl dropdown
+            - tp/sl input label
+            - tp/sl input field
+            - tp/sl % text
+            - tp/sl warning
+        - tif option
+        - reduce only checkbox
+    - MarketCloseModal
+        - Amount input
+        - Slider
+        - QuickOptionsButton Row
+        - QuickOptions Button
+        - Size row
+    - SpotOrderTicket
+        - toggle buttons
+            - Buy/Long Sell/Short Buttons
+            - Limit/Market Buttons
+            - cross/isolated buttons
+        - Ticker price "input" label
+        - Ticker price (may or may not be input)
+        - Use market text button
+        - size label
+        - size input field
+        - tradeable text
+        - slider
+        - tif option
+    - ChartScreen
+        - Info Header
+            - Ticker
+            - Leverage
+            - Price
+            - % change
+            - Market type
+            - Slideable info row
+                - List of
+                    - Label
+                    - Value
+            - Content area (where chart/orderbook/trades are displayed)
+                - Chart
+                - Orderbook
+                - Trades
+            - Open Position Container
+                - Label
+                - Position View
+            - Recent Trades Container
+                - Label
+                - Position View
+
+## Utils
+- formatNumberWithComma()
