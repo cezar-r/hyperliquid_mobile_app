@@ -13,7 +13,7 @@ import SkeletonScreen from '../../components/SkeletonScreen';
 import PanelSelector from '../../shared/components/panel_selector/PanelSelector';
 import EmptyState from '../../shared/components/empty_state/EmptyState';
 import ErrorState from '../../shared/components/error_state/ErrorState';
-import TradeCard from './components/TradeCard';
+import TradeCard from '../../shared/components/trade_card/TradeCard';
 import LedgerCard from './components/LedgerCard';
 import LoadingState from './components/LoadingState';
 

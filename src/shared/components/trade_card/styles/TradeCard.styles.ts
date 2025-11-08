@@ -1,7 +1,7 @@
 import { StyleSheet } from 'react-native';
-import Color from '../../../styles/colors';
-import { fontSizes } from '../../../theme/typography';
-import { spacing } from '../../../theme/spacing';
+import Color from '../../../../styles/colors';
+import { fontSizes } from '../../../../theme/typography';
+import { spacing } from '../../../../theme/spacing';
 
 export const styles = StyleSheet.create({
   tradeCard: {
@@ -77,4 +77,5 @@ export const styles = StyleSheet.create({
     color: Color.FG_3,
   },
 });
+
 

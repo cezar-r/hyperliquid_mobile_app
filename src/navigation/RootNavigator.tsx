@@ -5,10 +5,10 @@ import { useAccount, useProvider } from '@reown/appkit-react-native';
 import { useWallet } from '../contexts/WalletContext';
 import { WebSocketProvider } from '../contexts/WebSocketContext';
 import { loadSessionKey } from '../lib/sessionKey';
-import SplashScreen from '../screens/SplashScreen';
-import ConnectScreen from '../screens/ConnectScreen';
-import EnableSessionKeyScreen from '../screens/EnableSessionKeyScreen';
-import ChartScreen from '../screens/ChartScreen';
+import SplashScreen from '../screens/splash_screen/SplashScreen';
+import ConnectScreen from '../screens/connect_screen/ConnectScreen';
+import EnableSessionKeyScreen from '../screens/enable_session_key_screen/EnableSessionKeyScreen';
+import ChartScreen from '../screens/chart_screen/ChartScreen';
 import TabNavigator from './TabNavigator';
 
 const Stack = createNativeStackNavigator();

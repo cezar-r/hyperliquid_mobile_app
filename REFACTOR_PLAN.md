@@ -5,6 +5,8 @@ shared/{components|styles}
 after screens are done, move all components but chart/LightweightChartBridge to modals/
 
 for each screen and component (except LightweightChartBridge) in screens/ and components/
+    DO NOT CHANGE THE ORIGINAL STYLING YOU FUCKING CLANKER
+
     determine all components and subcomponents in the page that can be modularized
 
     create sub directory for page specific components (components that don't appear anywhere else)
@@ -110,6 +112,10 @@ screens/
 
 
 After this, styles:
+    for each component/modal
+        find all duplicate styles, and put in shared.style.ts file in that comppnent/modal folder
+    for each shared.style.ts file
+         find all duplicate styles, and put in shared/shared.style.ts file
 
 After this util funcs
 

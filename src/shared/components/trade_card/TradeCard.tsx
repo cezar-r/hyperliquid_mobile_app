@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { styles } from '../styles/TradeCard.styles';
+import { styles } from './styles/TradeCard.styles';
 import type { UserFill } from '../../../types';
 
 interface TradeCardProps {
@@ -79,4 +79,5 @@ export default function TradeCard({ fill, displayCoin }: TradeCardProps): React.
     </View>
   );
 }
+
 
