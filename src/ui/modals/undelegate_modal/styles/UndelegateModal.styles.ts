@@ -1,7 +1,7 @@
 import { StyleSheet, Dimensions } from 'react-native';
-import Color from '../../ui/shared/styles/colors';
-import { fontSizes } from '../../ui/shared/styles/typography';
-import { spacing } from '../../ui/shared/styles/spacing';
+import { Color } from '../../../shared/styles/colors';
+import { fontSizes } from '../../../shared/styles/typography';
+import { spacing } from '../../../shared/styles/spacing';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -26,31 +26,6 @@ export const styles = StyleSheet.create({
   content: {
     paddingBottom: spacing.xl,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Color.ACCENT,
-  },
-  title: {
-    fontSize: fontSizes.xl,
-    fontWeight: '700',
-    color: Color.FG_1,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeButtonText: {
-    fontSize: 24,
-    color: Color.FG_2,
-    fontWeight: '300',
-  },
   body: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
@@ -60,30 +35,6 @@ export const styles = StyleSheet.create({
     color: Color.FG_3,
     marginBottom: spacing.lg,
     lineHeight: 20,
-  },
-  validatorCard: {
-    backgroundColor: Color.BG_3,
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    borderWidth: 1,
-    borderColor: Color.RED,
-  },
-  validatorLabel: {
-    fontSize: fontSizes.xs,
-    color: Color.FG_3,
-    marginBottom: spacing.xs,
-  },
-  validatorName: {
-    fontSize: fontSizes.lg,
-    color: Color.RED,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  validatorAddress: {
-    fontSize: fontSizes.xs,
-    color: Color.FG_3,
-    fontFamily: 'monospace',
   },
   balanceRow: {
     flexDirection: 'row',
@@ -102,42 +53,6 @@ export const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     color: Color.FG_1,
     fontWeight: '600',
-  },
-  inputGroup: {
-    marginBottom: spacing.lg,
-  },
-  inputLabel: {
-    fontSize: fontSizes.sm,
-    color: Color.FG_2,
-    marginBottom: spacing.sm,
-    fontWeight: '500',
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Color.BG_3,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Color.ACCENT,
-    paddingHorizontal: spacing.md,
-  },
-  input: {
-    flex: 1,
-    fontSize: fontSizes.lg,
-    color: Color.FG_1,
-    paddingVertical: spacing.md,
-    fontWeight: '500',
-  },
-  maxButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: Color.ACCENT,
-    borderRadius: 6,
-  },
-  maxButtonText: {
-    fontSize: fontSizes.xs,
-    color: Color.FG_1,
-    fontWeight: '700',
   },
   errorText: {
     fontSize: fontSizes.sm,
@@ -174,7 +89,7 @@ export const styles = StyleSheet.create({
   confirmButtonText: {
     fontSize: fontSizes.md,
     color: Color.FG_1,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -211,30 +126,6 @@ export const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     color: Color.FG_2,
     lineHeight: 20,
-  },
-  statusContainer: {
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
-  },
-  statusText: {
-    fontSize: fontSizes.md,
-    color: Color.FG_1,
-    textAlign: 'center',
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  statusHint: {
-    fontSize: fontSizes.sm,
-    color: Color.FG_3,
-    textAlign: 'center',
-  },
-  successIcon: {
-    fontSize: 64,
-    color: Color.BRIGHT_ACCENT,
-  },
-  errorIcon: {
-    fontSize: 64,
-    color: Color.RED,
   },
 });
 

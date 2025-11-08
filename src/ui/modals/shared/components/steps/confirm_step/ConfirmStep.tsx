@@ -14,22 +14,26 @@ interface ConfirmStepProps {
   title: string;
   details: DetailRowData[];
   warningText?: React.ReactNode;
+  warningVariant?: 'error' | 'info' | 'danger';
   onCancel: () => void;
   onConfirm: () => void;
   confirmText: string;
+  variant?: 'primary' | 'danger';
 }
 
 export const ConfirmStep: React.FC<ConfirmStepProps> = ({
   title,
   details,
   warningText,
+  warningVariant = 'error',
   onCancel,
   onConfirm,
   confirmText,
+  variant = 'primary',
 }) => {
   return (
     <View style={styles.confirmStep}>
-      <Text style={styles.confirmTitle}>{title}</Text>
+      {title && <Text style={styles.confirmTitle}>{title}</Text>}
       <View style={styles.confirmationDetails}>
         {details.map((detail, index) => (
           <View 
@@ -45,7 +49,7 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
         ))}
       </View>
       {warningText && (
-        <WarningContainer>
+        <WarningContainer variant={warningVariant}>
           {warningText}
         </WarningContainer>
       )}
@@ -53,6 +57,7 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
         onCancel={onCancel}
         onConfirm={onConfirm}
         confirmText={confirmText}
+        variant={variant}
       />
     </View>
   );

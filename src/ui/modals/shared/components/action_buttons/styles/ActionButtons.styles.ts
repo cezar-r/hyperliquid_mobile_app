@@ -28,10 +28,16 @@ export const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
+  dangerButtonFlex: {
+    backgroundColor: Color.RED,
+  },
   primaryButtonText: {
     color: Color.BG_2,
     fontSize: 16,
     fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
 });
 

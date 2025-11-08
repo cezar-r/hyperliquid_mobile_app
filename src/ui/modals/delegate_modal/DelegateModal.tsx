@@ -4,32 +4,32 @@ import {
   Text,
   Modal,
   TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useWallet } from '../contexts/WalletContext';
-import { styles } from './styles/UndelegateModal.styles';
+import { useWallet } from '../../../contexts/WalletContext';
+import { styles } from './styles/DelegateModal.styles';
+import { ModalHeader, ValidatorInfoContainer, InputContainer, PendingStep, SuccessStep, ErrorStep } from '../shared/components';
+import { fontSizes } from '../../shared/styles/typography';
+import { Color } from '../../shared/styles/colors';
 
-interface UndelegateModalProps {
+interface DelegateModalProps {
   visible: boolean;
   onClose: () => void;
-  validator: `0x${string}`;
   maxAmount: number;
 }
 
 type Step = 'form' | 'confirm' | 'pending' | 'success' | 'error';
 
+const DEFAULT_VALIDATOR = '0x5ac99df645f3414876c816caa18b2d234024b487';
 const VALIDATOR_NAME = 'HYPE Foundation 1';
 
-export default function UndelegateModal({
+export default function DelegateModal({
   visible,
   onClose,
-  validator,
   maxAmount,
-}: UndelegateModalProps): React.JSX.Element {
+}: DelegateModalProps): React.JSX.Element {
   const { mainExchangeClient, refetchAccount } = useWallet();
   const [amount, setAmount] = useState('');
   const [step, setStep] = useState<Step>('form');
@@ -90,15 +90,15 @@ export default function UndelegateModal({
     try {
       const wei = Math.floor(amountNum * 1e8);
 
-      console.log('[Staking] Undelegating:', { amount: amountNum, wei, validator });
+      console.log('[Staking] Delegating:', { amount: amountNum, wei, validator: DEFAULT_VALIDATOR });
 
       const result = await mainExchangeClient.tokenDelegate({
-        validator,
+        validator: DEFAULT_VALIDATOR as `0x${string}`,
         wei,
-        isUndelegate: true,
+        isUndelegate: false,
       });
 
-      console.log('[Staking] Undelegation result:', result);
+      console.log('[Staking] Delegation result:', result);
 
       setStep('success');
 
@@ -106,8 +106,8 @@ export default function UndelegateModal({
         refetchAccount();
       }, 3000);
     } catch (err: any) {
-      console.error('[Staking] Undelegation failed:', err);
-      setError(err.message || 'Undelegation failed');
+      console.error('[Staking] Delegation failed:', err);
+      setError(err.message || 'Delegation failed');
       setStep('error');
     }
   };
@@ -143,47 +143,34 @@ export default function UndelegateModal({
           {/* Form Step */}
           {step === 'form' && (
             <View style={styles.content}>
-              <View style={styles.header}>
-                <Text style={styles.title}>Undelegate from Validator</Text>
-                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                  <Text style={styles.closeButtonText}>✕</Text>
-                </TouchableOpacity>
-              </View>
+              <ModalHeader title="Delegate to Validator" onClose={onClose} />
 
               <View style={styles.body}>
                 <Text style={styles.description}>
-                  Remove your delegation from the validator. There is a 7-14 day lock period before you can transfer to spot.
+                  Delegate your HYPE to a validator to earn staking rewards and help secure the network.
                 </Text>
 
-                <View style={styles.validatorCard}>
-                  <Text style={styles.validatorLabel}>Validator</Text>
-                  <Text style={styles.validatorName}>{VALIDATOR_NAME}</Text>
-                  <Text style={styles.validatorAddress}>{validator.slice(0, 10)}...{validator.slice(-8)}</Text>
-                </View>
+                <ValidatorInfoContainer
+                  validatorName={VALIDATOR_NAME}
+                  validatorAddress={DEFAULT_VALIDATOR}
+                  variant="delegate"
+                />
 
                 <View style={styles.balanceRow}>
-                  <Text style={styles.balanceLabel}>Delegated Amount:</Text>
+                  <Text style={styles.balanceLabel}>Available to Delegate:</Text>
                   <Text style={styles.balanceValue}>{maxAmount.toFixed(6)} HYPE</Text>
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Amount to Undelegate</Text>
-                  <View style={styles.inputWrapper}>
-                    <TextInput
-                      style={styles.input}
-                      value={amount}
-                      onChangeText={handleAmountChange}
-                      placeholder="0.00"
-                      placeholderTextColor="#666"
-                      keyboardType="decimal-pad"
-                      autoFocus
-                    />
-                    <TouchableOpacity style={styles.maxButton} onPress={handleMaxClick}>
-                      <Text style={styles.maxButtonText}>MAX</Text>
-                    </TouchableOpacity>
-                  </View>
-                  {error && <Text style={styles.errorText}>{error}</Text>}
-                </View>
+                <InputContainer
+                  label="Amount"
+                  value={amount}
+                  onChangeText={handleAmountChange}
+                  placeholder="0.00"
+                  onMaxPress={handleMaxClick}
+                  autoFocus={true}
+                />
+
+                {error && <Text style={styles.errorText}>{error}</Text>}
               </View>
 
               <View style={styles.footer}>
@@ -204,12 +191,7 @@ export default function UndelegateModal({
           {/* Confirm Step */}
           {step === 'confirm' && (
             <View style={styles.content}>
-              <View style={styles.header}>
-                <Text style={styles.title}>Confirm Undelegation</Text>
-                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                  <Text style={styles.closeButtonText}>✕</Text>
-                </TouchableOpacity>
-              </View>
+              <ModalHeader title="Confirm Delegation" onClose={onClose} />
 
               <View style={styles.body}>
                 <View style={styles.confirmSection}>
@@ -223,13 +205,13 @@ export default function UndelegateModal({
                   </View>
                   <View style={styles.confirmRow}>
                     <Text style={styles.confirmLabel}>Action:</Text>
-                    <Text style={styles.confirmValue}>Undelegate</Text>
+                    <Text style={styles.confirmValue}>Delegate</Text>
                   </View>
                 </View>
 
                 <View style={styles.warningBox}>
                   <Text style={styles.warningText}>
-                    ⚠️ Undelegated tokens will be locked for 7-14 days before becoming available to withdraw.
+                    ⚠️ Once delegated, you will start earning rewards. To withdraw, you must first undelegate (7-14 day lock period).
                   </Text>
                 </View>
               </View>
@@ -239,7 +221,7 @@ export default function UndelegateModal({
                   <Text style={styles.cancelButtonText}>Back</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.confirmButton} onPress={handleExecute}>
-                  <Text style={styles.confirmButtonText}>Confirm Undelegation</Text>
+                  <Text style={styles.confirmButtonText}>Delegate</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -248,18 +230,14 @@ export default function UndelegateModal({
           {/* Pending Step */}
           {step === 'pending' && (
             <View style={styles.content}>
-              <View style={styles.header}>
-                <Text style={styles.title}>Processing...</Text>
-              </View>
+              <ModalHeader title="Processing..." onClose={onClose} />
 
               <View style={styles.body}>
-                <View style={styles.statusContainer}>
-                  <ActivityIndicator size="large" color="#00FF94" />
-                  <Text style={styles.statusText}>
-                    Undelegating {amountNum.toFixed(6)} HYPE...
-                  </Text>
-                  <Text style={styles.statusHint}>Please confirm the transaction in your wallet</Text>
-                </View>
+                <PendingStep
+                  title=""
+                  description={`Delegating ${amountNum.toFixed(6)} HYPE...`}
+                  footerText="Please confirm the transaction in your wallet"
+                />
               </View>
             </View>
           )}
@@ -267,29 +245,14 @@ export default function UndelegateModal({
           {/* Success Step */}
           {step === 'success' && (
             <View style={styles.content}>
-              <View style={styles.header}>
-                <Text style={styles.title}>Undelegation Successful!</Text>
-                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                  <Text style={styles.closeButtonText}>✕</Text>
-                </TouchableOpacity>
-              </View>
+              <ModalHeader title="Delegation Successful!" onClose={onClose} />
 
               <View style={styles.body}>
-                <View style={styles.statusContainer}>
-                  <Text style={styles.successIcon}>✓</Text>
-                  <Text style={styles.statusText}>
-                    Successfully undelegated {amountNum.toFixed(6)} HYPE
-                  </Text>
-                  <Text style={styles.statusHint}>
-                    Tokens will be available after the lock period
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.footer}>
-                <TouchableOpacity style={styles.confirmButton} onPress={onClose}>
-                  <Text style={styles.confirmButtonText}>Done</Text>
-                </TouchableOpacity>
+                <SuccessStep
+                  title=""
+                  description={`Successfully delegated ${amountNum.toFixed(6)} HYPE\nYou will start earning rewards`}
+                  onClose={onClose}
+                />
               </View>
             </View>
           )}
@@ -297,28 +260,15 @@ export default function UndelegateModal({
           {/* Error Step */}
           {step === 'error' && (
             <View style={styles.content}>
-              <View style={styles.header}>
-                <Text style={styles.title}>Undelegation Failed</Text>
-                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                  <Text style={styles.closeButtonText}>✕</Text>
-                </TouchableOpacity>
-              </View>
+              <ModalHeader title="Delegation Failed" onClose={onClose} />
 
               <View style={styles.body}>
-                <View style={styles.statusContainer}>
-                  <Text style={styles.errorIcon}>✕</Text>
-                  <Text style={styles.statusText}>Failed to undelegate</Text>
-                  {error && <Text style={styles.errorText}>{error}</Text>}
-                </View>
-              </View>
-
-              <View style={styles.footer}>
-                <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-                  <Text style={styles.cancelButtonText}>Close</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} onPress={() => setStep('form')}>
-                  <Text style={styles.confirmButtonText}>Try Again</Text>
-                </TouchableOpacity>
+                <ErrorStep
+                  title=""
+                  error={error}
+                  onClose={onClose}
+                  onRetry={() => setStep('form')}
+                />
               </View>
             </View>
           )}

@@ -5,6 +5,7 @@ export { WarningContainer } from './warning_container/WarningContainer';
 export { PrimaryButton } from './primary_button/PrimaryButton';
 export { InfoBox } from './info_box/InfoBox';
 export { ActionButtons } from './action_buttons/ActionButtons';
+export { ValidatorInfoContainer } from './validator_info_container/ValidatorInfoContainer';
 export { ConfirmStep } from './steps/confirm_step/ConfirmStep';
 export type { DetailRowData } from './steps/confirm_step/ConfirmStep';
 export { PendingStep } from './steps/pending_step/PendingStep';

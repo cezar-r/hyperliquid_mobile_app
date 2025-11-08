@@ -7,6 +7,8 @@ interface ActionButtonsProps {
   onConfirm: () => void;
   cancelText?: string;
   confirmText: string;
+  variant?: 'primary' | 'danger';
+  disabled?: boolean;
 }
 
 export const ActionButtons: React.FC<ActionButtonsProps> = ({
@@ -14,13 +16,23 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   onConfirm,
   cancelText = 'Cancel',
   confirmText,
+  variant = 'primary',
+  disabled = false,
 }) => {
   return (
     <View style={styles.actionButtons}>
       <TouchableOpacity style={styles.secondaryButton} onPress={onCancel}>
         <Text style={styles.secondaryButtonText}>{cancelText}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.primaryButtonFlex} onPress={onConfirm}>
+      <TouchableOpacity 
+        style={[
+          styles.primaryButtonFlex,
+          variant === 'danger' && styles.dangerButtonFlex,
+          disabled && styles.buttonDisabled
+        ]}
+        onPress={onConfirm}
+        disabled={disabled}
+      >
         <Text style={styles.primaryButtonText}>{confirmText}</Text>
       </TouchableOpacity>
     </View>
