@@ -25,8 +25,7 @@ import { playNavToChartHaptic } from '../../../lib/haptics';
 import { styles } from './styles/PortfolioScreen.styles';
 import type { PerpPosition, UserFill } from '../../../types';
 import { Color } from '../../shared/styles';
-import { DepositModal, WithdrawModal, PerpSpotTransferModal, DelegateModal, UndelegateModal, TransferToStakingModal, TransferFromStakingModal } from '../../modals';
-import TPSLEditModal from '../../../components/TPSLEditModal';
+import { DepositModal, WithdrawModal, PerpSpotTransferModal, DelegateModal, UndelegateModal, TransferToStakingModal, TransferFromStakingModal, TPSLEditModal } from '../../modals';
 import { EmptyState, SkeletonScreen } from '../../shared/components';
 import {
   TimeFilterSelector,

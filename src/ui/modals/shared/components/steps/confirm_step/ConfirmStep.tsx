@@ -53,12 +53,14 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
           {warningText}
         </WarningContainer>
       )}
-      <ActionButtons
-        onCancel={onCancel}
-        onConfirm={onConfirm}
-        confirmText={confirmText}
-        variant={variant}
-      />
+      <View style={styles.buttonContainer}>
+        <ActionButtons
+          onCancel={onCancel}
+          onConfirm={onConfirm}
+          confirmText={confirmText}
+          variant={variant}
+        />
+      </View>
     </View>
   );
 };

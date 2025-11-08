@@ -8,6 +8,7 @@ export const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: Color.FG_1,
+    marginTop: 20,
     marginBottom: 16,
   },
   confirmationDetails: {
@@ -31,6 +32,9 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
     textAlign: 'right',
+  },
+  buttonContainer: {
+    marginTop: 16,
   },
 });
 
