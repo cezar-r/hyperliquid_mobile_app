@@ -1,17 +1,17 @@
 import React from 'react';
 import { TouchableOpacity, Text } from 'react-native';
-import { styles } from './styles/DepositButton.styles';
+import { styles } from './styles/PrimaryButton.styles';
 
-interface DepositButtonProps {
+interface PrimaryButtonProps {
   onPress: () => void;
   disabled?: boolean;
-  text?: string;
+  text: string;
 }
 
-export const DepositButton: React.FC<DepositButtonProps> = ({ 
+export const PrimaryButton: React.FC<PrimaryButtonProps> = ({ 
   onPress, 
   disabled = false,
-  text = 'Deposit to Hyperliquid'
+  text
 }) => {
   return (
     <TouchableOpacity

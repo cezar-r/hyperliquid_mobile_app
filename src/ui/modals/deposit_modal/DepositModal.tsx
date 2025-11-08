@@ -14,7 +14,6 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { LoadingBlob } from '../../shared/components';
 import { createPublicClient, http, parseUnits, formatUnits } from 'viem';
 import { useAccount, useProvider } from '@reown/appkit-react-native';
 import { createWalletClient, custom } from 'viem';
@@ -30,9 +29,8 @@ import {
 } from '../../../lib/deposit';
 import { USDC } from '../../../lib/contracts';
 import { styles } from './styles/DepositModal.styles';
-import { ModalHeader, InfoContainer, InfoRow, InputContainer, WarningContainer } from '../shared/components';
-import { DepositButton, FooterText } from './components';
-import { Color } from '../../shared/styles/colors';
+import { ModalHeader, InfoContainer, InfoRow, InputContainer, WarningContainer, PrimaryButton, ConfirmStep, PendingStep, SuccessStep, ErrorStep } from '../shared/components';
+import { FooterText } from './components';
 
 interface DepositModalProps {
   visible: boolean;
@@ -360,7 +358,8 @@ export default function DepositModal({ visible, onClose }: DepositModalProps): R
                     </View>
                   )}
 
-                  <DepositButton
+                  <PrimaryButton
+                    text="Deposit to Hyperliquid"
                     onPress={handleDeposit}
                     disabled={!amount || !!validateAmount()}
                   />
@@ -371,108 +370,62 @@ export default function DepositModal({ visible, onClose }: DepositModalProps): R
 
               {/* Confirm Step */}
               {step === 'confirm' && (
-                <View style={styles.confirmStep}>
-                  <Text style={styles.confirmTitle}>Confirm Deposit</Text>
-                  <View style={styles.confirmationDetails}>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Amount:</Text>
-                      <Text style={styles.detailValue}>{amount} USDC</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>From:</Text>
-                      <Text style={styles.detailValue}>{address?.slice(0, 10)}...{address?.slice(-8)}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>To:</Text>
-                      <Text style={styles.detailValue}>Bridge2 ({bridgeAddress.slice(0, 10)}...{bridgeAddress.slice(-8)})</Text>
-                    </View>
-                    <View style={[styles.detailRow, { marginBottom: 0 }]}>
-                      <Text style={styles.detailLabel}>Network:</Text>
-                      <Text style={styles.detailValue}>{arbitrumChain.name}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.actionButtons}>
-                    <TouchableOpacity style={styles.secondaryButton} onPress={() => setStep('form')}>
-                      <Text style={styles.secondaryButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.primaryButtonFlex} onPress={executeDeposit}>
-                      <Text style={styles.primaryButtonText}>Confirm Deposit</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <ConfirmStep
+                  title="Confirm Deposit"
+                  details={[
+                    { label: 'Amount:', value: `${amount} USDC` },
+                    { label: 'From:', value: `${address?.slice(0, 10)}...${address?.slice(-8)}` },
+                    { label: 'To:', value: `Bridge2 (${bridgeAddress.slice(0, 10)}...${bridgeAddress.slice(-8)})` },
+                    { label: 'Network:', value: arbitrumChain.name, isLast: true },
+                  ]}
+                  onCancel={() => setStep('form')}
+                  onConfirm={executeDeposit}
+                  confirmText="Confirm Deposit"
+                />
               )}
 
               {/* Pending Step */}
               {step === 'pending' && (
-                <View style={styles.pendingStep}>
-                  <LoadingBlob />
-                  <Text style={styles.pendingTitle}>Transaction Pending...</Text>
-                  <Text style={styles.pendingText}>
-                    Please wait for the transaction to be confirmed on {arbitrumChain.name}.
-                  </Text>
-                  {txHash && (
-                    <TouchableOpacity onPress={openTxLink}>
-                      <Text style={styles.txLink}>
-                        View on {arbitrumChain.name === 'Arbitrum One' ? 'Arbiscan' : 'Arbiscan Sepolia'} →
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  <Text style={styles.helpText}>You can close this modal. The deposit will complete in the background.</Text>
-                </View>
+                <PendingStep
+                  title="Transaction Pending..."
+                  description={`Please wait for the transaction to be confirmed on ${arbitrumChain.name}.`}
+                  txLink={txHash ? {
+                    url: `${arbitrumChain.blockExplorers[0]}/tx/${txHash}`,
+                    text: `View on ${arbitrumChain.name === 'Arbitrum One' ? 'Arbiscan' : 'Arbiscan Sepolia'} →`,
+                    onPress: openTxLink,
+                  } : undefined}
+                  footerText="You can close this modal. The deposit will complete in the background."
+                />
               )}
 
               {/* Success Step */}
               {step === 'success' && (
-                <View style={styles.successStep}>
-                  <View style={styles.successIcon}>
-                    <Text style={styles.successIconText}>✓</Text>
-                  </View>
-                  <Text style={styles.successTitle}>Deposit Successful!</Text>
-                  <Text style={styles.successText}>Your USDC has been sent to Bridge2.</Text>
-                  <View style={styles.successDetails}>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Amount:</Text>
-                      <Text style={styles.detailValue}>{amount} USDC</Text>
-                    </View>
-                    {txHash && (
-                      <TouchableOpacity onPress={openTxLink}>
-                        <Text style={styles.txLink}>View Transaction →</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  <View style={styles.infoBox}>
-                    <Text style={styles.infoBoxTitle}>📥 Crediting to Hyperliquid</Text>
-                    <Text style={styles.infoBoxText}>
-                      Funds should appear in your Hyperliquid account within ~1 minute.
-                    </Text>
-                  </View>
-                  <TouchableOpacity style={styles.primaryButton} onPress={handleClose}>
-                    <Text style={styles.primaryButtonText}>Close</Text>
-                  </TouchableOpacity>
-                </View>
+                <SuccessStep
+                  title="Deposit Successful!"
+                  description="Your USDC has been sent to Bridge2."
+                  details={[
+                    { label: 'Amount:', value: `${amount} USDC` },
+                  ]}
+                  txLink={txHash ? {
+                    text: 'View Transaction →',
+                    onPress: openTxLink,
+                  } : undefined}
+                  infoBox={{
+                    title: '📥 Crediting to Hyperliquid',
+                    text: 'Funds should appear in your Hyperliquid account within ~1 minute.',
+                  }}
+                  onClose={handleClose}
+                />
               )}
 
               {/* Error Step */}
               {step === 'error' && (
-                <View style={styles.errorStep}>
-                  <View style={styles.errorIcon}>
-                    <Text style={styles.errorIconText}>✕</Text>
-                  </View>
-                  <Text style={styles.errorTitle}>Transaction Failed</Text>
-                  {error && (
-                    <View style={styles.errorMessage}>
-                      <Text style={styles.errorText}>{error}</Text>
-                    </View>
-                  )}
-                  <View style={styles.actionButtons}>
-                    <TouchableOpacity style={styles.secondaryButton} onPress={handleClose}>
-                      <Text style={styles.secondaryButtonText}>Close</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.primaryButtonFlex} onPress={() => setStep('form')}>
-                      <Text style={styles.primaryButtonText}>Try Again</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <ErrorStep
+                  title="Transaction Failed"
+                  error={error}
+                  onClose={handleClose}
+                  onRetry={() => setStep('form')}
+                />
               )}
             </View>
           </ScrollView>

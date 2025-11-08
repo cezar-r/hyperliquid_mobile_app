@@ -28,7 +28,7 @@ export default function PanelSelector({
 
     Animated.timing(filterLinePosition, {
       toValue: index * segmentWidth,
-      duration: options.length * 50,
+      duration: 140,
       useNativeDriver: true,
     }).start();
   }, [selectedOption, options, filterLinePosition]);
