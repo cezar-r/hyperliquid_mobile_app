@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import Color from '../../styles/colors';
+import Color from '../../ui/shared/styles/colors';
 
 export const styles = StyleSheet.create({
   modalOverlay: {

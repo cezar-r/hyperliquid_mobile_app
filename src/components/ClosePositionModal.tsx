@@ -9,19 +9,19 @@ import {
   Modal,
   TouchableOpacity,
   TextInput,
-  Image,
   ScrollView,
   Animated,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
+import { LoadingBlob } from '../ui/shared/components';
 import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder } from '../lib/formatting';
 import { getSkipClosePositionConfirmations } from '../lib/confirmations';
 import { styles } from './styles/ClosePositionModal.styles';
-import { Color } from '../styles/colors';
+import { Color } from '../ui/shared/styles/colors';
 import type { PerpPosition } from '../types';
 
 interface ClosePositionModalProps {
@@ -414,10 +414,7 @@ export default function ClosePositionModal({
   // Render pending step
   const renderPendingStep = () => (
     <View style={styles.pendingStep}>
-      <Image 
-        source={require('../../assets/blob_green.gif')} 
-        style={styles.loadingGif}
-      />
+      <LoadingBlob />
       <Text style={styles.pendingTitle}>Closing Position...</Text>
       <Text style={styles.pendingText}>
         Please wait for the transaction to complete.

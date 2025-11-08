@@ -4,7 +4,7 @@ DO NOT DELETE FILES WITHOUT ASKING OR I WILL FUCKING MURDER YOU
 
 reference example on how to modularize
 shared/{components|styles}
-after screens are done, move all components but chart/LightweightChartBridge to modals/
+after screens are done, move all components except components/chart/LightweightChartBridge to modals/
 
 for each screen and component (except LightweightChartBridge) in screens/ and components/
     DO NOT CHANGE THE ORIGINAL STYLING YOU FUCKING CLANKER

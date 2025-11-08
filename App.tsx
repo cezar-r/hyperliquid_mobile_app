@@ -7,8 +7,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { AppKit, AppKitProvider } from '@reown/appkit-react-native';
-import Color from './src/styles/colors';
-import RootNavigator from './src/navigation/RootNavigator';
+import Color from './src/ui/shared/styles/colors';
+import RootNavigator from './src/ui/navigation/RootNavigator';
 import { WalletProvider } from './src/contexts/WalletContext';
 import { appKit } from './src/lib/appKitConfig';
 

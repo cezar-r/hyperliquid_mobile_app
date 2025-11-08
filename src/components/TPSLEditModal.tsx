@@ -19,7 +19,7 @@ import { useWallet } from '../contexts/WalletContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { formatPrice, formatSize } from '../lib/formatting';
 import { styles } from './styles/TPSLEditModal.styles';
-import { Color } from '../styles/colors';
+import { Color } from '../ui/shared/styles/colors';
 import type { PerpPosition } from '../types';
 
 interface TPSLEditModalProps {

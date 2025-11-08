@@ -23,7 +23,7 @@ import { formatPrice, formatSize, formatWithCommas } from '../lib/formatting';
 import { getSkipOpenOrderConfirmations } from '../lib/confirmations';
 import { playOrderTicketSelectionChangeHaptic, playSliderChangeHaptic, playOrderSubmitHaptic } from '../lib/haptics';
 import { styles } from './styles/OrderTicket.styles';
-import Color from '../styles/colors';
+import Color from '../ui/shared/styles/colors';
 
 type OrderSide = 'buy' | 'sell';
 type OrderType = 'limit' | 'market';

@@ -6,7 +6,7 @@
     "paths": {
       "@/*": ["src/*"],
       "@/components/*": ["src/components/*"],
-      "@/screens/*": ["src/screens/*"],
+      "@/screens/*": ["src/ui/screens/*"],
       "@/contexts/*": ["src/contexts/*"],
       "@/hooks/*": ["src/hooks/*"],
       "@/lib/*": ["src/lib/*"],
@@ -15,7 +15,7 @@
       "@/theme/*": ["src/theme/*"],
       "@/types/*": ["src/types/*"],
       "@/constants/*": ["src/constants/*"],
-      "@/navigation/*": ["src/navigation/*"],
+      "@/navigation/*": ["src/ui/navigation/*"],
       "@/features/*": ["src/features/*"]
     }
   }

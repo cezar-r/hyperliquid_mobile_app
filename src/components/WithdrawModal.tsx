@@ -9,19 +9,19 @@ import {
   Modal,
   TouchableOpacity,
   TextInput,
-  Image,
   ScrollView,
   Alert,
   Animated,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { LoadingBlob } from '../ui/shared/components';
 import { useAccount } from '@reown/appkit-react-native';
 import { useWallet } from '../contexts/WalletContext';
 import { isTestnet } from '../lib/config';
 import { getArbitrumChainForEnv } from '../lib/deposit';
 import { styles } from './styles/WithdrawModal.styles';
-import { Color } from '../styles/colors';
+import { Color } from '../ui/shared/styles/colors';
 
 interface WithdrawModalProps {
   visible: boolean;
@@ -309,10 +309,7 @@ export default function WithdrawModal({ visible, onClose }: WithdrawModalProps):
               {/* Pending Step */}
               {step === 'pending' && (
                 <View style={styles.pendingStep}>
-                  <Image 
-                    source={require('../../assets/blob_green.gif')} 
-                    style={styles.loadingGif}
-                  />
+                  <LoadingBlob />
                   <Text style={styles.pendingTitle}>Withdrawal Submitted</Text>
                   <Text style={styles.pendingText}>
                     Your withdrawal request has been signed and submitted to Hyperliquid validators.

@@ -1,7 +1,7 @@
 import { StyleSheet, Dimensions } from 'react-native';
-import Color from '../../styles/colors';
-import { fontSizes } from '../../theme/typography';
-import { spacing } from '../../theme/spacing';
+import Color from '../../ui/shared/styles/colors';
+import { fontSizes } from '../../ui/shared/styles/typography';
+import { spacing } from '../../ui/shared/styles/spacing';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 

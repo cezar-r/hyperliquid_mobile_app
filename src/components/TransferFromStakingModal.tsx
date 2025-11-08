@@ -5,11 +5,11 @@ import {
   Modal,
   TouchableOpacity,
   TextInput,
-  Image,
   Animated,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { LoadingBlob } from '../ui/shared/components';
 import { useWallet } from '../contexts/WalletContext';
 import { styles } from './styles/TransferFromStakingModal.styles';
 
@@ -240,10 +240,7 @@ export default function TransferFromStakingModal({
 
               <View style={styles.body}>
                 <View style={styles.statusContainer}>
-                  <Image 
-                    source={require('../../assets/blob_green.gif')} 
-                    style={styles.loadingGif}
-                  />
+                  <LoadingBlob />
                   <Text style={styles.statusText}>
                     Transferring {amountNum.toFixed(6)} HYPE to spot...
                   </Text>

@@ -9,7 +9,6 @@ import {
   Modal,
   TouchableOpacity,
   TextInput,
-  Image,
   ScrollView,
   Linking,
   Alert,
@@ -17,6 +16,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { LoadingBlob } from '../ui/shared/components';
 import { createPublicClient, http, parseUnits, formatUnits } from 'viem';
 import { useAccount, useProvider } from '@reown/appkit-react-native';
 import { createWalletClient, custom } from 'viem';
@@ -32,7 +32,7 @@ import {
 } from '../lib/deposit';
 import { USDC } from '../lib/contracts';
 import { styles } from './styles/DepositModal.styles';
-import { Color } from '../styles/colors';
+import { Color } from '../ui/shared/styles/colors';
 
 interface DepositModalProps {
   visible: boolean;
@@ -428,10 +428,7 @@ export default function DepositModal({ visible, onClose }: DepositModalProps): R
               {/* Pending Step */}
               {step === 'pending' && (
                 <View style={styles.pendingStep}>
-                  <Image 
-                    source={require('../../assets/blob_green.gif')} 
-                    style={styles.loadingGif}
-                  />
+                  <LoadingBlob />
                   <Text style={styles.pendingTitle}>Transaction Pending...</Text>
                   <Text style={styles.pendingText}>
                     Please wait for the transaction to be confirmed on {arbitrumChain.name}.
