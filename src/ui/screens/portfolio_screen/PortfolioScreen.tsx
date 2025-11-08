@@ -33,8 +33,7 @@ import TransferFromStakingModal from '../../../components/TransferFromStakingMod
 import DelegateModal from '../../../components/DelegateModal';
 import UndelegateModal from '../../../components/UndelegateModal';
 import TPSLEditModal from '../../../components/TPSLEditModal';
-import SkeletonScreen from '../../../components/SkeletonScreen';
-import { EmptyState } from '../../shared/components';
+import { EmptyState, SkeletonScreen } from '../../shared/components';
 import {
   TimeFilterSelector,
   MarketDropdown,

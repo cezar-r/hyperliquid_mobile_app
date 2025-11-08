@@ -13,9 +13,8 @@ import { playNavToChartHaptic } from '../../../lib/haptics';
 import { styles } from './styles/HomeScreen.styles';
 import type { PerpPosition } from '../../../types';
 import { Color } from '../../shared/styles';
-import SkeletonScreen from '../../../components/SkeletonScreen';
 import DepositModal from '../../../components/DepositModal';
-import { PanelSelector, EmptyState, ErrorState } from '../../shared/components';
+import { PanelSelector, EmptyState, ErrorState, SkeletonScreen } from '../../shared/components';
 import {
   BalanceContent,
   PerpPositionsContainer,

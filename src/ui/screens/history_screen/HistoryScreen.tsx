@@ -9,8 +9,7 @@ import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { resolveSpotTicker } from '../../../lib/formatting';
 import { styles } from './styles/HistoryScreen.styles';
 import type { UserFill, LedgerUpdate } from '../../../types';
-import SkeletonScreen from '../../../components/SkeletonScreen';
-import { PanelSelector, EmptyState, ErrorState, TradeCard } from '../../shared/components';
+import { PanelSelector, EmptyState, ErrorState, TradeCard, SkeletonScreen } from '../../shared/components';
 import { LedgerCard, LoadingState } from './components';
 
 type ViewFilter = 'Trades' | 'Ledger';

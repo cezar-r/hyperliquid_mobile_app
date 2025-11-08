@@ -23,8 +23,7 @@ import { isTickerStarred, toggleStarredTicker } from '../../../lib/starredTicker
 import type { Candle, CandleInterval } from '../../../types';
 import { styles } from './styles/ChartScreen.styles';
 import { Color } from '../../shared/styles';
-import SkeletonScreen from '../../../components/SkeletonScreen';
-import { PanelSelector } from '../../shared/components';
+import { PanelSelector, SkeletonScreen } from '../../shared/components';
 import {
   ChartHeader,
   ChartContent,

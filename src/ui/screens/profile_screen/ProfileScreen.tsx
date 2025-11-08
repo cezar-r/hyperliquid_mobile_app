@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ScrollView, Alert, SafeAreaView, InteractionManager } from 'react-native';
 import { useAccount, useAppKit } from '@reown/appkit-react-native';
 import { styles } from './styles/ProfileScreen.styles';
-import SkeletonScreen from '../../../components/SkeletonScreen';
+import { SkeletonScreen } from '../../shared/components';
 import { WalletInfoContainer, SettingsContainer, DisconnectButton } from './components';
 
 export default function ProfileScreen(): React.JSX.Element {

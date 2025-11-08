@@ -18,8 +18,7 @@ import { getDisplayTicker } from '../../../lib/formatting';
 import { playToggleHaptic, playNavToChartHaptic } from '../../../lib/haptics';
 import { styles } from './styles/SearchScreen.styles';
 import { Color } from '../../shared/styles';
-import SkeletonScreen from '../../../components/SkeletonScreen';
-import { PanelSelector, MarketCell, EmptyState } from '../../shared/components';
+import { PanelSelector, MarketCell, EmptyState, SkeletonScreen } from '../../shared/components';
 import { SearchBar, SortButtons, SortType } from './components';
 
 // Helper function to format large numbers
