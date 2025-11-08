@@ -1,5 +1,7 @@
 ## Styles and Defintions
 
+DO NOT DELETE FILES WITHOUT ASKING OR I WILL FUCKING MURDER YOU
+
 reference example on how to modularize
 shared/{components|styles}
 after screens are done, move all components but chart/LightweightChartBridge to modals/

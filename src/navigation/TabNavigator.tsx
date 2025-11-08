@@ -8,7 +8,7 @@ import HomeScreen from '../screens/home_screen/HomeScreen';
 import PortfolioScreen from '../screens/PortfolioScreen';
 import SearchScreen from '../screens/search_screen/SearchScreen';
 import HistoryScreen from '../screens/history_screen/HistoryScreen';
-import ProfileScreen from '../screens/ProfileScreen';
+import ProfileScreen from '../screens/profile_screen/ProfileScreen';
 import Color from '../styles/colors';
 import { styles } from './TabNavigator.styles';
 import { playNavbarHaptic } from '../lib/haptics';
