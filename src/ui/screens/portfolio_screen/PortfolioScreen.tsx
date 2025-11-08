@@ -25,7 +25,7 @@ import { playNavToChartHaptic } from '../../../lib/haptics';
 import { styles } from './styles/PortfolioScreen.styles';
 import type { PerpPosition, UserFill } from '../../../types';
 import { Color } from '../../shared/styles';
-import DepositModal from '../../../components/DepositModal';
+import { DepositModal } from '../../modals';
 import WithdrawModal from '../../../components/WithdrawModal';
 import PerpSpotTransferModal from '../../../components/PerpSpotTransferModal';
 import TransferToStakingModal from '../../../components/TransferToStakingModal';

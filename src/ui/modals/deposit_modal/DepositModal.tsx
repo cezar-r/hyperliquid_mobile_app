@@ -8,20 +8,18 @@ import {
   Text,
   Modal,
   TouchableOpacity,
-  TextInput,
   ScrollView,
   Linking,
-  Alert,
   Animated,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { LoadingBlob } from '../ui/shared/components';
+import { LoadingBlob } from '../../shared/components';
 import { createPublicClient, http, parseUnits, formatUnits } from 'viem';
 import { useAccount, useProvider } from '@reown/appkit-react-native';
 import { createWalletClient, custom } from 'viem';
-import { useWallet } from '../contexts/WalletContext';
-import { isTestnet } from '../lib/config';
+import { useWallet } from '../../../contexts/WalletContext';
+import { isTestnet } from '../../../lib/config';
 import {
   getArbitrumChainForEnv,
   getBridgeAddress,
@@ -29,10 +27,12 @@ import {
   ensureArbitrumChain,
   readUsdcBalance,
   transferUsdc,
-} from '../lib/deposit';
-import { USDC } from '../lib/contracts';
+} from '../../../lib/deposit';
+import { USDC } from '../../../lib/contracts';
 import { styles } from './styles/DepositModal.styles';
-import { Color } from '../ui/shared/styles/colors';
+import { ModalHeader, InfoContainer, InfoRow, InputContainer, WarningContainer } from '../shared/components';
+import { DepositButton, FooterText } from './components';
+import { Color } from '../../shared/styles/colors';
 
 interface DepositModalProps {
   visible: boolean;
@@ -292,12 +292,7 @@ export default function DepositModal({ visible, onClose }: DepositModalProps): R
             { transform: [{ translateY: slideAnim }] },
           ]}
         >
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Deposit USDC</Text>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>×</Text>
-            </TouchableOpacity>
-          </View>
+          <ModalHeader title="Deposit USDC" onClose={handleClose} />
 
           <ScrollView style={styles.scrollView}>
             <View style={styles.modalBody}>
@@ -329,48 +324,35 @@ export default function DepositModal({ visible, onClose }: DepositModalProps): R
               {/* Form Step */}
               {step === 'form' && (
                 <View style={styles.formStep}>
+                  <InfoContainer>
+                    <InfoRow label="Network:" value={arbitrumChain.name} />
+                    <InfoRow 
+                      label="Wallet:" 
+                      value={`${address?.slice(0, 6)}...${address?.slice(-4)}`} 
+                    />
+                    <InfoRow 
+                      label="Available:" 
+                      value={`${balanceFormatted} USDC`}
+                      isLast={true}
+                      valueStyle="accent"
+                    />
+                  </InfoContainer>
 
-                  <View style={styles.walletInfo}>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.infoLabel}>Network:</Text>
-                      <Text style={styles.infoValue}>{arbitrumChain.name}</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.infoLabel}>Wallet:</Text>
-                      <Text style={styles.infoValue}>
-                        {address?.slice(0, 6)}...{address?.slice(-4)}
-                      </Text>
-                    </View>
-                    <View style={[styles.infoRow, styles.balanceRow]}>
-                      <Text style={styles.infoLabel}>Available:</Text>
-                      <Text style={styles.balanceValue}>{balanceFormatted} USDC</Text>
-                    </View>
-                  </View>
+                  <InputContainer
+                    label="Amount (USDC)"
+                    value={amount}
+                    onChangeText={setAmount}
+                    placeholder="0.00"
+                    onMaxPress={handleMaxClick}
+                    autoFocus={true}
+                  />
 
-                  <View style={styles.formGroup}>
-                    <Text style={styles.label}>Amount (USDC)</Text>
-                    <View style={styles.inputWithButton}>
-                      <TextInput
-                        style={styles.amountInput}
-                        value={amount}
-                        onChangeText={setAmount}
-                        placeholder="0.00"
-                        placeholderTextColor={Color.FG_3}
-                        keyboardType="decimal-pad"
-                        autoFocus
-                      />
-                      <TouchableOpacity style={styles.maxButton} onPress={handleMaxClick}>
-                        <Text style={styles.maxButtonText}>Max</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  <View style={styles.warningBox}>
+                  <WarningContainer>
                     <Text style={styles.warningText}>
                       <Text style={styles.warningBold}>⚠️ Important:</Text> Minimum deposit is 5 USDC. 
                       Amounts less than 5 USDC will not be credited and lost forever.
                     </Text>
-                  </View>
+                  </WarningContainer>
 
                   {error && (
                     <View style={styles.errorMessage}>
@@ -378,17 +360,12 @@ export default function DepositModal({ visible, onClose }: DepositModalProps): R
                     </View>
                   )}
 
-                  <TouchableOpacity
-                    style={[styles.primaryButton, (!amount || !!validateAmount()) && styles.primaryButtonDisabled]}
+                  <DepositButton
                     onPress={handleDeposit}
                     disabled={!amount || !!validateAmount()}
-                  >
-                    <Text style={styles.primaryButtonText}>Deposit to Hyperliquid</Text>
-                  </TouchableOpacity>
+                  />
 
-                  <Text style={styles.helpText}>
-                    USDC will be transferred to Bridge2 and credited to your Hyperliquid account within ~1 minute.
-                  </Text>
+                  <FooterText text="USDC will be transferred to Bridge2 and credited to your Hyperliquid account within ~1 minute." />
                 </View>
               )}
 

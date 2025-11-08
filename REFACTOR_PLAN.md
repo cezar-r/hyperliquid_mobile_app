@@ -1,12 +1,12 @@
-## Styles and Defintions
+## Refactor Plan
 
 DO NOT DELETE FILES WITHOUT ASKING OR I WILL FUCKING MURDER YOU
 
 reference example on how to modularize
 shared/{components|styles}
-after screens are done, move all components except components/chart/LightweightChartBridge to modals/
+move all components in src/components to ui/modals
 
-for each screen and component (except LightweightChartBridge) in screens/ and components/
+for eachcomponent in components/
     DO NOT CHANGE THE ORIGINAL STYLING YOU FUCKING CLANKER
 
     determine all components and subcomponents in the page that can be modularized
@@ -21,6 +21,8 @@ for each screen and component (except LightweightChartBridge) in screens/ and co
     All helper functions should stay in <page>.tsx initially
 
     document in COMPONENTS.md what the component is, what page its on, what input it takes, what styles its using (all of the CSS), etc
+
+Reference how ui/screens/* are organized
 
 ### Example of modularity
 For example the <PanelSelector> in home is
@@ -99,6 +101,7 @@ modals/
 --|--|--| shared.styles.tsx
 --|--|--| ClosePositionModal.styles.tsx
 --| delegate/
+--|--| ...
 screens/
 --| home_screen/
 --|--| HomeScreen.tsx // should be the only thing directly imported from this folder
@@ -112,8 +115,9 @@ screens/
 --| connect_screen/
 --| {other screens}
 
+--- FINISH READING ---
 
-After this, styles:
+After this, styles (mainly where the moving stuff to ui/shared/ should happen):
     for each component/modal
         find all duplicate styles, and put in shared.style.ts file in that comppnent/modal folder
     for each shared.style.ts file
