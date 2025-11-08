@@ -4,19 +4,21 @@ import { fontSizes } from '../../../theme/typography';
 import { spacing } from '../../../theme/spacing';
 
 export const styles = StyleSheet.create({
-  emptyState: {
+  loadingContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
     padding: spacing.xl,
-    marginTop: spacing.xl,
+    marginTop: 40,
   },
-  emptyText: {
+  loadingText: {
     fontSize: fontSizes.md,
-    color: Color.FG_2,
-    marginBottom: spacing.sm,
-  },
-  emptySubtext: {
-    fontSize: fontSizes.sm,
     color: Color.FG_3,
+    marginTop: spacing.md,
+  },
+  loadingGif: {
+    width: 100,
+    height: 100,
+    marginBottom: 20,
   },
 });
 

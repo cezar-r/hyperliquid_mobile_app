@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import HomeScreen from '../screens/home_screen/HomeScreen';
 import PortfolioScreen from '../screens/PortfolioScreen';
 import SearchScreen from '../screens/search_screen/SearchScreen';
-import HistoryScreen from '../screens/HistoryScreen';
+import HistoryScreen from '../screens/history_screen/HistoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import Color from '../styles/colors';
 import { styles } from './TabNavigator.styles';

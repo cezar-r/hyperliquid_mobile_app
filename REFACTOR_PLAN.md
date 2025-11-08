@@ -107,3 +107,14 @@ screens/
 --|--|--| {other subcomponents styles}
 --| connect_screen/
 --| {other screens}
+
+
+After this, styles:
+
+After this util funcs
+
+After this constants
+
+After this cleanup comments
+
+After this unit tests

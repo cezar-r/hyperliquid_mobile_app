@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { styles } from '../styles/ErrorState.styles';
+import { styles } from './styles/ErrorState.styles';
 
 interface ErrorStateProps {
   error: string;

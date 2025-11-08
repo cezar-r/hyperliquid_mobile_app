@@ -16,14 +16,14 @@ import Color from '../../styles/colors';
 import SkeletonScreen from '../../components/SkeletonScreen';
 import DepositModal from '../../components/DepositModal';
 import PanelSelector from '../../shared/components/panel_selector/PanelSelector';
+import EmptyState from '../../shared/components/empty_state/EmptyState';
+import ErrorState from '../../shared/components/error_state/ErrorState';
 import BalanceContent from './components/BalanceContent';
 import PerpPositionsContainer from './components/PerpPositionsContainer';
 import SpotBalancesContainer from './components/SpotBalancesContainer';
 import StakingContainer from './components/StakingContainer';
 import StarredTickersContainer from './components/StarredTickersContainer';
 import LoadingState from './components/LoadingState';
-import ErrorState from './components/ErrorState';
-import EmptyState from './components/EmptyState';
 
 type MarketFilter = 'Perp' | 'Spot' | 'Account';
 

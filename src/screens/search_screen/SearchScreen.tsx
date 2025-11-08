@@ -21,9 +21,9 @@ import Color from '../../styles/colors';
 import SkeletonScreen from '../../components/SkeletonScreen';
 import PanelSelector from '../../shared/components/panel_selector/PanelSelector';
 import MarketCell from '../../shared/components/market_cell/MarketCell';
+import EmptyState from '../../shared/components/empty_state/EmptyState';
 import SearchBar from './components/SearchBar';
 import SortButtons, { SortType } from './components/SortButtons';
-import EmptyState from './components/EmptyState';
 
 // Helper function to format large numbers
 function formatLargeNumber(num: number | undefined | null): string {
