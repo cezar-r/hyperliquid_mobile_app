@@ -17,7 +17,7 @@ export const appKit = createAppKit({
   adapters: [ethersAdapter],
   storage,
   metadata: {
-    name: 'Hyperliquid Mobile',
+    name: 'Hyperliquid',
     description: 'Mobile companion for Hyperliquid',
     url: 'https://hyperliquid.xyz',
     icons: ['https://hyperliquid.xyz/favicon.ico'],
