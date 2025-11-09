@@ -98,7 +98,8 @@
               timeScale: { 
                 borderVisible: false,
                 timeVisible: true,
-                secondsVisible: false
+                secondsVisible: false,
+                rightOffset: 5,
               },
               grid: { vertLines: { color: '#161b22' }, horzLines: { color: '#161b22' } },
             });
@@ -129,7 +130,28 @@
           if (type === 'setData') {
             if (!chart) ensureChart({});
             const candles = payload.candles || [];
-            candleSeries.setData(candles);
+            
+            // Add whitespace data points for future dates to show on x-axis
+            let extendedData = candles;
+            if (candles.length >= 2) {
+              // Calculate the interval between candles
+              const lastCandle = candles[candles.length - 1];
+              const secondLastCandle = candles[candles.length - 2];
+              const interval = lastCandle.time - secondLastCandle.time;
+              
+              // Generate 25 future whitespace points (only time property, no OHLC)
+              const futurePoints = [];
+              for (let i = 1; i <= 350; i++) {
+                futurePoints.push({
+                  time: lastCandle.time + (interval * i)
+                });
+              }
+              
+              // Combine actual candles with future whitespace points
+              extendedData = candles.concat(futurePoints);
+            }
+            
+            candleSeries.setData(extendedData);
             if (candles.length) {
               lastBarTime = candles[candles.length - 1].time;
             }
