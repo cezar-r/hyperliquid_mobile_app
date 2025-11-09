@@ -25,6 +25,7 @@
         let chart, candleSeries, smaSeries;
         let lastBarTime = null;
         let priceLines = [];
+        let allMarkers = [];
 
         function computeSMA(data, period) {
           const result = [];
@@ -40,6 +41,47 @@
             }
           }
           return result;
+        }
+
+        function updateVisibleMarkers() {
+          if (!chart || !candleSeries || allMarkers.length === 0) return;
+          
+          try {
+            const timeScale = chart.timeScale();
+            const visibleLogicalRange = timeScale.getVisibleLogicalRange();
+            
+            if (!visibleLogicalRange) {
+              candleSeries.setMarkers(allMarkers);
+              return;
+            }
+            
+            // Get all candle data to map logical indices to times
+            const barsInfo = candleSeries.barsInLogicalRange(visibleLogicalRange);
+            
+            if (!barsInfo) {
+              candleSeries.setMarkers(allMarkers);
+              return;
+            }
+            
+            // Get the time range of visible candles
+            const visibleTimeRange = timeScale.getVisibleRange();
+            
+            if (!visibleTimeRange) {
+              candleSeries.setMarkers(allMarkers);
+              return;
+            }
+            
+            // Filter markers to only those within the visible time range
+            const visibleMarkers = allMarkers.filter(marker => {
+              return marker.time >= visibleTimeRange.from && marker.time <= visibleTimeRange.to;
+            });
+            
+            candleSeries.setMarkers(visibleMarkers);
+          } catch (e) {
+            // If any error occurs, show all markers as fallback
+            console.error('Error updating visible markers:', e);
+            candleSeries.setMarkers(allMarkers);
+          }
         }
 
         function ensureChart(opts) {
@@ -64,6 +106,9 @@
               upColor: '#26a69a', downColor: '#ffffff', borderVisible: false,
               wickUpColor: '#26a69a', wickDownColor: '#ffffff',
             });
+            
+            // Subscribe to visible range changes to update markers dynamically
+            chart.timeScale().subscribeVisibleLogicalRangeChange(updateVisibleMarkers);
           } else {
             chart.applyOptions({ width: opts.width, height: opts.height });
           }
@@ -122,8 +167,8 @@
 
           if (type === 'setMarkers') {
             if (!candleSeries) return;
-            const markers = payload.markers || [];
-            candleSeries.setMarkers(markers);
+            allMarkers = payload.markers || [];
+            updateVisibleMarkers();
           }
 
           if (type === 'setPriceLines') {

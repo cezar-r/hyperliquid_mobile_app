@@ -534,8 +534,9 @@ export default function ChartScreen(): React.JSX.Element {
           position: isBuy ? 'belowBar' : 'aboveBar',
           color: isBuy ? '#26a69a' : '#ef5350',
           shape: 'circle',
-          text: '',
-          size: 1,
+          text: isBuy ? 'B' : 'S',
+          size: 2,
+          textColor: Color.FG_1,
         });
       });
     }
