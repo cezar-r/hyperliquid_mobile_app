@@ -8,7 +8,7 @@ import {
   InteractionManager,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LWCandle, ChartMarker, ChartPriceLine, LightweightChartBridgeRef } from '../../chart/LightweightChartBridge';
 import { TPSLEditModal, ClosePositionModal, PerpOrderTicket, SpotOrderTicket } from '../../modals';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
@@ -34,6 +34,7 @@ import {
 
 const INTERVALS: CandleInterval[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
 const SHOW_TRADES_KEY = '@show_trades_on_chart';
+const HIDE_SMALL_BALANCES_KEY = '@hide_small_balances';
 
 interface ChartData {
   timestamp: number;
@@ -109,6 +110,7 @@ export default function ChartScreen(): React.JSX.Element {
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
   const [showTradesOnChart, setShowTradesOnChart] = useState(false);
+  const [hideSmallBalances, setHideSmallBalances] = useState(false);
 
   // Chart ref for markers and price lines
   const chartRef = useRef<LightweightChartBridgeRef>(null);
@@ -189,21 +191,43 @@ export default function ChartScreen(): React.JSX.Element {
     loadSavedInterval();
   }, []);
 
-  // Load show trades preference on mount
+  // Load show trades and hide small balances preferences on mount
   useEffect(() => {
-    const loadShowTradesPreference = async () => {
+    const loadPreferences = async () => {
       try {
-        const value = await AsyncStorage.getItem(SHOW_TRADES_KEY);
-        if (value !== null) {
-          setShowTradesOnChart(value === 'true');
+        const showTradesValue = await AsyncStorage.getItem(SHOW_TRADES_KEY);
+        if (showTradesValue !== null) {
+          setShowTradesOnChart(showTradesValue === 'true');
+        }
+
+        const hideSmallBalancesValue = await AsyncStorage.getItem(HIDE_SMALL_BALANCES_KEY);
+        if (hideSmallBalancesValue !== null) {
+          setHideSmallBalances(hideSmallBalancesValue === 'true');
         }
       } catch (error) {
-        console.error('[ChartScreen] Failed to load show trades preference:', error);
+        console.error('[ChartScreen] Failed to load preferences:', error);
       }
     };
     
-    loadShowTradesPreference();
+    loadPreferences();
   }, []);
+
+  // Reload hide small balances preference when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadHideSmallBalances = async () => {
+        try {
+          const hideSmallBalancesValue = await AsyncStorage.getItem(HIDE_SMALL_BALANCES_KEY);
+          if (hideSmallBalancesValue !== null) {
+            setHideSmallBalances(hideSmallBalancesValue === 'true');
+          }
+        } catch (error) {
+          console.error('[ChartScreen] Failed to load hide small balances preference:', error);
+        }
+      };
+      loadHideSmallBalances();
+    }, [])
+  );
 
   // Set default tick size to minimum when options change
   useEffect(() => {
@@ -744,13 +768,18 @@ export default function ChartScreen(): React.JSX.Element {
       : parseFloat(perpPosition.positionValue || '0') / (perpPosition.leverage?.value || 1);
     const pnl = calculateUnrealizedPnL(perpPosition, currentPrice);
     
-    perpPosData = {
-      perpPosition,
-      perpPrice: price,
-      perpMarginUsed: marginUsed,
-      perpPnl: pnl,
-      perpPriceChange: priceChangePct,
-    };
+    // If hideSmallBalances is enabled, filter out positions with USD value < $10
+    if (hideSmallBalances && marginUsed < 10) {
+      perpPosData = null;
+    } else {
+      perpPosData = {
+        perpPosition,
+        perpPrice: price,
+        perpMarginUsed: marginUsed,
+        perpPnl: pnl,
+        perpPriceChange: priceChangePct,
+      };
+    }
   }
 
   // Prepare spot balance data
@@ -778,14 +807,19 @@ export default function ChartScreen(): React.JSX.Element {
     const spotMarket = state.spotMarkets.find(m => m.name.split('/')[0] === filteredBalance.coin);
     const displayName = spotMarket ? getDisplayTicker(spotMarket.name) : filteredBalance.coin;
     
-    spotBalData = {
-      spotBalance: filteredBalance,
-      spotPrice: coinPrice,
-      spotUsdValue: usdValue,
-      spotTotal: balance,
-      spotPriceChange: changePct,
-      spotDisplayName: displayName,
-    };
+    // If hideSmallBalances is enabled, filter out balances with USD value < $10
+    if (hideSmallBalances && usdValue < 10) {
+      spotBalData = null;
+    } else {
+      spotBalData = {
+        spotBalance: filteredBalance,
+        spotPrice: coinPrice,
+        spotUsdValue: usdValue,
+        spotTotal: balance,
+        spotPriceChange: changePct,
+        spotDisplayName: displayName,
+      };
+    }
   }
 
   // Prepare open orders for current ticker

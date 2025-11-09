@@ -27,6 +27,7 @@ import {
 type MarketFilter = 'Perp' | 'Spot' | 'Account';
 
 const MARKET_FILTER_KEY = 'hl_home_market_filter';
+const HIDE_SMALL_BALANCES_KEY = '@hide_small_balances';
 
 // Helper to calculate PnL for a position
 function calculatePositionPnL(
@@ -55,6 +56,7 @@ export default function HomeScreen(): React.JSX.Element {
   const [closingPosition, setClosingPosition] = useState<string | null>(null);
   const [marketFilter, setMarketFilter] = useState<MarketFilter>('Account');
   const [depositModalVisible, setDepositModalVisible] = useState(false);
+  const [hideSmallBalances, setHideSmallBalances] = useState(false);
 
   // For skeleton loading
   const [isReady, setIsReady] = useState(false);
@@ -80,9 +82,9 @@ export default function HomeScreen(): React.JSX.Element {
     return () => task.cancel();
   }, []);
 
-  // Load saved market filter on mount
+  // Load saved market filter and hide small balances preference on mount
   useEffect(() => {
-    const loadMarketFilter = async () => {
+    const loadPreferences = async () => {
       try {
         const savedFilter = await AsyncStorage.getItem(MARKET_FILTER_KEY);
         if (
@@ -91,27 +93,37 @@ export default function HomeScreen(): React.JSX.Element {
         ) {
           setMarketFilter(savedFilter as MarketFilter);
         }
+
+        const hideSmallBalancesValue = await AsyncStorage.getItem(HIDE_SMALL_BALANCES_KEY);
+        if (hideSmallBalancesValue !== null) {
+          setHideSmallBalances(hideSmallBalancesValue === 'true');
+        }
       } catch (error) {
-        console.error('[HomeScreen] Error loading market filter:', error);
+        console.error('[HomeScreen] Error loading preferences:', error);
       }
     };
-    loadMarketFilter();
+    loadPreferences();
   }, []);
 
-  // Load starred tickers when screen comes into focus
+  // Load starred tickers and hide small balances preference when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      const loadStarredTickers = async () => {
+      const loadStarredTickersAndPreferences = async () => {
         try {
           const perpStarred = await getStarredTickers('perp');
           const spotStarred = await getStarredTickers('spot');
           setStarredPerpTickers(perpStarred);
           setStarredSpotTickers(spotStarred);
+
+          const hideSmallBalancesValue = await AsyncStorage.getItem(HIDE_SMALL_BALANCES_KEY);
+          if (hideSmallBalancesValue !== null) {
+            setHideSmallBalances(hideSmallBalancesValue === 'true');
+          }
         } catch (error) {
-          console.error('[HomeScreen] Error loading starred tickers:', error);
+          console.error('[HomeScreen] Error loading starred tickers and preferences:', error);
         }
       };
-      loadStarredTickers();
+      loadStarredTickersAndPreferences();
     }, [])
   );
 
@@ -271,8 +283,15 @@ export default function HomeScreen(): React.JSX.Element {
           assetContext: wsState.assetContexts[position.coin],
         };
       })
+      .filter((item) => {
+        // If hideSmallBalances is enabled, filter out positions with USD value < $10
+        if (hideSmallBalances && item.marginUsed < 10) {
+          return false;
+        }
+        return true;
+      })
       .sort((a, b) => b.marginUsed - a.marginUsed);
-  }, [account.data?.perpPositions, wsState.prices, wsState.assetContexts]);
+  }, [account.data?.perpPositions, wsState.prices, wsState.assetContexts, hideSmallBalances]);
 
   // Prepare sorted spot balances with USD values
   const sortedSpotBalances = useMemo(() => {
@@ -300,8 +319,15 @@ export default function HomeScreen(): React.JSX.Element {
           assetContext: wsState.assetContexts[balance.coin],
         };
       })
+      .filter((item) => {
+        // If hideSmallBalances is enabled, filter out balances with USD value < $10
+        if (hideSmallBalances && item.usdValue < 10) {
+          return false;
+        }
+        return true;
+      })
       .sort((a, b) => b.usdValue - a.usdValue);
-  }, [account.data?.spotBalances, wsState.prices, wsState.assetContexts]);
+  }, [account.data?.spotBalances, wsState.prices, wsState.assetContexts, hideSmallBalances]);
 
   // Prepare starred tickers with data
   const starredTickersData = useMemo(() => {

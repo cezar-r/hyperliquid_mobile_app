@@ -10,7 +10,7 @@ import {
   InteractionManager,
 } from 'react-native';
 import { useAccount } from '@reown/appkit-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -42,6 +42,7 @@ import { PerpPositionsContainer, SpotBalancesContainer } from '../home_screen/co
 
 const PORTFOLIO_MARKET_FILTER_KEY = 'hl_portfolio_market_filter';
 const PORTFOLIO_TIME_FILTER_KEY = 'hl_portfolio_time_filter';
+const HIDE_SMALL_BALANCES_KEY = '@hide_small_balances';
 
 // Helper to calculate PnL for a position
 function calculatePositionPnL(
@@ -107,6 +108,7 @@ export default function PortfolioScreen(): React.JSX.Element {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24h');
   const [tradesDisplayLimit, setTradesDisplayLimit] = useState(10);
   const [marketDropdownVisible, setMarketDropdownVisible] = useState(false);
+  const [hideSmallBalances, setHideSmallBalances] = useState(false);
 
   // For value animation
   const [previousValue, setPreviousValue] = useState<number | null>(null);
@@ -141,12 +143,34 @@ export default function PortfolioScreen(): React.JSX.Element {
         if (savedTimeFilter && ['24h', '7d', '30d', 'All Time'].includes(savedTimeFilter)) {
           setTimeFilter(savedTimeFilter as TimeFilter);
         }
+
+        const hideSmallBalancesValue = await AsyncStorage.getItem(HIDE_SMALL_BALANCES_KEY);
+        if (hideSmallBalancesValue !== null) {
+          setHideSmallBalances(hideSmallBalancesValue === 'true');
+        }
       } catch (error) {
         console.error('[PortfolioScreen] Error loading filters:', error);
       }
     };
     loadFilters();
   }, []);
+
+  // Reload hide small balances preference when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadHideSmallBalances = async () => {
+        try {
+          const hideSmallBalancesValue = await AsyncStorage.getItem(HIDE_SMALL_BALANCES_KEY);
+          if (hideSmallBalancesValue !== null) {
+            setHideSmallBalances(hideSmallBalancesValue === 'true');
+          }
+        } catch (error) {
+          console.error('[PortfolioScreen] Error loading hide small balances preference:', error);
+        }
+      };
+      loadHideSmallBalances();
+    }, [])
+  );
 
   // Save market filter when it changes
   const handleMarketFilterChange = async (filter: MarketFilter) => {
@@ -434,8 +458,15 @@ export default function PortfolioScreen(): React.JSX.Element {
           assetContext: wsState.assetContexts[position.coin],
         };
       })
+      .filter((item) => {
+        // If hideSmallBalances is enabled, filter out positions with USD value < $10
+        if (hideSmallBalances && item.marginUsed < 10) {
+          return false;
+        }
+        return true;
+      })
       .sort((a, b) => b.marginUsed - a.marginUsed);
-  }, [account.data?.perpPositions, wsState.prices, wsState.assetContexts]);
+  }, [account.data?.perpPositions, wsState.prices, wsState.assetContexts, hideSmallBalances]);
 
   // Prepare sorted spot balances with USD values
   const sortedSpotBalances = useMemo(() => {
@@ -463,8 +494,15 @@ export default function PortfolioScreen(): React.JSX.Element {
           assetContext: wsState.assetContexts[balance.coin],
         };
       })
+      .filter((item) => {
+        // If hideSmallBalances is enabled, filter out balances with USD value < $10
+        if (hideSmallBalances && item.usdValue < 10) {
+          return false;
+        }
+        return true;
+      })
       .sort((a, b) => b.usdValue - a.usdValue);
-  }, [account.data?.spotBalances, wsState.prices, wsState.assetContexts]);
+  }, [account.data?.spotBalances, wsState.prices, wsState.assetContexts, hideSmallBalances]);
 
   // Navigate to chart detail
   const handleNavigateToChart = (coin: string, market: 'perp' | 'spot') => {
