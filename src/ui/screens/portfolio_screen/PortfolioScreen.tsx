@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@reown/appkit-react-native';
@@ -107,6 +108,18 @@ export default function PortfolioScreen(): React.JSX.Element {
   const [tradesDisplayLimit, setTradesDisplayLimit] = useState(10);
   const [marketDropdownVisible, setMarketDropdownVisible] = useState(false);
   const [hideSmallBalances, setHideSmallBalances] = useState(false);
+
+  // Close dropdown when navigating away from screen
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        // Close dropdown when screen loses focus
+        if (marketDropdownVisible) {
+          setMarketDropdownVisible(false);
+        }
+      };
+    }, [marketDropdownVisible])
+  );
 
   // For value animation
   const [previousValue, setPreviousValue] = useState<number | null>(null);
@@ -876,6 +889,7 @@ export default function PortfolioScreen(): React.JSX.Element {
               style={styles.scrollView}
               contentContainerStyle={styles.content}
               contentInsetAdjustmentBehavior="never"
+              scrollEnabled={!marketDropdownVisible}
             >
               {/* Market Filter Dropdown */}
               <MarketDropdown
@@ -884,6 +898,22 @@ export default function PortfolioScreen(): React.JSX.Element {
                 onToggle={() => setMarketDropdownVisible(!marketDropdownVisible)}
                 onFilterChange={handleMarketFilterChange}
               />
+
+              {/* Backdrop to close dropdown when tapping outside */}
+              {marketDropdownVisible && (
+                <TouchableOpacity
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 2500,
+                  }}
+                  activeOpacity={1}
+                  onPress={() => setMarketDropdownVisible(false)}
+                />
+              )}
 
               {!address && (
                 <EmptyState

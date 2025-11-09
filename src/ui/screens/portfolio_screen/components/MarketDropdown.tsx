@@ -2,7 +2,6 @@ import React from 'react';
 import { View } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { styles } from '../styles/MarketDropdown.styles';
-import { Color } from '../../../shared/styles';
 
 export type MarketFilter = 'Perp' | 'Spot' | 'Staking' | 'Perp+Spot' | 'Account';
 
@@ -65,6 +64,26 @@ export default function MarketDropdown({
           zIndexInverse={1000}
           closeAfterSelecting={true}
           listMode="SCROLLVIEW"
+          closeOnBackPressed={true}
+          onSelectItem={(item) => {
+            // When item is selected, close dropdown and update filter
+            if (item.value) {
+              onFilterChange(item.value);
+            }
+          }}
+          onOpen={() => {
+            // Ensure state is synced when opened
+            if (!isVisible) {
+              onToggle();
+            }
+          }}
+          onClose={() => {
+            // Ensure state is synced when closed
+            if (isVisible) {
+              onToggle();
+            }
+          }}
+          disableLocalSearch={true}
         />
       </View>
 

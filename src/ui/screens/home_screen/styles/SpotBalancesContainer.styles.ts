@@ -13,7 +13,7 @@ export const styles = StyleSheet.create({
     marginTop: 16,
   },
   spotSection: {
-    marginTop: 20,
+    marginTop: 8,
   },
 });
 

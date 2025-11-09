@@ -5,7 +5,7 @@ import { fontSizes, spacing } from '../../../shared/styles';
 export const styles = StyleSheet.create({
   stakingSection: {
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
+    paddingTop: spacing.xl,
   },
   sectionLabel: {
     fontSize: 15,
