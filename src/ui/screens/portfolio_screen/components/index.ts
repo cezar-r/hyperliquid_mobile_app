@@ -6,7 +6,6 @@ export { default as EquityBreakdown } from './EquityBreakdown';
 export { default as EquityRow } from './EquityRow';
 export { default as FundsActionsContainer } from './FundsActionsContainer';
 export { default as MarketDropdown } from './MarketDropdown';
-export { default as MarketDropdownOption } from './MarketDropdownOption';
 export { default as PortfolioOpenOrdersContainer } from './PortfolioOpenOrdersContainer';
 export { default as PortfolioStakingContainer } from './PortfolioStakingContainer';
 export { default as StakingInfoCell } from './StakingInfoCell';

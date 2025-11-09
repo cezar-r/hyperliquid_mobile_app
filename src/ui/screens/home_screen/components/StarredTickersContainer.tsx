@@ -55,7 +55,7 @@ export default function StarredTickersContainer({
   }
 
   return (
-    <View style={styles.starredSection}>
+    <View style={[styles.container, styles.starredSection]}>
       {/* Starred Perp Tickers */}
       {perpData.length > 0 && (
         <View>

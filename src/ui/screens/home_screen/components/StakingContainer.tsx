@@ -20,7 +20,7 @@ export default function StakingContainer({
   }
 
   return (
-    <View style={styles.stakingSection}>
+    <View style={[styles.container, styles.stakingSection]}>
       <Text style={styles.sectionLabel}>Staking</Text>
       {delegations.map((delegation, idx) => {
         const delegationAmount = parseFloat(delegation.amount);

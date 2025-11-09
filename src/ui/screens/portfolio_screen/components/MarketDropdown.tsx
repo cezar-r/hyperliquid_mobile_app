@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View } from 'react-native';
+import DropDownPicker from 'react-native-dropdown-picker';
 import { styles } from '../styles/MarketDropdown.styles';
-import MarketDropdownOption from './MarketDropdownOption';
+import { Color } from '../../../shared/styles';
 
 export type MarketFilter = 'Perp' | 'Spot' | 'Staking' | 'Perp+Spot' | 'Account';
 
@@ -18,39 +19,56 @@ export default function MarketDropdown({
   onToggle,
   onFilterChange,
 }: MarketDropdownProps): React.JSX.Element {
-  const options: MarketFilter[] = ['Perp', 'Spot', 'Staking', 'Perp+Spot', 'Account'];
+  const items = [
+    { label: 'Perp', value: 'Perp' as MarketFilter },
+    { label: 'Spot', value: 'Spot' as MarketFilter },
+    { label: 'Staking', value: 'Staking' as MarketFilter },
+    { label: 'Perp+Spot', value: 'Perp+Spot' as MarketFilter },
+    { label: 'Account', value: 'Account' as MarketFilter },
+  ];
 
   return (
     <>
       <View style={styles.marketDropdownContainer}>
-        <TouchableOpacity style={styles.marketDropdownButton} onPress={onToggle}>
-          <Text style={styles.marketDropdownButtonText}>{selectedFilter}</Text>
-          <Text style={styles.marketDropdownArrow}>{isVisible ? '▲' : '▼'}</Text>
-        </TouchableOpacity>
+        <DropDownPicker
+          open={isVisible}
+          value={selectedFilter}
+          items={items}
+          setOpen={(callback) => {
+            // Handle both function and boolean
+            if (typeof callback === 'function') {
+              const newValue = callback(isVisible);
+              if (newValue !== isVisible) {
+                onToggle();
+              }
+            } else if (callback !== isVisible) {
+              onToggle();
+            }
+          }}
+          setValue={(callback) => {
+            const newValue = typeof callback === 'function' ? callback(selectedFilter) : callback;
+            if (newValue !== null) {
+              onFilterChange(newValue);
+            }
+          }}
+          style={styles.dropdownStyle}
+          textStyle={styles.dropdownTextStyle}
+          dropDownContainerStyle={styles.dropDownContainerStyle}
+          arrowIconStyle={styles.arrowIconStyle}
+          tickIconStyle={styles.tickIconStyle}
+          listItemContainerStyle={styles.listItemContainerStyle}
+          selectedItemContainerStyle={styles.selectedItemContainerStyle}
+          selectedItemLabelStyle={styles.selectedItemLabelStyle}
+          listItemLabelStyle={styles.listItemLabelStyle}
+          dropDownDirection="BOTTOM"
+          zIndex={3000}
+          zIndexInverse={1000}
+          closeAfterSelecting={true}
+          listMode="SCROLLVIEW"
+        />
       </View>
 
       <View style={styles.separator} />
-
-      {/* Dropdown Backdrop and Menu - rendered for proper z-index */}
-      {isVisible && (
-        <>
-          <TouchableOpacity
-            style={styles.dropdownBackdrop}
-            activeOpacity={1}
-            onPress={onToggle}
-          />
-          <View style={styles.marketDropdownMenuOverlay}>
-            {options.map((option) => (
-              <MarketDropdownOption
-                key={option}
-                label={option}
-                isSelected={selectedFilter === option}
-                onPress={() => onFilterChange(option)}
-              />
-            ))}
-          </View>
-        </>
-      )}
     </>
   );
 }

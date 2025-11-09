@@ -13,7 +13,6 @@ export const styles = StyleSheet.create({
   },
   positionsContainer: {
     paddingBottom: 10,
-    paddingHorizontal: 10,
   },
 });
 

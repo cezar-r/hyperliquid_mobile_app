@@ -29,7 +29,7 @@ export default function SpotBalancesContainer({
   }
 
   return (
-    <View style={showLabel ? styles.spotSection : undefined}>
+    <View style={[styles.container, showLabel && styles.spotSection]}>
       {showLabel && <Text style={styles.balancesLabel}>Balances</Text>}
       {sortedBalances.map((item) => {
         // Find the spot market for this coin to get the full pair name

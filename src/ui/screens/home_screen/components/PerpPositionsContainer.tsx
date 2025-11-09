@@ -42,7 +42,7 @@ export default function PerpPositionsContainer({
   onCloseAll,
 }: PerpPositionsContainerProps): React.JSX.Element {
   return (
-    <View>
+    <View style={styles.container}>
       {showCloseAll && sortedPositions.length > 0 && (
         <View style={styles.perpsHeaderRow}>
           <Text style={styles.sectionLabel}>Perps</Text>
