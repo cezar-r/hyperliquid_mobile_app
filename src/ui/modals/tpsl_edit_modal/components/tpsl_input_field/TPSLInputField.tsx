@@ -44,6 +44,7 @@ export const TPSLInputField: React.FC<TPSLInputFieldProps> = ({
         placeholder="Optional"
         placeholderTextColor={Color.FG_3}
         keyboardType="decimal-pad"
+        keyboardAppearance="dark"
         returnKeyType={returnKeyType}
         onSubmitEditing={onSubmitEditing}
       />

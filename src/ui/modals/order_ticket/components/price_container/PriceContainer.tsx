@@ -34,6 +34,7 @@ export const PriceContainer: React.FC<PriceContainerProps> = ({
         placeholder="0.00"
         placeholderTextColor={Color.FG_3}
         keyboardType="decimal-pad"
+        keyboardAppearance="dark"
         editable={orderType !== 'market'}
       />
       {currentPrice && orderType === 'limit' && onUseMarket && (

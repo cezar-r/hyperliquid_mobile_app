@@ -67,6 +67,7 @@ export const TpSlContainer: React.FC<TpSlContainerProps> = ({
               placeholder="Optional"
               placeholderTextColor={Color.FG_3}
               keyboardType="decimal-pad"
+              keyboardAppearance="dark"
             />
             {takeProfitPrice && !tpValid && (
               <Text style={styles.validationError}>
@@ -97,6 +98,7 @@ export const TpSlContainer: React.FC<TpSlContainerProps> = ({
               placeholder="Optional"
               placeholderTextColor={Color.FG_3}
               keyboardType="decimal-pad"
+              keyboardAppearance="dark"
             />
             {stopLossPrice && !slValid && (
               <Text style={styles.validationError}>

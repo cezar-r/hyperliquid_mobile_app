@@ -25,6 +25,7 @@ export const PercentageInputContainer: React.FC<PercentageInputContainerProps> =
         placeholder="0"
         placeholderTextColor="#6B7280"
         keyboardType="decimal-pad"
+        keyboardAppearance="dark"
         autoFocus={autoFocus}
       />
       <Text style={styles.percentageSymbol}>%</Text>

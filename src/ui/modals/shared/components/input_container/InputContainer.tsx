@@ -33,6 +33,7 @@ export const InputContainer: React.FC<InputContainerProps> = ({
           placeholder={placeholder}
           placeholderTextColor={Color.FG_3}
           keyboardType={keyboardType}
+          keyboardAppearance="dark"
           autoFocus={autoFocus}
         />
         {onMaxPress && (

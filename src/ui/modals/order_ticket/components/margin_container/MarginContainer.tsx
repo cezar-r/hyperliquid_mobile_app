@@ -35,6 +35,7 @@ export const MarginContainer: React.FC<MarginContainerProps> = ({
         placeholder="0.00"
         placeholderTextColor={Color.FG_3}
         keyboardType="decimal-pad"
+        keyboardAppearance="dark"
       />
       <SliderComponent
         style={styles.slider}

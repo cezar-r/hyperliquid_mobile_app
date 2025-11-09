@@ -43,6 +43,7 @@ export const SizeContainer: React.FC<SizeContainerProps> = ({
         placeholder="0.0000"
         placeholderTextColor={Color.FG_3}
         keyboardType="decimal-pad"
+        keyboardAppearance="dark"
       />
       <SliderComponent
         style={styles.slider}
