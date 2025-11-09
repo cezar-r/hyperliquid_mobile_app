@@ -26,7 +26,7 @@ import { styles } from './styles/PortfolioScreen.styles';
 import type { PerpPosition, UserFill } from '../../../types';
 import { Color } from '../../shared/styles';
 import { DepositModal, WithdrawModal, PerpSpotTransferModal, DelegateModal, UndelegateModal, TransferToStakingModal, TransferFromStakingModal, TPSLEditModal } from '../../modals';
-import { EmptyState, SkeletonScreen } from '../../shared/components';
+import { EmptyState, LoadingBlob, SkeletonScreen } from '../../shared/components';
 import {
   TimeFilterSelector,
   MarketDropdown,
@@ -870,7 +870,7 @@ export default function PortfolioScreen(): React.JSX.Element {
                         marginTop: 40,
                       }}
                     >
-                      <ActivityIndicator size="large" color={Color.BRIGHT_ACCENT} />
+                      <LoadingBlob />
                     </View>
                   )}
 
