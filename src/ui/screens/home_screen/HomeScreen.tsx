@@ -8,7 +8,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../../../contexts/WalletContext';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
-import { formatPrice, formatSize } from '../../../lib/formatting';
+import { formatPrice, formatSize, getDisplayTicker } from '../../../lib/formatting';
 import { getStarredTickers } from '../../../lib/starredTickers';
 import { playNavToChartHaptic } from '../../../lib/haptics';
 import { styles } from './styles/HomeScreen.styles';
@@ -296,13 +296,29 @@ export default function HomeScreen(): React.JSX.Element {
       .map((balance) => {
         const total = parseFloat(balance.total);
         // USDC is always $1
-        let price, usdValue;
+        let price, usdValue, assetContext, pnl;
         if (balance.coin === 'USDC') {
           price = '1';
           usdValue = total;
+          assetContext = wsState.assetContexts[balance.coin];
+          // USDC has no PnL (it's always $1)
+          pnl = { pnl: 0, pnlPercent: 0 };
         } else {
-          price = wsState.prices[balance.coin];
+          // Find the spot market to get full market name for price lookup
+          const spotMarket = wsState.spotMarkets.find(
+            (m) => m.name.split('/')[0] === balance.coin
+          );
+          const marketName = spotMarket?.name || balance.coin;  // e.g., "UBTC/USDC"
+          
+          price = wsState.prices[marketName];  // Use full market name
           usdValue = price ? total * parseFloat(price) : 0;
+          assetContext = wsState.assetContexts[marketName];  // Also use marketName here
+          
+          // Calculate spot PnL
+          const entryValue = parseFloat(balance.entryNtl || '0');
+          const pnlValue = usdValue - entryValue;
+          const pnlPercent = entryValue > 0 ? (pnlValue / entryValue) * 100 : 0;
+          pnl = { pnl: pnlValue, pnlPercent };
         }
 
         return {
@@ -310,7 +326,8 @@ export default function HomeScreen(): React.JSX.Element {
           price,
           total,
           usdValue,
-          assetContext: wsState.assetContexts[balance.coin],
+          pnl,
+          assetContext,
         };
       })
       .filter((item) => {
@@ -321,7 +338,7 @@ export default function HomeScreen(): React.JSX.Element {
         return true;
       })
       .sort((a, b) => b.usdValue - a.usdValue);
-  }, [account.data?.spotBalances, wsState.prices, wsState.assetContexts, hideSmallBalances]);
+  }, [account.data?.spotBalances, wsState.prices, wsState.assetContexts, wsState.spotMarkets, hideSmallBalances]);
 
   // Prepare starred tickers with data
   const starredTickersData = useMemo(() => {
@@ -382,8 +399,8 @@ export default function HomeScreen(): React.JSX.Element {
         const priceChange = prevPrice > 0 ? (price - prevPrice) / prevPrice : 0;
         const volume = ctx?.dayNtlVlm || 0;
         
-        // For spot tickers, use the actual market name
-        const displayName = ticker;
+        // For spot tickers, apply display mapping (e.g., "UBTC/USDC" → "BTC/USDC")
+        const displayName = getDisplayTicker(ticker);
 
         if (price > 0 && volume > 0) {
           spotData.push({

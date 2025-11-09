@@ -21,6 +21,7 @@ import {
   formatSize as formatSizeForOrder,
   resolveSpotTicker,
 } from '../../../lib/formatting';
+import { resolveSubscriptionCoin } from '../../../lib/markets';
 import { playNavToChartHaptic } from '../../../lib/haptics';
 import { styles } from './styles/PortfolioScreen.styles';
 import type { PerpPosition, UserFill } from '../../../types';
@@ -82,7 +83,7 @@ function getTimeFilterCutoff(filter: TimeFilter): number | null {
 export default function PortfolioScreen(): React.JSX.Element {
   const { address } = useAccount();
   const { account, exchangeClient, refetchAccount } = useWallet();
-  const { state: wsState, selectCoin, setMarketType } = useWebSocket();
+  const { state: wsState, selectCoin, setMarketType, infoClient } = useWebSocket();
   const navigation = useNavigation<any>();
 
   // For skeleton loading
@@ -108,6 +109,29 @@ export default function PortfolioScreen(): React.JSX.Element {
   const [tradesDisplayLimit, setTradesDisplayLimit] = useState(10);
   const [marketDropdownVisible, setMarketDropdownVisible] = useState(false);
   const [hideSmallBalances, setHideSmallBalances] = useState(false);
+
+  // State for historical spot prices (for time-based PnL) - keyed by timeFilter
+  const [historicalSpotPrices, setHistoricalSpotPrices] = useState<{
+    '24h': Record<string, number>;
+    '7d': Record<string, number>;
+    '30d': Record<string, number>;
+  }>({
+    '24h': {},
+    '7d': {},
+    '30d': {},
+  });
+
+  const [isFetchingHistorical, setIsFetchingHistorical] = useState(false);
+
+  // Track which time filters have been loaded at least once (for loading indicator)
+  const hasLoadedOnceRef = useRef<Set<'24h' | '7d' | '30d'>>(new Set());
+
+  // Track last fetch time for EACH time filter independently (to throttle fetching to once per minute per filter)
+  const lastFetchTimeRef = useRef<{
+    '24h'?: number;
+    '7d'?: number;
+    '30d'?: number;
+  }>({});
 
   // Close dropdown when navigating away from screen
   useFocusEffect(
@@ -176,6 +200,147 @@ export default function PortfolioScreen(): React.JSX.Element {
     }, [])
   );
 
+  // Fetch historical spot prices for time-based PnL
+  useEffect(() => {
+    const fetchHistoricalPrices = async () => {
+      // For "All Time", no fetch needed - mark as loaded immediately
+      if (timeFilter === 'All Time') {
+        hasLoadedOnceRef.current.add('24h' as any);  // Type workaround
+        return;
+      }
+      
+      if (!infoClient || !account.data?.spotBalances) {
+        return;
+      }
+
+      // CRITICAL: Wait for spot markets to load before fetching
+      // if (!wsState.spotMarkets || wsState.spotMarkets.length === 0) {
+      //   const timestamp = new Date().toISOString();
+      //   console.log(`[${timestamp}] [PortfolioScreen] Waiting for spot markets to load (currently ${wsState.spotMarkets.length})`);
+      //   return;
+      // }
+
+      const now = Date.now();
+      const timestamp = new Date().toISOString();
+
+      // Check if we've fetched recently (within last 10 seconds)
+      const lastFetch = lastFetchTimeRef.current[timeFilter];
+      if (lastFetch && now - lastFetch < 10000) {
+        console.log(`[${timestamp}] [PortfolioScreen] Skipping fetch for ${timeFilter} - last fetched ${Math.round((now - lastFetch) / 1000)}s ago`);
+        return;
+      }
+
+      console.log(`[${timestamp}] [PortfolioScreen] Starting fetch for ${timeFilter}`);
+      console.log(`[${timestamp}] [PortfolioScreen] Spot markets count: ${wsState.spotMarkets.length}`);
+      console.log(`[${timestamp}] [PortfolioScreen] Spot balances: ${account.data.spotBalances.map(b => b.coin).join(', ')}`);
+      
+      setIsFetchingHistorical(true);
+      
+      const prices: Record<string, number> = {};
+
+      // Configure time range and interval based on filter
+      let startTime: number;
+      let endTime: number;
+      let interval: '1m' | '1h' | '1d';
+
+      if (timeFilter === '24h') {
+        // 24h: startTime = 24h ago, endTime = 23h 30m ago, interval = 1m
+        startTime = now - 24 * 60 * 60 * 1000;
+        endTime = now - 23.5 * 60 * 60 * 1000;
+        interval = '1m';
+      } else if (timeFilter === '7d') {
+        // 7d: startTime = 7d ago, endTime = 6d 24h ago, interval = 1h
+        startTime = now - 7 * 24 * 60 * 60 * 1000;
+        endTime = now - 6 * 24 * 60 * 60 * 1000;
+        interval = '1h';
+      } else {
+        // 30d: startTime = 31d ago, endTime = 30d ago, interval = 1d
+        startTime = now - 31 * 24 * 60 * 60 * 1000;
+        endTime = now - 30 * 24 * 60 * 60 * 1000;
+        interval = '1d';
+      }
+
+      const balancesToFetch = account.data.spotBalances.filter(
+        (balance) => balance.coin !== 'USDC' && parseFloat(balance.total) > 0
+      );
+
+      // Batch requests with delays to avoid rate limiting
+      for (let i = 0; i < balancesToFetch.length; i++) {
+        const balance = balancesToFetch[i];
+
+        // Find the spot market to get the full market name
+        const spotMarket = wsState.spotMarkets.find(
+          (m) => m.name.split('/')[0] === balance.coin
+        );
+        if (!spotMarket) {
+          console.warn(`[${timestamp}] [PortfolioScreen] No spot market found for coin: ${balance.coin}`);
+          continue;
+        }
+        
+        console.log(`[${timestamp}] [PortfolioScreen] Found spot market for ${balance.coin}: ${spotMarket.name}`);
+
+        try {
+          // Use resolveSubscriptionCoin to get the proper API format (@{index} or literal name)
+          const subscriptionCoin = resolveSubscriptionCoin('spot', spotMarket.name, wsState.spotMarkets);
+
+          // Fetch candles with specified interval
+          const candles = await infoClient.candleSnapshot({
+            coin: subscriptionCoin,
+            interval,
+            startTime,
+            endTime,
+          });
+
+          if (candles && candles.length > 0) {
+            // Get the EARLIEST candle's open price (first candle in array)
+            const historicalCandle = candles[0];
+            if (historicalCandle && historicalCandle.o) {
+              const historicalPrice = parseFloat(historicalCandle.o);
+              prices[spotMarket.name] = historicalPrice;
+              const candleTime = new Date(historicalCandle.t).toISOString();
+              console.log(`[${timestamp}] [PortfolioScreen] ${spotMarket.name}: Historical price = $${historicalPrice} (candle from ${candleTime})`);
+            }
+          }
+        } catch (error) {
+          const errorTimestamp = new Date().toISOString();
+          console.warn(`[${errorTimestamp}] [PortfolioScreen] Error fetching candles for ${spotMarket.name}:`, error);
+        }
+
+        // Add small delay between requests to avoid rate limiting
+        if (i < balancesToFetch.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      // Update state for this specific time filter
+      if (Object.keys(prices).length > 0) {
+        setHistoricalSpotPrices(prev => {
+          const updated = {
+            ...prev,
+            [timeFilter]: prices,  // Store prices under the specific time filter key
+          };
+          const finalTimestamp = new Date().toISOString();
+          console.log(`[${finalTimestamp}] [PortfolioScreen] Updated historicalSpotPrices[${timeFilter}]:`, JSON.stringify(prices, null, 2));
+          return updated;
+        });
+        
+        // Mark this time filter as loaded at least once
+        if (timeFilter === '24h' || timeFilter === '7d' || timeFilter === '30d') {
+          hasLoadedOnceRef.current.add(timeFilter);
+        }
+      } else {
+        const finalTimestamp = new Date().toISOString();
+        console.log(`[${finalTimestamp}] [PortfolioScreen] No prices fetched for ${timeFilter}`);
+      }
+
+      // Update last fetch time for this specific time filter
+      lastFetchTimeRef.current[timeFilter] = now;
+      setIsFetchingHistorical(false);
+    };
+
+    fetchHistoricalPrices();
+  }, [infoClient, account.data?.spotBalances, timeFilter, wsState.spotMarkets]);
+
   // Save market filter when it changes
   const handleMarketFilterChange = async (filter: MarketFilter) => {
     setMarketFilter(filter);
@@ -207,6 +372,10 @@ export default function PortfolioScreen(): React.JSX.Element {
     animated: boolean = false,
     direction?: 'left' | 'right'
   ) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] [PortfolioScreen] ======== Time filter changed to: ${filter} ========`);
+    console.log(`[${timestamp}] [PortfolioScreen] Has loaded before: ${hasLoadedOnceRef.current.has(filter as '24h' | '7d' | '30d')}`);
+    
     if (animated && direction) {
       // Start slide animation
       const slideDistance = direction === 'left' ? -50 : 50;
@@ -337,6 +506,79 @@ export default function PortfolioScreen(): React.JSX.Element {
     let uPnl = 0;
     let shouldShowPnL = false;
 
+    // Helper to calculate spot PnL
+    const calculateSpotPnL = () => {
+      const calcTimestamp = new Date().toISOString();
+      let spotPnl = 0;
+      const calcDetails: string[] = [];
+
+      // Get historical prices for the current time filter
+      const currentFilterPrices = timeFilter === 'All Time' 
+        ? {} 
+        : (historicalSpotPrices[timeFilter as '24h' | '7d' | '30d'] || {});
+
+      console.log(`[${calcTimestamp}] [PortfolioScreen] calculateSpotPnL() called for ${timeFilter}`);
+      console.log(`[${calcTimestamp}] [PortfolioScreen] historicalSpotPrices[${timeFilter}]:`, JSON.stringify(currentFilterPrices, null, 2));
+
+      if (account.data?.spotBalances) {
+        account.data.spotBalances.forEach((balance) => {
+          if (balance.coin !== 'USDC' && parseFloat(balance.total) > 0) {
+            // Find the spot market to get full market name
+            const spotMarket = wsState.spotMarkets.find(
+              (m) => m.name.split('/')[0] === balance.coin
+            );
+            
+            if (!spotMarket) {
+              calcDetails.push(`    ${balance.coin}: SKIPPED (spot market not found)`);
+              return;
+            }
+            
+            const marketName = spotMarket.name;
+            const currentPrice = wsState.prices[marketName];
+            
+            if (!currentPrice) {
+              calcDetails.push(`    ${marketName}: SKIPPED (no current price)`);
+              return;
+            }
+            
+            const total = parseFloat(balance.total);
+            const currentValue = total * parseFloat(currentPrice);
+            
+            let baseValue;
+            if (timeFilter === 'All Time') {
+              // Use entry value for "All Time"
+              baseValue = parseFloat(balance.entryNtl || '0');
+              const pnl = currentValue - baseValue;
+              spotPnl += pnl;
+              calcDetails.push(`    ${marketName}: $${currentValue.toFixed(2)} - $${baseValue.toFixed(2)} (entry) = ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`);
+            } else {
+              // Use historical price for time-based filters (24h, 7d, 30d)
+              const historicalPrice = currentFilterPrices[marketName];
+              if (historicalPrice) {
+                baseValue = total * historicalPrice;
+                const pnl = currentValue - baseValue;
+                spotPnl += pnl;
+                calcDetails.push(`    ${marketName}: $${currentValue.toFixed(2)} - $${baseValue.toFixed(2)} (hist @ $${historicalPrice.toFixed(2)}) = ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`);
+              } else {
+                calcDetails.push(`    ${marketName}: SKIPPED (no historical price in state)`);
+                // If no historical price yet, skip this balance
+                return;
+              }
+            }
+          }
+        });
+      }
+
+      if (calcDetails.length > 0) {
+        calcDetails.forEach(detail => console.log(detail));
+      } else {
+        console.log(`    No spot balances to calculate`);
+      }
+      console.log(`[${calcTimestamp}] [PortfolioScreen] => Total Spot PnL: ${spotPnl >= 0 ? '+' : ''}$${spotPnl.toFixed(2)}`);
+
+      return spotPnl;
+    };
+
     // Calculate value and PnL based on market filter
     if (marketFilter === 'Perp') {
       value = perpAccountValue;
@@ -352,7 +594,8 @@ export default function PortfolioScreen(): React.JSX.Element {
     } else if (marketFilter === 'Spot') {
       value = spotTotalValue;
       shouldShowPnL = true;
-      // Spot positions don't have unrealized PnL in the same way
+      // Calculate unrealized PnL for spot balances
+      uPnl += calculateSpotPnL();
     } else if (marketFilter === 'Staking') {
       value = stakingValue;
       shouldShowPnL = false; // No PnL for staking
@@ -367,6 +610,8 @@ export default function PortfolioScreen(): React.JSX.Element {
           uPnl += posPnl;
         }
       });
+      // Calculate unrealized PnL for spot balances
+      uPnl += calculateSpotPnL();
     } else {
       // Account
       value = perpAccountValue + spotTotalValue + stakingValue;
@@ -379,6 +624,8 @@ export default function PortfolioScreen(): React.JSX.Element {
           uPnl += posPnl;
         }
       });
+      // Calculate unrealized PnL for spot balances
+      uPnl += calculateSpotPnL();
     }
 
     // Calculate realized PnL from filtered fills
@@ -399,12 +646,36 @@ export default function PortfolioScreen(): React.JSX.Element {
   }, [
     account.data,
     wsState.prices,
+    wsState.spotMarkets,
     perpAccountValue,
     spotTotalValue,
     stakingValue,
     filteredFills,
     marketFilter,
+    timeFilter,
+    historicalSpotPrices,
   ]);
+
+  // Determine if we should show loading for spot PnL
+  const isLoadingSpotPnL = useMemo(() => {
+    // Only show loading for time-based filters (not All Time)
+    if (timeFilter === 'All Time') return false;
+    
+    // Only show loading if we have spot balances and are viewing spot-related filters
+    const hasSpotBalances = account.data?.spotBalances && account.data.spotBalances.some(b => b.coin !== 'USDC' && parseFloat(b.total) > 0);
+    const isSpotFilter = ['Spot', 'Perp+Spot', 'Account'].includes(marketFilter);
+    
+    if (!hasSpotBalances || !isSpotFilter) return false;
+    
+    // Only show loading if this time filter has NEVER been loaded before
+    const hasLoadedBefore = hasLoadedOnceRef.current.has(timeFilter as '24h' | '7d' | '30d');
+    const shouldLoad = !hasLoadedBefore && isFetchingHistorical;
+    
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] [PortfolioScreen] isLoadingSpotPnL check: hasLoadedBefore=${hasLoadedBefore}, isFetching=${isFetchingHistorical}, result=${shouldLoad}`);
+    
+    return shouldLoad;
+  }, [timeFilter, isFetchingHistorical, marketFilter, account.data?.spotBalances]);
 
   // Animate value changes - only when there's an actual change at 2 decimal places
   useEffect(() => {
@@ -472,7 +743,7 @@ export default function PortfolioScreen(): React.JSX.Element {
       .sort((a, b) => b.marginUsed - a.marginUsed);
   }, [account.data?.perpPositions, wsState.prices, wsState.assetContexts, hideSmallBalances]);
 
-  // Prepare sorted spot balances with USD values
+  // Prepare sorted spot balances with USD values and PnL
   const sortedSpotBalances = useMemo(() => {
     if (!account.data?.spotBalances) return [];
 
@@ -481,13 +752,29 @@ export default function PortfolioScreen(): React.JSX.Element {
       .map((balance) => {
         const total = parseFloat(balance.total);
         // USDC is always $1
-        let price, usdValue;
+        let price, usdValue, assetContext, pnl;
         if (balance.coin === 'USDC') {
           price = '1';
           usdValue = total;
+          assetContext = wsState.assetContexts[balance.coin];
+          // USDC has no PnL (it's always $1)
+          pnl = { pnl: 0, pnlPercent: 0 };
         } else {
-          price = wsState.prices[balance.coin];
+          // Find the spot market to get full market name for price lookup
+          const spotMarket = wsState.spotMarkets.find(
+            (m) => m.name.split('/')[0] === balance.coin
+          );
+          const marketName = spotMarket?.name || balance.coin;  // e.g., "UBTC/USDC"
+          
+          price = wsState.prices[marketName];  // Use full market name
           usdValue = price ? total * parseFloat(price) : 0;
+          assetContext = wsState.assetContexts[marketName];  // Also use marketName here
+          
+          // Calculate spot PnL
+          const entryValue = parseFloat(balance.entryNtl || '0');
+          const pnlValue = usdValue - entryValue;
+          const pnlPercent = entryValue > 0 ? (pnlValue / entryValue) * 100 : 0;
+          pnl = { pnl: pnlValue, pnlPercent };
         }
 
         return {
@@ -495,7 +782,8 @@ export default function PortfolioScreen(): React.JSX.Element {
           price,
           total,
           usdValue,
-          assetContext: wsState.assetContexts[balance.coin],
+          pnl,
+          assetContext,
         };
       })
       .filter((item) => {
@@ -506,7 +794,7 @@ export default function PortfolioScreen(): React.JSX.Element {
         return true;
       })
       .sort((a, b) => b.usdValue - a.usdValue);
-  }, [account.data?.spotBalances, wsState.prices, wsState.assetContexts, hideSmallBalances]);
+  }, [account.data?.spotBalances, wsState.prices, wsState.assetContexts, wsState.spotMarkets, hideSmallBalances]);
 
   // Navigate to chart detail
   const handleNavigateToChart = (coin: string, market: 'perp' | 'spot') => {
@@ -964,6 +1252,7 @@ export default function PortfolioScreen(): React.JSX.Element {
                         tradingVolume={tradingVolume}
                         marketFilter={marketFilter}
                         textColor={textColor}
+                        isLoadingPnL={isLoadingSpotPnL}
                       />
 
                       {/* Unified layout for all non-staking markets */}

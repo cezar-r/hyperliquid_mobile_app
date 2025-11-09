@@ -10,6 +10,10 @@ interface SpotBalanceCellProps {
   price: string | undefined;
   total: number;
   usdValue: number;
+  pnl: {
+    pnl: number;
+    pnlPercent: number;
+  };
   assetContext?: any;
   displayName: string;
   onPress: () => void;
@@ -37,6 +41,7 @@ export default function SpotBalanceCell({
   price,
   total,
   usdValue,
+  pnl,
   assetContext,
   displayName,
   onPress,
@@ -69,13 +74,24 @@ export default function SpotBalanceCell({
         </View>
         <View style={sharedStyles.rightSide}>
           <Text style={sharedStyles.price}>${formatNumber(usdValue, 2)}</Text>
-          <Text style={[sharedStyles.pnl, { color: Color.FG_3 }]}>
-            {total.toLocaleString('en-US', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 4,
-            })}{' '}
-            {getDisplayTicker(balance.coin)}
-          </Text>
+          <View style={sharedStyles.priceContainer}>
+            <Text
+              style={[
+                sharedStyles.pnl,
+                { color: pnl.pnl >= 0 ? Color.BRIGHT_ACCENT : Color.RED },
+              ]}
+            >
+              {pnl.pnl >= 0 ? '+' : '-'}${formatNumber(Math.abs(pnl.pnl), 2)}
+            </Text>
+            <Text
+              style={[
+                sharedStyles.priceChange,
+                { color: pnl.pnl >= 0 ? Color.BRIGHT_ACCENT : Color.RED },
+              ]}
+            >
+              {formatPercent(pnl.pnlPercent / 100)}
+            </Text>
+          </View>
         </View>
       </TouchableOpacity>
       <View style={sharedStyles.separator} />

@@ -11,6 +11,10 @@ interface SpotBalancesContainerProps {
     price: string | undefined;
     total: number;
     usdValue: number;
+    pnl: {
+      pnl: number;
+      pnlPercent: number;
+    };
     assetContext?: any;
   }>;
   spotMarkets: Array<{ name: string; index: number; szDecimals?: number }>;
@@ -47,6 +51,7 @@ export default function SpotBalancesContainer({
             price={item.price}
             total={item.total}
             usdValue={item.usdValue}
+            pnl={item.pnl}
             assetContext={item.assetContext}
             displayName={displayName}
             onPress={() => {

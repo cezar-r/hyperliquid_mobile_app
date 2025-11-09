@@ -14,6 +14,7 @@ interface BalanceContainerProps {
   tradingVolume: number | null;
   marketFilter: MarketFilter;
   textColor: Animated.AnimatedInterpolation<string | number>;
+  isLoadingPnL?: boolean;
 }
 
 export default function BalanceContainer({
@@ -24,6 +25,7 @@ export default function BalanceContainer({
   tradingVolume,
   marketFilter,
   textColor,
+  isLoadingPnL = false,
 }: BalanceContainerProps): React.JSX.Element {
   return (
     <>
@@ -40,7 +42,7 @@ export default function BalanceContainer({
         ]}
       >
         <BalanceAmount amount={totalValue} textColor={textColor} />
-        {showPnL && <BalancePnL pnl={totalPnL} timeFilter={timeFilter} />}
+        {showPnL && <BalancePnL pnl={totalPnL} timeFilter={timeFilter} isLoading={isLoadingPnL} />}
       </View>
     </>
   );

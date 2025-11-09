@@ -39,6 +39,7 @@ export interface SpotBalance {
   hold: string;
   token: number;
   total: string;
+  entryNtl: string;  // Entry notional value in USDC
 }
 
 export interface UserFill {

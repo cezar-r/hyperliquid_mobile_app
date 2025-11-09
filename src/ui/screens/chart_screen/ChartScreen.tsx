@@ -820,23 +820,35 @@ export default function ChartScreen(): React.JSX.Element {
   let spotBalData = null;
   if (filteredBalance) {
     const balance = parseFloat(filteredBalance.total);
-    let coinPrice, usdValue;
+    
+    // Find the spot market to get full market name for price lookup
+    const spotMarket = state.spotMarkets.find(m => m.name.split('/')[0] === filteredBalance.coin);
+    const marketName = spotMarket?.name || filteredBalance.coin;  // e.g., "UBTC/USDC"
+    const displayName = spotMarket ? getDisplayTicker(spotMarket.name) : filteredBalance.coin;
+    
+    let coinPrice, usdValue, assetContext, pnl;
     if (filteredBalance.coin === 'USDC') {
       coinPrice = 1;
       usdValue = balance;
+      assetContext = state.assetContexts[filteredBalance.coin];
+      // USDC has no PnL (it's always $1)
+      pnl = { pnl: 0, pnlPercent: 0 };
     } else {
-      const priceStr = state.prices[filteredBalance.coin];
+      const priceStr = state.prices[marketName];  // Use full market name
       coinPrice = priceStr ? parseFloat(priceStr) : 0;
       usdValue = priceStr ? balance * parseFloat(priceStr) : 0;
+      assetContext = state.assetContexts[marketName];  // Use full market name
+      
+      // Calculate spot PnL
+      const entryValue = parseFloat(filteredBalance.entryNtl || '0');
+      const pnlValue = usdValue - entryValue;
+      const pnlPercent = entryValue > 0 ? (pnlValue / entryValue) * 100 : 0;
+      pnl = { pnl: pnlValue, pnlPercent };
     }
     
-    const assetContext = state.assetContexts[filteredBalance.coin];
     const prevPrice = assetContext?.prevDayPx || coinPrice;
     const change = coinPrice - prevPrice;
     const changePct = prevPrice > 0 ? change / prevPrice : 0;
-    
-    const spotMarket = state.spotMarkets.find(m => m.name.split('/')[0] === filteredBalance.coin);
-    const displayName = spotMarket ? getDisplayTicker(spotMarket.name) : filteredBalance.coin;
     
     
     // If hideSmallBalances is enabled, filter out balances with USD value < $10
@@ -850,6 +862,7 @@ export default function ChartScreen(): React.JSX.Element {
         spotTotal: balance,
         spotPriceChange: changePct,
         spotDisplayName: displayName,
+        spotPnl: pnl,
       };
     }
   }

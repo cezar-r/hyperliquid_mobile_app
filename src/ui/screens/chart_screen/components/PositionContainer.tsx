@@ -29,6 +29,7 @@ interface PositionContainerProps {
   spotTotal?: number;
   spotPriceChange?: number;
   spotDisplayName?: string;
+  spotPnl?: { pnl: number; pnlPercent: number };
 }
 
 // Helper to format numbers
@@ -63,6 +64,7 @@ export default function PositionContainer({
   spotTotal,
   spotPriceChange,
   spotDisplayName,
+  spotPnl,
 }: PositionContainerProps): React.JSX.Element {
 
   return (
@@ -158,17 +160,34 @@ export default function PositionContainer({
         )
       ) : (
         spotBalance ? (
-          <PositionCell
-            ticker={spotBalance.coin}
-            displayName={spotDisplayName}
-            price={spotPrice || 0}
-            priceChange={spotPriceChange || 0}
-            value={spotUsdValue || 0}
-            subValue={`${(spotTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ${getDisplayTicker(spotBalance.coin)}`}
-            subValueColor={Color.FG_3}
-            onPress={() => {}}
-            showSeparator={false}
-          />
+          <>
+            <PositionCell
+              ticker={spotBalance.coin}
+              displayName={spotDisplayName}
+              price={spotPrice || 0}
+              priceChange={spotPriceChange || 0}
+              value={spotUsdValue || 0}
+              subValue={`${spotPnl && spotPnl.pnl >= 0 ? '+' : '-'}$${formatNumber(Math.abs(spotPnl?.pnl || 0), 2)}`}
+              subValueColor={spotPnl && spotPnl.pnl >= 0 ? Color.BRIGHT_ACCENT : Color.RED}
+              onPress={() => {}}
+              showSeparator={false}
+              pnlPercent={spotPnl?.pnlPercent}
+            />
+
+            {/* Spot balance details - always shown */}
+            <View style={styles.expandedContent}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Entry Price</Text>
+                <Text style={styles.detailValue}>
+                  ${formatNumber(
+                    spotTotal && spotTotal > 0
+                      ? parseFloat(spotBalance.entryNtl || '0') / spotTotal
+                      : 0
+                  )}
+                </Text>
+              </View>
+            </View>
+          </>
         ) : (
           <Text style={styles.subtitle}>No balance for {selectedCoin.split('/')[0]}</Text>
         )
