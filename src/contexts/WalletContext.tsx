@@ -370,13 +370,13 @@ export function WalletProvider({
 
       console.log('[SessionKey] Session key enabled successfully');
 
-      // Auto-enable HIP-3 DEX abstraction
-      try {
-        await enableDexAbstraction(address);
-        console.log('[SessionKey] HIP-3 DEX abstraction enabled successfully');
-      } catch (dexError) {
-        console.warn('[SessionKey] Failed to enable HIP-3 DEX abstraction (non-blocking):', dexError);
-      }
+      // // Auto-enable HIP-3 DEX abstraction
+      // try {
+      //   await enableDexAbstraction(address);
+      //   console.log('[SessionKey] HIP-3 DEX abstraction enabled successfully');
+      // } catch (dexError) {
+      //   console.warn('[SessionKey] Failed to enable HIP-3 DEX abstraction (non-blocking):', dexError);
+      // }
     } catch (error) {
       console.error('[SessionKey] Failed to enable session key:', error);
       throw error;

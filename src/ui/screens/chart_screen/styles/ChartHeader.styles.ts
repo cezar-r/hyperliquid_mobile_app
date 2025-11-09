@@ -4,8 +4,9 @@ import { fontSizes, spacing } from '../../../shared/styles';
 
 export const styles = StyleSheet.create({
   tickerHeader: {
-    padding: spacing.md,
-    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
     backgroundColor: '#0b0f13',
     marginBottom: 0,
   },

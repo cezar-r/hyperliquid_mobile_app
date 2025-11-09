@@ -16,7 +16,8 @@ export const styles = StyleSheet.create({
   subtitle: {
     fontSize: fontSizes.sm,
     color: Color.FG_3,
-    marginTop: spacing.xs,
+    marginLeft: spacing.sm,
+    marginTop: spacing.sm,
   },
   marketCloseButton: {
     paddingVertical: spacing.xs,
