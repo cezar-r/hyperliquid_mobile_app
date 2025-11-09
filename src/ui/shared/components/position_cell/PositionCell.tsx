@@ -21,6 +21,7 @@ interface PositionCellProps {
   leverage?: number;
   leverageType?: string;
   isLong?: boolean;
+  pnlPercent?: number;
   tpPrice?: number | null;
   slPrice?: number | null;
   showTpSl?: boolean;
@@ -60,6 +61,7 @@ export default function PositionCell({
   leverage,
   leverageType,
   isLong,
+  pnlPercent,
   tpPrice,
   slPrice,
   showTpSl = false,
@@ -127,9 +129,25 @@ export default function PositionCell({
         </View>
         <View style={styles.rightSide}>
           <Text style={styles.price}>${formatNumber(value, 2)}</Text>
-          <Text style={[styles.pnl, subValueColor && { color: subValueColor }]}>
-            {subValue}
-          </Text>
+          {isPerp && pnlPercent !== undefined && leverage ? (
+            <View style={styles.priceContainer}>
+              <Text style={[styles.pnl, subValueColor && { color: subValueColor }]}>
+                {subValue}
+              </Text>
+              <Text
+                style={[
+                  styles.priceChange,
+                  subValueColor && { color: subValueColor },
+                ]}
+              >
+                {formatPercent((pnlPercent / 100) * leverage)}
+              </Text>
+            </View>
+          ) : (
+            <Text style={[styles.pnl, subValueColor && { color: subValueColor }]}>
+              {subValue}
+            </Text>
+          )}
         </View>
       </TouchableOpacity>
       {showSeparator && <View style={styles.separator} />}

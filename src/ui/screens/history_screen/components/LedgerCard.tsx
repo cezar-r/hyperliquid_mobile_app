@@ -115,16 +115,47 @@ export default function LedgerCard({ update, userAddress }: LedgerCardProps): Re
           </>
         );
 
+      case 'cStakingTransfer':
+        return (
+          <>
+            <View style={styles.tradeTopRow}>
+              <Text style={[styles.tradeSide, styles.sideTransfer]}>
+                {delta.isDeposit ? 'STAKE' : 'UNSTAKE'}
+              </Text>
+              <Text style={[styles.tradePnl, delta.isDeposit ? styles.pnlPositive : styles.pnlNegative]}>
+                {delta.isDeposit ? '+' : '-'}{formatDollarAmount(delta.amount)} {delta.token}
+              </Text>
+            </View>
+            <Text style={styles.ledgerDetails}>
+              {delta.isDeposit ? 'Spot → Staking' : 'Staking → Spot'}
+            </Text>
+          </>
+        );
+
       default:
-        return null;
+        return (
+          <>
+            <View style={styles.tradeTopRow}>
+              <Text style={[styles.tradeSide, styles.sideTransfer]}>UNKNOWN</Text>
+              <Text style={[styles.tradePnl, styles.pnlPositive]}>
+                Type: {delta.type}
+              </Text>
+            </View>
+            <Text style={styles.ledgerDetails}>
+              Unrecognized transaction type
+            </Text>
+          </>
+        );
     }
   };
+
+  const content = renderContent();
 
   return (
     <View>
       <View style={styles.tradeCard}>
         <View style={styles.tradeLeftSide}>
-          {renderContent()}
+          {content}
           <Text style={styles.tradeTime}>{formatDate(update.time)}</Text>
         </View>
       </View>

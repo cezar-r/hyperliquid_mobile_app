@@ -58,6 +58,14 @@ export interface UserFill {
   feeToken?: string;
 }
 
+export interface UserFunding {
+  time: number;
+  coin: string;
+  usdc: string;
+  szi: string;
+  fundingRate: string;
+}
+
 export interface OpenOrder {
   coin: string;
   side: string;
@@ -101,6 +109,7 @@ export interface AccountData {
   spotBalances: SpotBalance[];
   openOrders: OpenOrder[];
   userFills: UserFill[];
+  userFundings: UserFunding[];
   stakingDelegations: StakingDelegation[];
   stakingSummary: StakingSummary | null;
   stakingRewards: StakingReward[];
@@ -198,6 +207,7 @@ export interface LedgerUpdate {
     | { type: 'withdraw'; usdc: string; nonce: number; fee: string }
     | { type: 'accountClassTransfer'; usdc: string; toPerp: boolean }
     | { type: 'spotTransfer'; token: string; amount: string; user: string; destination: string; fee: string; usdcValue: string }
-    | { type: 'internalTransfer'; usdc: string; user: string; destination: string; fee: string };
+    | { type: 'internalTransfer'; usdc: string; user: string; destination: string; fee: string }
+    | { type: 'cStakingTransfer'; token: string; amount: string; isDeposit: boolean };
 }
 

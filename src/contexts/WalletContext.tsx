@@ -83,7 +83,7 @@ export function WalletProvider({
       }
 
       try {
-        const [perpState, spotState, openOrders, userFills, stakingDelegations, stakingSummary, stakingRewards] =
+        const [perpState, spotState, openOrders, userFills, userFundings, stakingDelegations, stakingSummary, stakingRewards] =
           await Promise.all([
             infoClient
               .clearinghouseState({ user: userAddress as `0x${string}` })
@@ -107,6 +107,15 @@ export function WalletProvider({
               .userFills({ user: userAddress as `0x${string}` })
               .catch((err) => {
                 if (!silent) console.warn('[Phase 3] userFills error:', err);
+                return [];
+              }),
+            infoClient
+              .userFunding({ 
+                user: userAddress as `0x${string}`,
+                startTime: Date.now() - 30 * 24 * 60 * 60 * 1000, // Last 30 days
+              })
+              .catch((err) => {
+                if (!silent) console.warn('[Phase 3] userFunding error:', err);
                 return [];
               }),
             infoClient
@@ -174,6 +183,18 @@ export function WalletProvider({
           };
         });
 
+        // Map userFundings from API response structure
+        // API returns array of { time, hash, delta: { type: "funding", coin, usdc, szi, fundingRate } }
+        const mappedUserFundings = (userFundings || [])
+          .filter((item: any) => item.delta?.type === 'funding')
+          .map((item: any) => ({
+            time: item.time,
+            coin: item.delta.coin,
+            usdc: item.delta.usdc,
+            szi: item.delta.szi,
+            fundingRate: item.delta.fundingRate,
+          }));
+
         const accountData: AccountData = {
           perpPositions,
           perpMarginSummary: {
@@ -186,6 +207,7 @@ export function WalletProvider({
           spotBalances: spotState?.balances || [],
           openOrders: openOrders || [],
           userFills: userFills || [],
+          userFundings: mappedUserFundings,
           stakingDelegations: stakingDelegations || [],
           stakingSummary: stakingSummary || null,
           stakingRewards: stakingRewards || [],

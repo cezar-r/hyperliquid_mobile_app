@@ -84,14 +84,24 @@ export default function PerpPositionCell({
         </View>
         <View style={sharedStyles.rightSide}>
           <Text style={sharedStyles.price}>${formatNumber(marginUsed, 2)}</Text>
-          <Text
-            style={[
-              sharedStyles.pnl,
-              { color: pnl.pnl >= 0 ? Color.BRIGHT_ACCENT : Color.RED },
-            ]}
-          >
-            {pnl.pnl >= 0 ? '+' : '-'}${formatNumber(Math.abs(pnl.pnl), 2)}
-          </Text>
+          <View style={sharedStyles.priceContainer}>
+            <Text
+              style={[
+                sharedStyles.pnl,
+                { color: pnl.pnl >= 0 ? Color.BRIGHT_ACCENT : Color.RED },
+              ]}
+            >
+              {pnl.pnl >= 0 ? '+' : '-'}${formatNumber(Math.abs(pnl.pnl), 2)}
+            </Text>
+            <Text
+              style={[
+                sharedStyles.priceChange,
+                { color: pnl.pnl >= 0 ? Color.BRIGHT_ACCENT : Color.RED },
+              ]}
+            >
+              {formatPercent((pnl.pnlPercent / 100) * leverage)}
+            </Text>
+          </View>
         </View>
       </TouchableOpacity>
       <View style={sharedStyles.separator} />

@@ -14,6 +14,11 @@ interface PositionContainerProps {
   perpMarginUsed?: number;
   perpPnl?: { pnl: number; pnlPercent: number };
   perpPriceChange?: number;
+  perpEntryPrice?: number;
+  perpPositionSize?: number;
+  perpPositionValue?: number;
+  perpLiquidationPrice?: number | null;
+  perpFundingPaid?: number;
   onEditTpSl?: () => void;
   onMarketClose?: () => void;
   // Spot balance props
@@ -44,6 +49,11 @@ export default function PositionContainer({
   perpMarginUsed,
   perpPnl,
   perpPriceChange,
+  perpEntryPrice,
+  perpPositionSize,
+  perpPositionValue,
+  perpLiquidationPrice,
+  perpFundingPaid,
   onEditTpSl,
   onMarketClose,
   spotBalance,
@@ -53,6 +63,7 @@ export default function PositionContainer({
   spotPriceChange,
   spotDisplayName,
 }: PositionContainerProps): React.JSX.Element {
+
   return (
     <View style={styles.positionsContainer}>
       <Text style={styles.sectionLabel}>
@@ -76,12 +87,56 @@ export default function PositionContainer({
                 ? perpPosition.leverage.type.charAt(0).toUpperCase() + perpPosition.leverage.type.slice(1)
                 : 'Cross'}
               isLong={parseFloat(perpPosition.szi) > 0}
+              pnlPercent={perpPnl?.pnlPercent}
               tpPrice={perpPosition.tpPrice}
               slPrice={perpPosition.slPrice}
               showTpSl={true}
               onEditTpSl={onEditTpSl}
               showSeparator={false}
             />
+
+            {/* Position details - always shown */}
+            <View style={styles.expandedContent}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Entry Price</Text>
+                <Text style={styles.detailValue}>
+                  ${formatNumber(perpEntryPrice || 0)}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Position Size</Text>
+                <Text style={styles.detailValue}>
+                  {formatNumber(Math.abs(perpPositionSize || 0), 4)} {selectedCoin}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Position Value</Text>
+                <Text style={styles.detailValue}>
+                  ${formatNumber(perpPositionValue || 0)}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Liquidation Price</Text>
+                <Text style={styles.detailValue}>
+                  {perpLiquidationPrice && perpLiquidationPrice > 0
+                    ? `$${formatNumber(perpLiquidationPrice)}`
+                    : 'N/A'}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Funding Paid</Text>
+                <Text
+                  style={[
+                    styles.detailValue,
+                    { color: Color.RED },
+                  ]}
+                >
+                  {perpFundingPaid !== undefined
+                    ? `-$${formatNumber(Math.abs(perpFundingPaid), 2)}`
+                    : 'N/A'}
+                </Text>
+              </View>
+            </View>
             
             {onMarketClose && (
               <TouchableOpacity

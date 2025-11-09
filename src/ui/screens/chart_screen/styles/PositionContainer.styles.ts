@@ -19,6 +19,27 @@ export const styles = StyleSheet.create({
     marginLeft: spacing.sm,
     marginTop: spacing.sm,
   },
+  expandedContent: {
+    paddingHorizontal: 10,
+    marginTop: -4,
+    paddingBottom: 4,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: Color.FG_3,
+    fontWeight: '400',
+  },
+  detailValue: {
+    fontSize: 12,
+    color: Color.FG_1,
+    fontWeight: '400',
+  },
   marketCloseButton: {
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,

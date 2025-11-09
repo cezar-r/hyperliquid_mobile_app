@@ -768,6 +768,19 @@ export default function ChartScreen(): React.JSX.Element {
       : parseFloat(perpPosition.positionValue || '0') / (perpPosition.leverage?.value || 1);
     const pnl = calculateUnrealizedPnL(perpPosition, currentPrice);
     
+    // Extract additional position details
+    const entryPrice = perpPosition.entryPx ? parseFloat(perpPosition.entryPx) : 0;
+    const positionSize = perpPosition.szi ? parseFloat(perpPosition.szi) : 0;
+    const positionValue = perpPosition.positionValue ? parseFloat(perpPosition.positionValue) : 0;
+    const liquidationPrice = perpPosition.liquidationPx ? parseFloat(perpPosition.liquidationPx) : null;
+    
+    // Calculate cumulative funding paid for this position
+    const userFundings = account.data?.userFundings || [];
+    const coinFundings = userFundings.filter((f: any) => f.coin === selectedCoin);
+    const fundingPaid = coinFundings.reduce((total: number, f: any) => {
+      return total + parseFloat(f.usdc || '0');
+    }, 0);
+    
     // If hideSmallBalances is enabled, filter out positions with USD value < $10
     if (hideSmallBalances && marginUsed < 10) {
       perpPosData = null;
@@ -778,6 +791,11 @@ export default function ChartScreen(): React.JSX.Element {
         perpMarginUsed: marginUsed,
         perpPnl: pnl,
         perpPriceChange: priceChangePct,
+        perpEntryPrice: entryPrice,
+        perpPositionSize: positionSize,
+        perpPositionValue: positionValue,
+        perpLiquidationPrice: liquidationPrice,
+        perpFundingPaid: fundingPaid,
       };
     }
   }
