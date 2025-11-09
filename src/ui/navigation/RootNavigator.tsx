@@ -13,23 +13,21 @@ import TabNavigator from './TabNavigator';
 
 const Stack = createNativeStackNavigator();
 
-// Wrapper component for authenticated screens that need WebSocket
+// Wrapper component for authenticated screens
 function AuthenticatedScreens(): React.JSX.Element {
   return (
-    <WebSocketProvider>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen 
-          name="Tabs" 
-          component={TabNavigator}
-          options={{ gestureEnabled: false }}
-        />
-        <Stack.Screen 
-          name="ChartDetail" 
-          component={ChartScreen}
-          options={{ headerShown: false }}
-        />
-      </Stack.Navigator>
-    </WebSocketProvider>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen 
+        name="Tabs" 
+        component={TabNavigator}
+        options={{ gestureEnabled: false }}
+      />
+      <Stack.Screen 
+        name="ChartDetail" 
+        component={ChartScreen}
+        options={{ headerShown: false }}
+      />
+    </Stack.Navigator>
   );
 }
 
@@ -73,27 +71,29 @@ export default function RootNavigator(): React.JSX.Element {
   }, [isConnected, address, provider]);
 
   return (
-    <Stack.Navigator 
-      screenOptions={{ headerShown: false }}
-      initialRouteName="Splash"
-    >
-      <Stack.Screen 
-        name="Splash" 
-        component={SplashScreen}
-        options={{ gestureEnabled: false }}
-      />
-      <Stack.Screen name="Connect" component={ConnectScreen} />
-      <Stack.Screen
-        name="EnableSessionKey"
-        component={EnableSessionKeyScreen}
-        options={{ gestureEnabled: false }}
-      />
-      <Stack.Screen 
-        name="Authenticated" 
-        component={AuthenticatedScreens}
-        options={{ gestureEnabled: false, headerShown: false }}
-      />
-    </Stack.Navigator>
+    <WebSocketProvider>
+      <Stack.Navigator 
+        screenOptions={{ headerShown: false }}
+        initialRouteName="Splash"
+      >
+        <Stack.Screen 
+          name="Splash" 
+          component={SplashScreen}
+          options={{ gestureEnabled: false }}
+        />
+        <Stack.Screen name="Connect" component={ConnectScreen} />
+        <Stack.Screen
+          name="EnableSessionKey"
+          component={EnableSessionKeyScreen}
+          options={{ gestureEnabled: false }}
+        />
+        <Stack.Screen 
+          name="Authenticated" 
+          component={AuthenticatedScreens}
+          options={{ gestureEnabled: false, headerShown: false }}
+        />
+      </Stack.Navigator>
+    </WebSocketProvider>
   );
 }
 

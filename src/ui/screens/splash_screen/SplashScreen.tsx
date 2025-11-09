@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAccount } from '@reown/appkit-react-native';
 import { loadSessionKey } from '../../../lib/sessionKey';
 import { useWallet } from '../../../contexts/WalletContext';
+import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { styles } from './styles/SplashScreen.styles';
 
 type NavigationProp = NativeStackNavigationProp<any>;
@@ -14,6 +15,7 @@ export default function SplashScreen(): React.JSX.Element {
   const navigation = useNavigation<NavigationProp>();
   const { address, isConnected } = useAccount();
   const { account } = useWallet();
+  const { state: wsState } = useWebSocket();
   const hasNavigated = useRef(false);
   const startTime = useRef(Date.now());
   const checkTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -56,30 +58,44 @@ export default function SplashScreen(): React.JSX.Element {
           return;
         }
 
-        // HAS SESSION KEY - wait for account data before going to home
-        console.log('[SplashScreen] Has session key, waiting for account data...');
+        // HAS SESSION KEY - wait for account and market data before going to home
+        console.log('[SplashScreen] Has session key, waiting for account and market data...');
         
-        // Wait for account data to load (up to 5 seconds)
+        // Wait for both account and market data to load (up to 5 seconds)
         const maxWaitForData = 5000;
         const dataStartTime = Date.now();
         
-        const checkAccountData = () => {
+        const checkAllData = () => {
           if (hasNavigated.current) return;
           
           const waitedForData = Date.now() - dataStartTime;
           
-          // If we have data OR we've waited too long, navigate
-          if (account.data !== null || waitedForData > maxWaitForData) {
-            console.log('[SplashScreen] Account data ready, navigating to home');
+          // Check if we have all required data
+          const hasAccountData = account.data !== null;
+          const hasMarketData = wsState.perpMarkets.length > 0 && wsState.spotMarkets.length > 0;
+          const isWebSocketConnected = wsState.isConnected;
+          
+          console.log('[SplashScreen] Data check:', {
+            hasAccountData,
+            hasMarketData,
+            isWebSocketConnected,
+            perpMarkets: wsState.perpMarkets.length,
+            spotMarkets: wsState.spotMarkets.length,
+            waitedMs: waitedForData
+          });
+          
+          // Navigate if we have all data OR we've waited too long
+          if ((hasAccountData && hasMarketData && isWebSocketConnected) || waitedForData > maxWaitForData) {
+            console.log('[SplashScreen] All data ready, navigating to home');
             hasNavigated.current = true;
             navigation.replace('Authenticated', { screen: 'Tabs' });
           } else {
             // Check again in 200ms
-            setTimeout(checkAccountData, 200);
+            setTimeout(checkAllData, 200);
           }
         };
         
-        checkAccountData();
+        checkAllData();
         
       } catch (error) {
         console.error('[SplashScreen] Error checking session key:', error);
@@ -93,7 +109,7 @@ export default function SplashScreen(): React.JSX.Element {
         clearTimeout(checkTimeout.current);
       }
     };
-  }, [isConnected, address, account.data, navigation]);
+  }, [isConnected, address, account.data, wsState.perpMarkets.length, wsState.spotMarkets.length, wsState.isConnected, navigation]);
 
   return (
     <View style={styles.container}>

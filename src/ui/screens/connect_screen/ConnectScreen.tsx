@@ -1,10 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppKit, useAccount } from '@reown/appkit-react-native';
 import { styles } from './styles/ConnectScreen.styles';
-import { loadSessionKey } from '../../../lib/sessionKey';
 import { VideoBackground } from './components';
 
 type NavigationProp = NativeStackNavigationProp<any>;
@@ -13,26 +12,17 @@ export default function ConnectScreen(): React.JSX.Element {
   const navigation = useNavigation<NavigationProp>();
   const { open } = useAppKit();
   const { address, isConnected } = useAccount();
+  const hasNavigated = useRef(false);
 
+  // When user connects wallet on this screen, navigate back to Splash
+  // Splash will handle routing to the correct screen (EnableSessionKey or Home)
   useEffect(() => {
-    const checkSessionAndNavigate = async () => {
-      if (isConnected && address) {
-        console.log('[ConnectScreen] Connected:', address);
-        
-        // Check if user already has a valid session key
-        const existingSessionKey = await loadSessionKey();
-        
-        if (existingSessionKey) {
-          console.log('[ConnectScreen] Found existing session key, skipping setup screen');
-          navigation.navigate('Authenticated', { screen: 'Tabs' });
-        } else {
-          console.log('[ConnectScreen] No session key found, showing setup screen');
-          navigation.navigate('EnableSessionKey');
-        }
-      }
-    };
-
-    checkSessionAndNavigate();
+    if (isConnected && address && !hasNavigated.current) {
+      console.log('[ConnectScreen] Wallet connected:', address, '- navigating to Splash');
+      hasNavigated.current = true;
+      // Navigate to Splash which will handle the routing logic
+      navigation.replace('Splash');
+    }
   }, [isConnected, address, navigation]);
 
   const handleConnect = async () => {

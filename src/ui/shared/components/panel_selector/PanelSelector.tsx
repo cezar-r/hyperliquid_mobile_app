@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Animated, Dimensions } from 'react-native';
 import { playToggleHaptic } from '../../../../lib/haptics';
 import { styles } from './styles/PanelSelector.styles';
@@ -15,7 +15,18 @@ export default function PanelSelector({
   selectedOption,
   onOptionChange,
 }: PanelSelectorProps): React.JSX.Element {
-  const filterLinePosition = useRef(new Animated.Value(0)).current;
+  // Calculate initial position based on selectedOption to avoid animation on mount
+  const initialPosition = useMemo(() => {
+    const index = options.indexOf(selectedOption);
+    const screenWidth = Dimensions.get('window').width;
+    const paddingHorizontal = spacing.md;
+    const availableWidth = screenWidth - paddingHorizontal * 2;
+    const segmentWidth = availableWidth / options.length;
+    return index * segmentWidth;
+  }, []); // Empty deps - only calculate once on mount
+
+  const filterLinePosition = useRef(new Animated.Value(initialPosition)).current;
+  const isFirstRender = useRef(true);
 
   // Animate filter line position when selected option changes
   useEffect(() => {
@@ -24,7 +35,12 @@ export default function PanelSelector({
     const paddingHorizontal = spacing.md;
     const availableWidth = screenWidth - paddingHorizontal * 2;
     const segmentWidth = availableWidth / options.length;
-    const separatorWidth = segmentWidth;
+
+    // Skip animation on first render since we initialized to correct position
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
 
     Animated.timing(filterLinePosition, {
       toValue: index * segmentWidth,
