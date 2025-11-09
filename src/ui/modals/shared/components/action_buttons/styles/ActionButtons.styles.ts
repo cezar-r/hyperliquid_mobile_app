@@ -10,7 +10,6 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Color.BG_3,
     paddingVertical: 16,
-    paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,

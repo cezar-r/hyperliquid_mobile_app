@@ -6,3 +6,4 @@ export { default as PanelSelector } from './panel_selector/PanelSelector';
 export { default as PositionCell } from './position_cell/PositionCell';
 export { default as SkeletonScreen } from './skeleton_screen/SkeletonScreen';
 export { default as TradeCard } from './trade_card/TradeCard';
+export { Slider } from './slider/Slider';
