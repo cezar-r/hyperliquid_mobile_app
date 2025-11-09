@@ -20,7 +20,7 @@ export default function SearchBar({
       <Ionicons
         name="search"
         size={20}
-        color={Color.BRIGHT_ACCENT}
+        color={Color.FG_3}
         style={styles.searchIcon}
       />
       <TextInput

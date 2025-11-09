@@ -4,6 +4,7 @@ import { Color, fontSizes, spacing } from '../../../styles';
 export const styles = StyleSheet.create({
   filterContainer: {
     paddingTop: spacing.md,
+    // backgroundColor: "#0b0f13",
     // borderColor: "#FFFFFF",
     // borderWidth: 3,
   },

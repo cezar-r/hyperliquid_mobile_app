@@ -5,11 +5,13 @@ export const styles = StyleSheet.create({
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Color.DARK_ACCENT,
+    backgroundColor: "#0b0f13",
     marginHorizontal: 16,
     marginTop: 16,
     paddingHorizontal: 16,
     borderRadius: 5,
+    borderColor: Color.BRIGHT_ACCENT,
+    borderWidth: 1,
   },
   searchIcon: {
     marginRight: 8,

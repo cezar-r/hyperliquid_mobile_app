@@ -85,7 +85,7 @@ function calculateUnrealizedPnL(position: any, currentPrice: number | string): {
 
 export default function ChartScreen(): React.JSX.Element {
   const navigation = useNavigation();
-  const { state, infoClient, subscribeToCandles, unsubscribeFromCandles, subscribeToOrderbook, unsubscribeFromOrderbook, subscribeToTrades, unsubscribeFromTrades } =
+  const { state, infoClient, enterChartMode, exitChartMode, subscribeToCandles, unsubscribeFromCandles, subscribeToOrderbook, unsubscribeFromOrderbook, subscribeToTrades, unsubscribeFromTrades } =
     useWebSocket();
   const { account, exchangeClient, refetchAccount } = useWallet();
   const { selectedCoin, marketType, spotMarkets } = state;
@@ -128,6 +128,16 @@ export default function ChartScreen(): React.JSX.Element {
 
     return () => task.cancel();
   }, []);
+
+  // Engage Chart Mode subscriptions only while this screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      enterChartMode?.();
+      return () => {
+        exitChartMode?.();
+      };
+    }, [enterChartMode, exitChartMode])
+  );
 
   // Get current asset's market data for szDecimals
   const perpMarket = marketType === 'perp'
@@ -665,19 +675,7 @@ export default function ChartScreen(): React.JSX.Element {
     showTradesOnChart,
   ]);
 
-  // Handle Show More button for trades
-  const handleShowMoreTrades = () => {
-    if (tradesDisplayLimit === 10) {
-      setTradesDisplayLimit(20);
-    } else if (tradesDisplayLimit === 20) {
-      setTradesDisplayLimit(50);
-    } else if (tradesDisplayLimit === 50) {
-      setTradesDisplayLimit(Number.MAX_SAFE_INTEGER);
-    } else {
-      // Reset to 10 when showing all
-      setTradesDisplayLimit(10);
-    }
-  };
+  // Limit recent trades row to 10 to reduce animation/render cost
 
   // Handle cancel order
   const handleCancelOrder = async (coin: string, oid: number) => {
@@ -840,6 +838,7 @@ export default function ChartScreen(): React.JSX.Element {
     const spotMarket = state.spotMarkets.find(m => m.name.split('/')[0] === filteredBalance.coin);
     const displayName = spotMarket ? getDisplayTicker(spotMarket.name) : filteredBalance.coin;
     
+    
     // If hideSmallBalances is enabled, filter out balances with USD value < $10
     if (hideSmallBalances && usdValue < 10) {
       spotBalData = null;
@@ -966,9 +965,9 @@ export default function ChartScreen(): React.JSX.Element {
 
         {/* Recent Trades */}
         <RecentTradesContainer
-          trades={filteredTrades}
-          displayLimit={tradesDisplayLimit}
-          onShowMore={handleShowMoreTrades}
+          trades={filteredTrades.slice(0, 10)}
+          displayLimit={10}
+          onShowMore={() => {}}
           getDisplayCoin={getDisplayCoin}
         />
       </ScrollView>

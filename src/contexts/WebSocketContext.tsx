@@ -44,6 +44,9 @@ interface WebSocketContextValue {
     coin: string,
     opts?: { nSigFigs?: number; mantissa?: number }
   ) => void;
+  // ChartScreen performance mode (conditional subscriptions)
+  enterChartMode: () => Promise<void>;
+  exitChartMode: () => Promise<void>;
   unsubscribeFromOrderbook: () => void;
   subscribeToTrades: (coin: string) => void;
   unsubscribeFromTrades: () => void;
@@ -95,6 +98,9 @@ export function WebSocketProvider({
   const activeTradesCoinRef = useRef<string | null>(null);
   const allPerpAssetCtxSubsRef = useRef<any[]>([]);
   const allSpotAssetCtxSubsRef = useRef<any[]>([]);
+  // Subscription mode management
+  const subscriptionModeRef = useRef<'global' | 'chart'>('global');
+  const singleAssetCtxSubRef = useRef<any>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -735,12 +741,249 @@ export function WebSocketProvider({
     console.log('[UserAccount] Unsubscribed from userFundings');
   }, []);
 
+  // ===== Chart mode: conditional subscriptions (ChartScreen only) =====
+  const unsubscribeAllAssetCtx = useCallback(async (): Promise<void> => {
+    // Perp asset contexts
+    allPerpAssetCtxSubsRef.current.forEach((sub) => {
+      sub?.unsubscribe().catch((err: any) => {
+        if (!err.message?.includes('WebSocket connection closed')) {
+          console.error('[Phase 4] Error unsubscribing perp asset ctx:', err);
+        }
+      });
+    });
+    allPerpAssetCtxSubsRef.current = [];
+    // Spot asset contexts
+    allSpotAssetCtxSubsRef.current.forEach((sub) => {
+      sub?.unsubscribe().catch((err: any) => {
+        if (!err.message?.includes('WebSocket connection closed')) {
+          console.error('[Phase 4] Error unsubscribing spot asset ctx:', err);
+        }
+      });
+    });
+    allSpotAssetCtxSubsRef.current = [];
+  }, []);
+
+  const unsubscribeAllMids = useCallback(async (): Promise<void> => {
+    if (allMidsSubIdRef.current) {
+      await allMidsSubIdRef.current.unsubscribe().catch((err: any) => {
+        if (!err.message?.includes('WebSocket connection closed')) {
+          console.error('[Phase 4] Error unsubscribing allMids:', err);
+        }
+      });
+      allMidsSubIdRef.current = null;
+    }
+  }, []);
+
+  const unsubscribeSingleAssetCtx = useCallback(async (): Promise<void> => {
+    if (singleAssetCtxSubRef.current) {
+      await singleAssetCtxSubRef.current.unsubscribe().catch((err: any) => {
+        if (!err.message?.includes('WebSocket connection closed')) {
+          console.error('[Phase 4] Error unsubscribing single asset ctx:', err);
+        }
+      });
+      singleAssetCtxSubRef.current = null;
+    }
+  }, []);
+
+  const subscribeSingleAssetCtx = useCallback(async (): Promise<void> => {
+    const client = subscriptionClientRef.current;
+    if (!client) return;
+    const coin = state.selectedCoin;
+    if (!coin) return;
+
+    // Ensure previous single subscription is cleared
+    await unsubscribeSingleAssetCtx();
+
+    try {
+      if (state.marketType === 'perp') {
+        console.log('[Phase 4] [ChartMode] Subscribing single perp asset ctx:', coin);
+        const sub = await client.activeAssetCtx({ coin }, (data: any) => {
+          const ctx = {
+            dayNtlVlm: parseFloat(data.ctx.dayNtlVlm),
+            prevDayPx: parseFloat(data.ctx.prevDayPx),
+            markPx: parseFloat(data.ctx.markPx),
+            midPx: data.ctx.midPx ? parseFloat(data.ctx.midPx) : undefined,
+            funding: parseFloat(data.ctx.funding),
+            openInterest: parseFloat(data.ctx.openInterest),
+          };
+          setState((prev) => ({
+            ...prev,
+            assetContexts: {
+              ...prev.assetContexts,
+              [coin]: ctx,
+            },
+          }));
+        });
+        singleAssetCtxSubRef.current = sub;
+      } else {
+        const subscriptionCoin = resolveSubscriptionCoin('spot', coin, state.spotMarkets);
+        console.log('[Phase 4] [ChartMode] Subscribing single spot asset ctx:', { coin, subscriptionCoin });
+        const sub = await (client as any).activeSpotAssetCtx({ coin: subscriptionCoin }, (data: any) => {
+          const ctx = {
+            dayNtlVlm: parseFloat(data.ctx.dayNtlVlm),
+            prevDayPx: parseFloat(data.ctx.prevDayPx),
+            markPx: parseFloat(data.ctx.markPx),
+            midPx: data.ctx.midPx ? parseFloat(data.ctx.midPx) : undefined,
+            circulatingSupply: parseFloat(data.ctx.circulatingSupply),
+          };
+          setState((prev) => ({
+            ...prev,
+            assetContexts: {
+              ...prev.assetContexts,
+              [coin]: ctx,
+            },
+          }));
+        });
+        singleAssetCtxSubRef.current = sub;
+      }
+    } catch (error) {
+      console.error('[Phase 4] [ChartMode] Error subscribing single asset ctx:', error);
+    }
+  }, [state.selectedCoin, state.marketType, state.spotMarkets, unsubscribeSingleAssetCtx]);
+
+  const resubscribeGlobal = useCallback(async (): Promise<void> => {
+    const client = subscriptionClientRef.current;
+    if (!client) return;
+    console.log('[Phase 4] Restoring global subscriptions (allMids + all asset contexts)');
+    // Re-subscribe allMids
+    try {
+      const sub = await client.allMids((data: any) => {
+        setState((prev) => {
+          const priceMap: Record<string, string> = {};
+          if (data.mids && typeof data.mids === 'object') {
+            Object.entries(data.mids).forEach(([coin, price]) => {
+              if (typeof price === 'string') {
+                if (coin.startsWith('@')) {
+                  const spotIndex = parseInt(coin.substring(1), 10);
+                  const spotMarket = prev.spotMarkets.find(
+                    (m: SpotMarket) => m.index === spotIndex
+                  );
+                  if (spotMarket) {
+                    priceMap[spotMarket.name] = price;
+                  }
+                } else {
+                  priceMap[coin] = price;
+                }
+              }
+            });
+          }
+          return { ...prev, prices: priceMap };
+        });
+      });
+      allMidsSubIdRef.current = sub;
+    } catch (error) {
+      console.error('[Phase 4] Error restoring allMids:', error);
+    }
+
+    // Re-subscribe asset contexts for all markets
+    try {
+      // Perp markets
+      const clientAny: any = client;
+      const perpSubs = await Promise.all(
+        state.perpMarkets.map(async (market) => {
+          try {
+            const sub = await client.activeAssetCtx(
+              { coin: market.name },
+              (data: any) => {
+                const ctx = {
+                  dayNtlVlm: parseFloat(data.ctx.dayNtlVlm),
+                  prevDayPx: parseFloat(data.ctx.prevDayPx),
+                  markPx: parseFloat(data.ctx.markPx),
+                  midPx: data.ctx.midPx ? parseFloat(data.ctx.midPx) : undefined,
+                  funding: parseFloat(data.ctx.funding),
+                  openInterest: parseFloat(data.ctx.openInterest),
+                };
+                setState((prev) => ({
+                  ...prev,
+                  assetContexts: {
+                    ...prev.assetContexts,
+                    [market.name]: ctx,
+                  },
+                }));
+              }
+            );
+            return sub;
+          } catch (error) {
+            console.error(`[Phase 4] Error re-subscribing perp ${market.name}:`, error);
+            return null;
+          }
+        })
+      );
+      allPerpAssetCtxSubsRef.current = perpSubs.filter((sub) => sub !== null);
+
+      // Spot markets
+      const spotSubs = await Promise.all(
+        state.spotMarkets.map(async (market) => {
+          try {
+            const subscriptionCoin =
+              market.name === 'PURR/USDC' ? 'PURR/USDC' : `@${market.index}`;
+            const sub = await clientAny.activeSpotAssetCtx(
+              { coin: subscriptionCoin },
+              (data: any) => {
+                const ctx = {
+                  dayNtlVlm: parseFloat(data.ctx.dayNtlVlm),
+                  prevDayPx: parseFloat(data.ctx.prevDayPx),
+                  markPx: parseFloat(data.ctx.markPx),
+                  midPx: data.ctx.midPx ? parseFloat(data.ctx.midPx) : undefined,
+                  circulatingSupply: parseFloat(data.ctx.circulatingSupply),
+                };
+                setState((prev) => ({
+                  ...prev,
+                  assetContexts: {
+                    ...prev.assetContexts,
+                    [market.name]: ctx,
+                  },
+                }));
+              }
+            );
+            return sub;
+          } catch (error) {
+            console.error(`[Phase 4] Error re-subscribing spot ${market.name}:`, error);
+            return null;
+          }
+        })
+      );
+      allSpotAssetCtxSubsRef.current = spotSubs.filter((sub) => sub !== null);
+      console.log('[Phase 4] ✓ Global subscriptions restored:', {
+        perpCtx: allPerpAssetCtxSubsRef.current.length,
+        spotCtx: allSpotAssetCtxSubsRef.current.length,
+      });
+    } catch (error) {
+      console.error('[Phase 4] Error restoring asset contexts:', error);
+    }
+  }, [state.perpMarkets, state.spotMarkets]);
+
+  const enterChartMode = useCallback(async (): Promise<void> => {
+    if (subscriptionModeRef.current === 'chart') return;
+    subscriptionModeRef.current = 'chart';
+    console.log('[Phase 4] → Entering Chart Mode (single asset context)');
+    await unsubscribeAllMids();
+    await unsubscribeAllAssetCtx();
+    await subscribeSingleAssetCtx();
+  }, [unsubscribeAllMids, unsubscribeAllAssetCtx, subscribeSingleAssetCtx]);
+
+  const exitChartMode = useCallback(async (): Promise<void> => {
+    if (subscriptionModeRef.current === 'global') return;
+    subscriptionModeRef.current = 'global';
+    console.log('[Phase 4] → Exiting Chart Mode (restoring global subscriptions)');
+    await unsubscribeSingleAssetCtx();
+    await resubscribeGlobal();
+  }, [unsubscribeSingleAssetCtx, resubscribeGlobal]);
+
+  // Re-subscribe the single asset context when coin or market type changes during Chart Mode
+  useEffect(() => {
+    if (subscriptionModeRef.current !== 'chart') return;
+    subscribeSingleAssetCtx();
+  }, [state.selectedCoin, state.marketType, subscribeSingleAssetCtx]);
+
   const value: WebSocketContextValue = {
     state,
     infoClient: infoClientRef.current,
     selectCoin,
     setMarketType,
     subscribeToOrderbook,
+    enterChartMode,
+    exitChartMode,
     unsubscribeFromOrderbook,
     subscribeToTrades,
     unsubscribeFromTrades,

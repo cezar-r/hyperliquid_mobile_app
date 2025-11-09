@@ -326,7 +326,6 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
         isCross: marginType === 'cross',
         leverage,
       });
-      
       console.log('[PerpOrderTicket] ✓ Leverage updated');
 
       const sizeValue = orderStats.size;
@@ -358,7 +357,6 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
       console.log('[PerpOrderTicket] Placing order:', JSON.stringify(orderPayload, null, 2));
 
       const result = await exchangeClient.order(orderPayload);
-
       console.log('[PerpOrderTicket] ✓ Order placed:', result);
       
       // Place TP/SL orders if specified
