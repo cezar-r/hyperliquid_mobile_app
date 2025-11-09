@@ -10,9 +10,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { LWCandle, ChartMarker, ChartPriceLine, LightweightChartBridgeRef } from '../../chart/LightweightChartBridge';
-import OrderTicket from '../../../components/OrderTicket';
-import SpotOrderTicket from '../../../components/SpotOrderTicket';
-import { TPSLEditModal, ClosePositionModal } from '../../modals';
+import { TPSLEditModal, ClosePositionModal, PerpOrderTicket, SpotOrderTicket } from '../../modals';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { useWallet } from '../../../contexts/WalletContext';
 import { resolveSubscriptionCoin } from '../../../lib/markets';
@@ -920,7 +918,7 @@ export default function ChartScreen(): React.JSX.Element {
 
       {/* Order Ticket Modal */}
       {marketType === 'perp' ? (
-        <OrderTicket
+        <PerpOrderTicket
           visible={showOrderTicket}
           onClose={() => setShowOrderTicket(false)}
           defaultSide={orderTicketDefaultSide}

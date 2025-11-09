@@ -1,0 +1,503 @@
+/**
+ * Spot Order Ticket Modal
+ * Interface for placing spot limit and market orders
+ */
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { View, Modal, ScrollView, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useWallet } from '../../../contexts/WalletContext';
+import { useWebSocket } from '../../../contexts/WebSocketContext';
+import { formatSize, formatWithCommas } from '../../../lib/formatting';
+import { getSkipOpenOrderConfirmations } from '../../../lib/confirmations';
+import { playOrderTicketSelectionChangeHaptic, playSliderChangeHaptic, playOrderSubmitHaptic } from '../../../lib/haptics';
+import { styles } from './styles/SpotOrderTicket.styles';
+import { InfoContainer, InfoRow } from '../shared/components/info_container/InfoContainer';
+import {
+  CloseButton,
+  ToggleContainer,
+  ToggleButton,
+  PriceContainer,
+  SizeContainer,
+  TifSelector,
+  SubmitButton,
+  ConfirmationModal,
+} from './components';
+
+type OrderSide = 'buy' | 'sell';
+type OrderType = 'limit' | 'market';
+type TimeInForce = 'Gtc' | 'Ioc' | 'Alo';
+
+interface SpotOrderTicketProps {
+  visible: boolean;
+  onClose: () => void;
+  defaultSide?: OrderSide;
+}
+
+export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClose, defaultSide }) => {
+  const { exchangeClient, account, refetchAccount } = useWallet();
+  const { state: wsState } = useWebSocket();
+  const { selectedCoin, prices, spotMarkets, orderbook } = wsState;
+
+  const coin = selectedCoin || '';
+  const currentPrice = prices[coin];
+  
+  // Get spot asset info
+  const assetInfo = useMemo(() => {
+    console.log('[SpotOrderTicket] Looking for coin:', coin);
+    
+    const market = spotMarkets.find(m => m.name === coin);
+    
+    console.log('[SpotOrderTicket] Market found:', !!market);
+    if (market) {
+      console.log('[SpotOrderTicket] Universe Index:', market.index, 'Size Decimals:', market.szDecimals);
+    }
+    
+    return {
+      index: market?.index ?? 0,
+      szDecimals: market?.szDecimals ?? 0,
+    };
+  }, [coin, spotMarkets]);
+  
+  // Get USDC balance
+  const usdcBalance = useMemo(() => {
+    const spotBalances = account.data?.spotBalances || [];
+    const usdc = spotBalances.find((b: any) => b.coin === 'USDC');
+    return parseFloat(usdc?.total || '0');
+  }, [account.data?.spotBalances]);
+  
+  // Get token balance
+  const tokenBalance = useMemo(() => {
+    const spotBalances = account.data?.spotBalances || [];
+    const baseToken = coin.split('/')[0];
+    const token = spotBalances.find((b: any) => b.coin === baseToken);
+    return parseFloat(token?.total || '0');
+  }, [account.data?.spotBalances, coin]);
+  
+  const [side, setSide] = useState<OrderSide>('buy');
+  const [orderType, setOrderType] = useState<OrderType | null>(null);
+  const [price, setPrice] = useState('');
+  const [size, setSize] = useState('');
+  const [sizePercent, setSizePercent] = useState(0);
+  const [tif, setTif] = useState<TimeInForce>('Gtc');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+
+  // Set default side when modal opens
+  useEffect(() => {
+    if (visible && defaultSide) {
+      setSide(defaultSide);
+    }
+  }, [visible, defaultSide]);
+
+  // Load order type preference
+  useEffect(() => {
+    const loadOrderTypePreference = async () => {
+      try {
+        const savedOrderType = await AsyncStorage.getItem('hl_order_type');
+        console.log('[SpotOrderTicket] Loading saved order type:', savedOrderType);
+        
+        if (savedOrderType) {
+          const type = savedOrderType as OrderType;
+          setOrderType(type);
+          setTif(type === 'market' ? 'Ioc' : 'Gtc');
+        } else {
+          setOrderType('market');
+          setTif('Ioc');
+        }
+      } catch (err) {
+        console.error('[SpotOrderTicket] Failed to load order type:', err);
+        setOrderType('market');
+        setTif('Ioc');
+      }
+    };
+    
+    if (visible) {
+      loadOrderTypePreference();
+    }
+  }, [visible]);
+
+  // Load side preference
+  useEffect(() => {
+    const loadSidePreference = async () => {
+      try {
+        const savedSide = await AsyncStorage.getItem('hl_order_side');
+        if (savedSide && !defaultSide) setSide(savedSide as OrderSide);
+      } catch (err) {
+        console.error('[SpotOrderTicket] Failed to load side:', err);
+      }
+    };
+    
+    if (visible && coin) {
+      loadSidePreference();
+    }
+  }, [visible, coin, defaultSide]);
+
+  // Save preferences
+  useEffect(() => {
+    if (visible && side) {
+      AsyncStorage.setItem('hl_order_side', side);
+    }
+  }, [side, visible]);
+  
+  useEffect(() => {
+    if (orderType && orderType !== null) {
+      AsyncStorage.setItem('hl_order_type', orderType);
+    }
+  }, [orderType]);
+
+  // Auto-fill price for market orders using orderbook
+  const getMarketPrice = () => {
+    if (orderbook && orderbook.levels) {
+      const asks = orderbook.levels[1];
+      const bids = orderbook.levels[0];
+      
+      if (side === 'buy' && asks.length > 0) {
+        const lowestAsk = asks[0].px;
+        console.log('[SpotOrderTicket] Buy market price from orderbook:', lowestAsk);
+        return lowestAsk;
+      } else if (side === 'sell' && bids.length > 0) {
+        const highestBid = bids[0].px;
+        console.log('[SpotOrderTicket] Sell market price from orderbook:', highestBid);
+        return highestBid;
+      }
+    }
+    
+    if (!currentPrice) {
+      return '';
+    }
+
+    const midPrice = parseFloat(currentPrice);
+    
+    if (side === 'buy') {
+      const marketPrice = (midPrice * 1.01).toString();
+      console.log('[SpotOrderTicket] Buy market price (fallback):', marketPrice);
+      return marketPrice;
+    } else {
+      const marketPrice = (midPrice * 0.99).toString();
+      console.log('[SpotOrderTicket] Sell market price (fallback):', marketPrice);
+      return marketPrice;
+    }
+  };
+
+  const handleOrderTypeChange = (type: OrderType) => {
+    playOrderTicketSelectionChangeHaptic();
+    setOrderType(type);
+    if (type === 'market') {
+      setTif('Ioc');
+      setPrice(getMarketPrice());
+    } else {
+      setTif('Gtc');
+      setPrice(currentPrice || '');
+    }
+  };
+
+  // Calculate cost/proceeds
+  const orderStats = useMemo(() => {
+    const p = parseFloat(price) || 0;
+    const s = parseFloat(size) || 0;
+    
+    if (!p || !s) {
+      return {
+        cost: 0,
+        costDisplay: '0.00',
+      };
+    }
+    
+    const usdAmount = p * s;
+    
+    return {
+      cost: usdAmount,
+      costDisplay: usdAmount.toFixed(2),
+    };
+  }, [price, size]);
+
+  // Handle slider change
+  const handleSizePercentChange = (percent: number) => {
+    setSizePercent(percent);
+    
+    if (side === 'buy') {
+      const p = parseFloat(price || currentPrice || '0');
+      if (p > 0) {
+        const usdToSpend = usdcBalance * (percent / 100);
+        const tokenAmount = usdToSpend / p;
+        setSize(tokenAmount.toFixed(assetInfo.szDecimals));
+      }
+    } else {
+      const tokenAmount = tokenBalance * (percent / 100);
+      setSize(tokenAmount.toFixed(assetInfo.szDecimals));
+    }
+  };
+
+  const handleSizeChange = (value: string) => {
+    setSize(value);
+    setSizePercent(0);
+  };
+
+  const handleSubmit = async () => {
+    setError(null);
+    
+    if (!price || !size) {
+      setError('Price and size required');
+      return;
+    }
+    
+    const priceValue = parseFloat(price);
+    const sizeValue = parseFloat(size);
+    
+    if (isNaN(priceValue) || isNaN(sizeValue) || priceValue <= 0 || sizeValue <= 0) {
+      setError('Invalid price or size');
+      return;
+    }
+    
+    const skipConfirmations = await getSkipOpenOrderConfirmations();
+    if (skipConfirmations) {
+      handleConfirmOrder();
+    } else {
+      setShowConfirmation(true);
+    }
+  };
+
+  const handleConfirmOrder = async () => {
+    if (!exchangeClient) {
+      Alert.alert('Error', 'Wallet not connected');
+      return;
+    }
+
+    const priceValue = parseFloat(price);
+    const sizeValue = parseFloat(size);
+
+    if (!priceValue || !sizeValue) {
+      setError('Price and size required');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    setShowConfirmation(false);
+
+    try {
+      console.log('[SpotOrderTicket] Placing order - Coin:', coin, 'Universe Index:', assetInfo.index);
+
+      const formattedPrice = price;
+      const formattedSize = formatSize(sizeValue, assetInfo.szDecimals, priceValue);
+
+      console.log('[SpotOrderTicket] Formatted Price:', formattedPrice, 'Formatted Size:', formattedSize);
+
+      const finalTif = orderType === 'market' ? 'Ioc' : tif;
+
+      const spotAssetId = 10000 + assetInfo.index;
+      
+      const orderPayload = {
+        orders: [{
+          a: spotAssetId,
+          b: side === 'buy',
+          p: formattedPrice,
+          s: formattedSize,
+          r: false,
+          t: {
+            limit: { tif: finalTif },
+          },
+        }],
+        grouping: 'na' as const,
+      };
+
+      console.log('[SpotOrderTicket] Placing spot order - Asset ID:', spotAssetId, 'Payload:', JSON.stringify(orderPayload, null, 2));
+
+      const result = await exchangeClient.order(orderPayload);
+
+      console.log('[SpotOrderTicket] ✓ Spot order placed successfully:', result);
+      
+      setTimeout(() => refetchAccount(), 2000);
+
+      setSize('');
+      setSizePercent(0);
+      if (orderType === 'limit') {
+        setPrice('');
+      }
+
+      Alert.alert('Success', `${side === 'buy' ? 'Buy' : 'Sell'} order placed successfully!`);
+      onClose();
+    } catch (err: any) {
+      console.error('[SpotOrderTicket] Order error:', err);
+      
+      setError(err.message || 'Failed to place order');
+      Alert.alert('Error', err.message || 'Failed to place order');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Update market order price when side, currentPrice, or orderbook changes
+  useEffect(() => {
+    if (orderType === 'market') {
+      const marketPrice = getMarketPrice();
+      if (marketPrice) {
+        setPrice(marketPrice);
+      }
+    }
+  }, [orderType, side, currentPrice, orderbook]);
+
+  if (!coin || orderType === null) {
+    return <View />;
+  }
+
+  if (spotMarkets.length === 0) {
+    return (
+      <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+              <CloseButton onPress={onClose} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  const tradeableLabel = side === 'buy' 
+    ? `$${formatWithCommas(usdcBalance, 2)}` 
+    : `${formatWithCommas(tokenBalance, 4)} ${coin.split('/')[0]}`;
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            <CloseButton onPress={onClose} />
+            
+            {/* Side Selector */}
+            <ToggleContainer>
+              <ToggleButton
+                label="Buy"
+                isActive={side === 'buy'}
+                onPress={() => {
+                  playOrderTicketSelectionChangeHaptic();
+                  setSide('buy');
+                }}
+                variant="buy"
+              />
+              <ToggleButton
+                label="Sell"
+                isActive={side === 'sell'}
+                onPress={() => {
+                  playOrderTicketSelectionChangeHaptic();
+                  setSide('sell');
+                }}
+                variant="sell"
+              />
+            </ToggleContainer>
+
+            {/* Order Type */}
+            <ToggleContainer>
+              <ToggleButton
+                label="Limit"
+                isActive={orderType === 'limit'}
+                onPress={() => handleOrderTypeChange('limit')}
+                variant="default"
+              />
+              <ToggleButton
+                label="Market"
+                isActive={orderType === 'market'}
+                onPress={() => handleOrderTypeChange('market')}
+                variant="default"
+              />
+            </ToggleContainer>
+
+            {/* Price Input */}
+            <PriceContainer
+              coin={coin}
+              price={price}
+              onPriceChange={setPrice}
+              currentPrice={currentPrice}
+              orderType={orderType}
+              onUseMarket={() => setPrice(currentPrice || '')}
+            />
+
+            {/* Size Input */}
+            <SizeContainer
+              coin={coin}
+              size={size}
+              onSizeChange={handleSizeChange}
+              sizePercent={sizePercent}
+              onSizePercentChange={handleSizePercentChange}
+              tradeableBalance={side === 'buy' ? usdcBalance : tokenBalance}
+              tradeableLabel={tradeableLabel}
+              side={side}
+              onSliderChange={playSliderChangeHaptic}
+            />
+
+            {/* Advanced Options */}
+            {orderType === 'limit' && (
+              <View style={styles.advancedOptions}>
+                <TifSelector
+                  value={tif}
+                  onValueChange={setTif}
+                />
+              </View>
+            )}
+
+            {/* Order Summary */}
+            <InfoContainer>
+              <InfoRow 
+                label={side === 'buy' ? 'USDC Balance:' : `${coin.split('/')[0]} Balance:`}
+                value={side === 'buy' ? `$${formatWithCommas(usdcBalance, 2)}` : `${formatWithCommas(tokenBalance, 4)}`}
+              />
+              <InfoRow 
+                label={side === 'buy' ? 'Cost:' : 'Proceeds:'}
+                value={`$${formatWithCommas(parseFloat(orderStats.costDisplay), 2)}`}
+                isLast
+              />
+            </InfoContainer>
+
+            {/* Submit Button */}
+            <SubmitButton
+              label={
+                side === 'buy' && orderStats.cost > usdcBalance
+                  ? 'Insufficient USDC'
+                  : side === 'sell' && parseFloat(size) > tokenBalance
+                  ? `Insufficient ${coin.split('/')[0]}`
+                  : `${side === 'buy' ? 'Buy' : 'Sell'} ${coin.split('/')[0]}`
+              }
+              onPress={() => {
+                playOrderSubmitHaptic();
+                handleSubmit();
+              }}
+              disabled={
+                isSubmitting ||
+                !price ||
+                !size ||
+                !exchangeClient ||
+                (side === 'buy' && orderStats.cost > usdcBalance) ||
+                (side === 'sell' && parseFloat(size) > tokenBalance)
+              }
+              isSubmitting={isSubmitting}
+              side={side}
+            />
+          </ScrollView>
+        </View>
+
+        {/* Confirmation Modal */}
+        <ConfirmationModal
+          visible={showConfirmation}
+          onClose={() => setShowConfirmation(false)}
+          onConfirm={handleConfirmOrder}
+          isSubmitting={isSubmitting}
+          orderDetails={{
+            coin,
+            side,
+            orderType,
+            price,
+            tokenSize: '',
+            size,
+            cost: orderStats.costDisplay,
+          }}
+          isSpot={true}
+        />
+      </View>
+    </Modal>
+  );
+};
+
