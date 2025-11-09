@@ -5,7 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { AppKit, AppKitProvider } from '@reown/appkit-react-native';
 import Color from './src/ui/shared/styles/colors';
 import RootNavigator from './src/ui/navigation/RootNavigator';
@@ -58,7 +58,17 @@ export default function App(): React.JSX.Element {
             <AppKit />
           </View>
           {appKitReady && (
-            <NavigationContainer>
+            <NavigationContainer
+              theme={{
+                ...DarkTheme,
+                colors: {
+                  ...DarkTheme.colors,
+                  background: '#0b0f13',
+                  card: '#0b0f13',
+                  border: '#0b0f13',
+                },
+              }}
+            >
               <WalletProvider>
                 <RootNavigator />
               </WalletProvider>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, Alert, SafeAreaView, InteractionManager } from 'react-native';
+import { ScrollView, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount, useAppKit } from '@reown/appkit-react-native';
 import { styles } from './styles/ProfileScreen.styles';
 import { SkeletonScreen } from '../../shared/components';
@@ -10,16 +11,9 @@ export default function ProfileScreen(): React.JSX.Element {
   const { disconnect } = useAppKit();
   
   // For skeleton loading
-  const [isReady, setIsReady] = useState(false);
+  const [isReady] = useState(true);
 
-  // Defer rendering until navigation is complete
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      setIsReady(true);
-    });
-
-    return () => task.cancel();
-  }, []);
+  // Defer rendering was removed to avoid initial flicker on first tab visit
 
   const handleDisconnect = () => {
     Alert.alert(
@@ -43,10 +37,11 @@ export default function ProfileScreen(): React.JSX.Element {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
+        contentInsetAdjustmentBehavior="never"
       >
         <WalletInfoContainer address={address} />
         

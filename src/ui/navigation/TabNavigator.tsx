@@ -112,7 +112,9 @@ export default function TabNavigator(): React.JSX.Element {
   return (
     <>
       <Tab.Navigator
+        initialRouteName="Home"
         screenOptions={{
+          headerShown: false,
           headerStyle: {
             backgroundColor: Color.BG_1,
             borderBottomWidth: 1,

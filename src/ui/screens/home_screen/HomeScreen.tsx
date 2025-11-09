@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { View, ScrollView, Alert, Animated, SafeAreaView, InteractionManager } from 'react-native';
+import { View, ScrollView, Alert, Animated } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@reown/appkit-react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -59,7 +60,7 @@ export default function HomeScreen(): React.JSX.Element {
   const [hideSmallBalances, setHideSmallBalances] = useState(false);
 
   // For skeleton loading
-  const [isReady, setIsReady] = useState(false);
+  const [isReady] = useState(true);
 
   // For starred tickers
   const [starredPerpTickers, setStarredPerpTickers] = useState<string[]>([]);
@@ -73,14 +74,7 @@ export default function HomeScreen(): React.JSX.Element {
   // For swipe animation
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  // Defer rendering until navigation is complete
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      setIsReady(true);
-    });
-
-    return () => task.cancel();
-  }, []);
+  // Defer rendering was removed to avoid initial flicker on first tab visit
 
   // Load saved market filter and hide small balances preference on mount
   useEffect(() => {
@@ -661,7 +655,7 @@ export default function HomeScreen(): React.JSX.Element {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       <View style={styles.contentContainer}>
         {/* Market Filter Panel */}
         <PanelSelector
@@ -673,7 +667,10 @@ export default function HomeScreen(): React.JSX.Element {
         {/* Entire page wrapped with Swipe Gesture */}
         <GestureDetector gesture={panGesture}>
           <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
-            <ScrollView style={styles.scrollView}>
+            <ScrollView
+              style={styles.scrollView}
+              contentInsetAdjustmentBehavior="never"
+            >
               <BalanceContent
                 balance={displayedBalance}
                 showDepositButton={marketFilter === 'Account' && displayedBalance === 0}

@@ -44,8 +44,6 @@ export default function EnableSessionKeyScreen(): React.JSX.Element {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.icon}>⚡</Text>
-
         <Text style={styles.title}>Enable Auto-Approve?</Text>
 
         <Text style={styles.description}>
@@ -56,30 +54,26 @@ export default function EnableSessionKeyScreen(): React.JSX.Element {
 
         <View style={styles.benefitsList}>
           <View style={styles.benefitItem}>
-            <Text style={styles.benefitIcon}>🚀</Text>
             <Text style={styles.benefitText}>
-              Place orders instantly without wallet popups
+              • Place orders instantly without wallet popups
             </Text>
           </View>
 
           <View style={styles.benefitItem}>
-            <Text style={styles.benefitIcon}>🔒</Text>
             <Text style={styles.benefitText}>
-              Secure: session expires after 7 days
+              • Secure: session expires after 7 days
             </Text>
           </View>
 
           <View style={styles.benefitItem}>
-            <Text style={styles.benefitIcon}>⏱️</Text>
             <Text style={styles.benefitText}>
-              Save time on every trade, cancel, and adjustment
+              • Save time on every trade, cancel, and adjustment
             </Text>
           </View>
 
           <View style={styles.benefitItem}>
-            <Text style={styles.benefitIcon}>💰</Text>
             <Text style={styles.benefitText}>
-              Deposits and withdrawals still require your approval
+              • Deposits and withdrawals still require your approval
             </Text>
           </View>
         </View>
@@ -92,25 +86,25 @@ export default function EnableSessionKeyScreen(): React.JSX.Element {
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity
+            style={styles.skipButton}
+            onPress={handleSkip}
+            disabled={isEnabling}
+          >
+            <Text style={styles.skipButtonText}>Skip</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.enableButton, isEnabling && styles.enableButtonDisabled]}
             onPress={handleEnable}
             disabled={isEnabling}
           >
             {isEnabling ? (
-              <ActivityIndicator color="#000000" />
+              <ActivityIndicator color="#303030" />
             ) : (
               <Text style={styles.enableButtonText}>
-                Enable Auto-Approve
+                Enable
               </Text>
             )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.skipButton}
-            onPress={handleSkip}
-            disabled={isEnabling}
-          >
-            <Text style={styles.skipButtonText}>Skip for Now</Text>
           </TouchableOpacity>
         </View>
       </View>

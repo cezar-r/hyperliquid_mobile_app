@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { View, ScrollView, SafeAreaView, Animated, InteractionManager } from 'react-native';
+import { View, ScrollView, Animated } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@reown/appkit-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -22,7 +23,8 @@ export default function HistoryScreen(): React.JSX.Element {
   const { state: wsState } = useWebSocket();
 
   // For skeleton loading
-  const [isReady, setIsReady] = useState(false);
+  const [isReady] = useState(true);
+  const [filterHydrated, setFilterHydrated] = useState(false);
 
   // Filter states
   const [viewFilter, setViewFilter] = useState<ViewFilter>('Trades');
@@ -33,14 +35,7 @@ export default function HistoryScreen(): React.JSX.Element {
   // For swipe animation
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  // Defer rendering until navigation is complete
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      setIsReady(true);
-    });
-
-    return () => task.cancel();
-  }, []);
+  // Defer rendering was removed to avoid initial flicker on first tab visit
 
   // Helper to check if a fill is a spot trade (handles both base token name and API format)
   const isSpotFill = useCallback(
@@ -65,6 +60,8 @@ export default function HistoryScreen(): React.JSX.Element {
         }
       } catch (error) {
         console.error('[HistoryScreen] Error loading filter:', error);
+      } finally {
+        setFilterHydrated(true);
       }
     };
     loadFilter();
@@ -173,12 +170,12 @@ export default function HistoryScreen(): React.JSX.Element {
     .activeOffsetX([-10, 10])
     .failOffsetY([-20, 20]);
 
-  if (!isReady) {
+  if (!isReady || !filterHydrated) {
     return <SkeletonScreen />;
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       <View style={styles.contentContainer}>
         {/* View Filter Selector */}
         <PanelSelector
@@ -190,7 +187,11 @@ export default function HistoryScreen(): React.JSX.Element {
         {/* Content */}
         <GestureDetector gesture={panGesture}>
           <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={styles.content}
+              contentInsetAdjustmentBehavior="never"
+            >
               {!address && (
                 <EmptyState
                   message="No wallet connected"

@@ -99,6 +99,7 @@ export const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: Color.BRIGHT_ACCENT,
     paddingVertical: 16,
+    paddingHorizontal: 20,
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 12,

@@ -1,12 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import {
-  View,
-  FlatList,
-  SafeAreaView,
-  Keyboard,
-  Animated,
-  InteractionManager,
-} from 'react-native';
+import { View, FlatList, Keyboard, Animated } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -53,7 +47,7 @@ export default function SearchScreen(): React.JSX.Element {
   const [isAscending, setIsAscending] = useState(false);
 
   // For skeleton loading
-  const [isReady, setIsReady] = useState(false);
+  const [isReady] = useState(true);
 
   // Store sort preferences per market type
   const [perpSort, setPerpSort] = useState<SortType>(SortType.VOLUME);
@@ -68,14 +62,7 @@ export default function SearchScreen(): React.JSX.Element {
   // For swipe animation
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  // Defer rendering until navigation is complete
-  React.useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      setIsReady(true);
-    });
-
-    return () => task.cancel();
-  }, []);
+  // Defer rendering was removed to avoid initial flicker on first tab visit
 
   // Load star filter preference from AsyncStorage on mount
   React.useEffect(() => {
@@ -531,12 +518,14 @@ export default function SearchScreen(): React.JSX.Element {
     .activeOffsetX([-10, 10])
     .failOffsetY([-20, 20]);
 
-  if (!isReady) {
+  const marketsHydrated = currentMarkets.length > 0;
+
+  if (!isReady || !marketsHydrated) {
     return <SkeletonScreen />;
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       <View style={styles.contentContainer}>
         {/* Perp/Spot Toggle */}
         <PanelSelector
@@ -574,6 +563,7 @@ export default function SearchScreen(): React.JSX.Element {
               keyExtractor={keyExtractor}
               renderItem={renderItem}
               keyboardShouldPersistTaps="handled"
+              contentInsetAdjustmentBehavior="never"
               initialNumToRender={20}
               windowSize={7}
               maxToRenderPerBatch={20}

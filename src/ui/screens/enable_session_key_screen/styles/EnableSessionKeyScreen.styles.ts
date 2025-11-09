@@ -4,7 +4,7 @@ import { Color } from '../../../shared/styles';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Color.BG_1,
+    backgroundColor: '#0b0f13',
     paddingHorizontal: 24,
     justifyContent: 'center',
   },
@@ -27,7 +27,7 @@ export const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
-    color: Color.FG_2,
+    color: Color.FG_1,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 32,
@@ -53,11 +53,28 @@ export const styles = StyleSheet.create({
     lineHeight: 22,
   },
   buttonContainer: {
+    flexDirection: 'row',
     width: '100%',
     gap: 12,
   },
+  skipButton: {
+    flex: 1,
+    backgroundColor: '#0b0f13',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Color.BRIGHT_ACCENT,
+  },
+  skipButtonText: {
+    color: Color.FG_1,
+    fontSize: 16,
+    fontWeight: '600',
+  },
   enableButton: {
-    backgroundColor: Color.BG_1,
+    flex: 1,
+    backgroundColor: Color.BRIGHT_ACCENT,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -67,21 +84,7 @@ export const styles = StyleSheet.create({
     opacity: 0.6,
   },
   enableButtonText: {
-    color: Color.FG_1,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  skipButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Color.BG_1,
-  },
-  skipButtonText: {
-    color: Color.FG_1,
+    color: Color.FG_2,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -90,7 +93,7 @@ export const styles = StyleSheet.create({
     marginTop: 16,
   },
   loadingText: {
-    color: Color.FG_2,
+    color: Color.FG_1,
     fontSize: 14,
     marginTop: 8,
   },

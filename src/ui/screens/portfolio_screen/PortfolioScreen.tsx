@@ -4,11 +4,10 @@ import {
   Text,
   ScrollView,
   ActivityIndicator,
-  SafeAreaView,
   Alert,
   Animated,
-  InteractionManager,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@reown/appkit-react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -87,7 +86,7 @@ export default function PortfolioScreen(): React.JSX.Element {
   const navigation = useNavigation<any>();
 
   // For skeleton loading
-  const [isReady, setIsReady] = useState(false);
+  const [isReady] = useState(true);
 
   // Modal states
   const [depositModalVisible, setDepositModalVisible] = useState(false);
@@ -118,14 +117,7 @@ export default function PortfolioScreen(): React.JSX.Element {
   // For swipe animation
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  // Defer rendering until navigation is complete
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      setIsReady(true);
-    });
-
-    return () => task.cancel();
-  }, []);
+  // Defer rendering was removed to avoid initial flicker on first tab visit
 
   // Load saved filters on mount
   useEffect(() => {
@@ -873,7 +865,7 @@ export default function PortfolioScreen(): React.JSX.Element {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       <View style={styles.contentContainer}>
         {/* Time Period Filter */}
         <TimeFilterSelector selectedFilter={timeFilter} onFilterChange={handleTimeFilterChange} />
@@ -881,7 +873,11 @@ export default function PortfolioScreen(): React.JSX.Element {
         {/* Entire content wrapped with Swipe Gesture */}
         <GestureDetector gesture={panGesture}>
           <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={styles.content}
+              contentInsetAdjustmentBehavior="never"
+            >
               {/* Market Filter Dropdown */}
               <MarketDropdown
                 selectedFilter={marketFilter}
