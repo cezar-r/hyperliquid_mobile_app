@@ -9,7 +9,6 @@ export { default as MarketDropdown } from './MarketDropdown';
 export { default as MarketDropdownOption } from './MarketDropdownOption';
 export { default as PortfolioOpenOrdersContainer } from './PortfolioOpenOrdersContainer';
 export { default as PortfolioStakingContainer } from './PortfolioStakingContainer';
-export { default as RecentTradesContainer } from './RecentTradesContainer';
 export { default as StakingInfoCell } from './StakingInfoCell';
 export { default as TimeFilterSelector } from './TimeFilterSelector';
 export { default as TradingVolumeDisplay } from './TradingVolumeDisplay';

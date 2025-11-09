@@ -25,7 +25,7 @@ import { styles } from './styles/PortfolioScreen.styles';
 import type { PerpPosition, UserFill } from '../../../types';
 import { Color } from '../../shared/styles';
 import { DepositModal, WithdrawModal, PerpSpotTransferModal, DelegateModal, UndelegateModal, TransferToStakingModal, TransferFromStakingModal, TPSLEditModal } from '../../modals';
-import { EmptyState, LoadingBlob, SkeletonScreen } from '../../shared/components';
+import { EmptyState, LoadingBlob, SkeletonScreen, RecentTradesContainer } from '../../shared/components';
 import {
   TimeFilterSelector,
   MarketDropdown,
@@ -34,7 +34,6 @@ import {
   EquityBreakdown,
   PortfolioOpenOrdersContainer,
   PortfolioStakingContainer,
-  RecentTradesContainer,
 } from './components';
 import type { TimeFilter, MarketFilter } from './components';
 import { PerpPositionsContainer, SpotBalancesContainer } from '../home_screen/components';
@@ -1034,7 +1033,10 @@ export default function PortfolioScreen(): React.JSX.Element {
                             } else if (tradesDisplayLimit === 20) {
                               setTradesDisplayLimit(50);
                             } else if (tradesDisplayLimit === 50) {
-                              setTradesDisplayLimit(filteredFills.length);
+                              setTradesDisplayLimit(Number.MAX_SAFE_INTEGER);
+                            } else {
+                              // Reset to 10 when showing all
+                              setTradesDisplayLimit(10);
                             }
                           }}
                           getDisplayCoin={getDisplayCoin}

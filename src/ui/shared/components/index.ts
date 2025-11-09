@@ -4,6 +4,7 @@ export { default as LoadingBlob } from './loading_blob/LoadingBlob';
 export { default as MarketCell } from './market_cell/MarketCell';
 export { default as PanelSelector } from './panel_selector/PanelSelector';
 export { default as PositionCell } from './position_cell/PositionCell';
+export { default as RecentTradesContainer } from './recent_trades_container/RecentTradesContainer';
 export { default as SkeletonScreen } from './skeleton_screen/SkeletonScreen';
 export { default as TradeCard } from './trade_card/TradeCard';
 export { Slider } from './slider/Slider';

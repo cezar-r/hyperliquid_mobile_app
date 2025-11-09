@@ -20,7 +20,7 @@ import { isTickerStarred, toggleStarredTicker } from '../../../lib/starredTicker
 import type { Candle, CandleInterval } from '../../../types';
 import { styles } from './styles/ChartScreen.styles';
 import { Color } from '../../shared/styles';
-import { PanelSelector, SkeletonScreen } from '../../shared/components';
+import { PanelSelector, SkeletonScreen, RecentTradesContainer } from '../../shared/components';
 import {
   ChartHeader,
   ChartContent,
@@ -28,7 +28,6 @@ import {
   TradesContent,
   PositionContainer,
   OpenOrdersContainer,
-  RecentTradesContainer,
   BuySellButtons,
 } from './components';
 
@@ -111,6 +110,7 @@ export default function ChartScreen(): React.JSX.Element {
   const [isStarred, setIsStarred] = useState(false);
   const [showTradesOnChart, setShowTradesOnChart] = useState(false);
   const [hideSmallBalances, setHideSmallBalances] = useState(false);
+  const [tradesDisplayLimit, setTradesDisplayLimit] = useState(10);
 
   // Chart ref for markers and price lines
   const chartRef = useRef<LightweightChartBridgeRef>(null);
@@ -665,6 +665,20 @@ export default function ChartScreen(): React.JSX.Element {
     showTradesOnChart,
   ]);
 
+  // Handle Show More button for trades
+  const handleShowMoreTrades = () => {
+    if (tradesDisplayLimit === 10) {
+      setTradesDisplayLimit(20);
+    } else if (tradesDisplayLimit === 20) {
+      setTradesDisplayLimit(50);
+    } else if (tradesDisplayLimit === 50) {
+      setTradesDisplayLimit(Number.MAX_SAFE_INTEGER);
+    } else {
+      // Reset to 10 when showing all
+      setTradesDisplayLimit(10);
+    }
+  };
+
   // Handle cancel order
   const handleCancelOrder = async (coin: string, oid: number) => {
     if (!exchangeClient || !selectedCoin) return;
@@ -953,6 +967,8 @@ export default function ChartScreen(): React.JSX.Element {
         {/* Recent Trades */}
         <RecentTradesContainer
           trades={filteredTrades}
+          displayLimit={tradesDisplayLimit}
+          onShowMore={handleShowMoreTrades}
           getDisplayCoin={getDisplayCoin}
         />
       </ScrollView>
