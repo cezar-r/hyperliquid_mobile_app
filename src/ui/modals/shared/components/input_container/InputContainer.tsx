@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { Color } from '../../../../shared/styles/colors';
 import { styles } from './styles/InputContainer.styles';
+import { playPrimaryButtonHaptic } from '../../../../../lib/haptics';
 
 interface InputContainerProps {
   label: string;
@@ -37,7 +38,10 @@ export const InputContainer: React.FC<InputContainerProps> = ({
           autoFocus={autoFocus}
         />
         {onMaxPress && (
-          <TouchableOpacity style={styles.maxButton} onPress={onMaxPress}>
+          <TouchableOpacity style={styles.maxButton} onPress={() => {
+            playPrimaryButtonHaptic();
+            onMaxPress();
+          }}>
             <Text style={styles.maxButtonText}>Max</Text>
           </TouchableOpacity>
         )}

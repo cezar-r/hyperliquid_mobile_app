@@ -11,7 +11,7 @@ export const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     height: '100%',
-    paddingTop: 20,
+    paddingTop: 28,
   },
   scrollContent: {
     padding: 20,

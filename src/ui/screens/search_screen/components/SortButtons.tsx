@@ -3,6 +3,7 @@ import { View, ScrollView, TouchableOpacity, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Color } from '../../../shared/styles';
 import { styles } from '../styles/SortButtons.styles';
+import { playOptionSelectionHaptic } from '../../../../lib/haptics';
 
 export enum SortType {
   ALPHABETICAL = 'A-Z',
@@ -38,7 +39,10 @@ export default function SortButtons({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.sortScrollContent}
       >
-        <TouchableOpacity style={styles.sortButton} onPress={onStarFilterToggle}>
+        <TouchableOpacity style={styles.sortButton} onPress={() => {
+          playOptionSelectionHaptic();
+          onStarFilterToggle();
+        }}>
           <Ionicons
             name={showStarredOnly ? 'star' : 'star-outline'}
             size={16}
@@ -52,7 +56,10 @@ export default function SortButtons({
               styles.sortButton,
               currentSort === sortType && styles.sortButtonActive,
             ]}
-            onPress={() => onSortPress(sortType)}
+            onPress={() => {
+              playOptionSelectionHaptic();
+              onSortPress(sortType);
+            }}
           >
             <Text
               style={[

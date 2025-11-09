@@ -4,6 +4,7 @@ import { styles } from '../styles/PortfolioStakingContainer.styles';
 import StakingInfoCell from './StakingInfoCell';
 import DelegationCell from './DelegationCell';
 import type { MarketFilter } from './MarketDropdown';
+import { playPrimaryButtonHaptic } from '../../../../lib/haptics';
 
 interface StakingDelegation {
   validator: `0x${string}`;
@@ -84,14 +85,20 @@ export default function PortfolioStakingContainer({
         <View style={styles.stakingButtons}>
           <TouchableOpacity
             style={styles.depositButton}
-            onPress={onTransferToStakingPress}
+            onPress={() => {
+              playPrimaryButtonHaptic();
+              onTransferToStakingPress();
+            }}
             disabled={!hasSpotHype}
           >
             <Text style={styles.depositButtonText}>Transfer to Staking</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.withdrawButton}
-            onPress={onTransferToSpotPress}
+            onPress={() => {
+              playPrimaryButtonHaptic();
+              onTransferToSpotPress();
+            }}
             disabled={!hasUndelegated}
           >
             <Text style={styles.withdrawButtonText}>Transfer to Spot</Text>
@@ -100,7 +107,10 @@ export default function PortfolioStakingContainer({
 
         {/* Delegate Button */}
         {hasUndelegated && (
-          <TouchableOpacity style={styles.delegateButton} onPress={onDelegatePress}>
+          <TouchableOpacity style={styles.delegateButton} onPress={() => {
+            playPrimaryButtonHaptic();
+            onDelegatePress();
+          }}>
             <Text style={styles.delegateButtonText}>Delegate to Validator</Text>
           </TouchableOpacity>
         )}

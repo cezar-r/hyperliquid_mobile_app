@@ -6,6 +6,7 @@ import { LoadingBlob } from '../../../shared/components';
 import { styles } from '../styles/ChartContent.styles';
 import { Color } from '../../../shared/styles';
 import type { CandleInterval } from '../../../../types';
+import { playStarHaptic } from '../../../../lib/haptics';
 
 const INTERVALS: CandleInterval[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
@@ -50,7 +51,10 @@ export default function ChartContent({
           </TouchableOpacity>
         ))}
         <TouchableOpacity
-          onPress={onToggleStar}
+          onPress={() => {
+            playStarHaptic();
+            onToggleStar();
+          }}
           style={styles.starButton}
           activeOpacity={0.7}
         >

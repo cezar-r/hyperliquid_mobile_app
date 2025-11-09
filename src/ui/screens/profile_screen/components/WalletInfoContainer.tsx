@@ -4,6 +4,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Octicons } from '@expo/vector-icons';
 import { Color } from '../../../shared/styles';
 import { styles } from '../styles/WalletInfoContainer.styles';
+import { playCopyButtonHaptic } from '../../../../lib/haptics';
 
 interface WalletInfoContainerProps {
   address: string | undefined;
@@ -19,6 +20,7 @@ export default function WalletInfoContainer({
 
   const handleCopyAddress = async () => {
     if (address) {
+      playCopyButtonHaptic();
       await Clipboard.setStringAsync(address);
       Alert.alert('Copied', 'Wallet address copied to clipboard');
     }

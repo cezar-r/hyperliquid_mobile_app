@@ -5,6 +5,7 @@ import { sharedStyles } from '../styles/shared.styles';
 import { styles } from '../styles/PerpPositionsContainer.styles';
 import PerpPositionCell from './PerpPositionCell';
 import type { PerpPosition } from '../../../../types';
+import { playTextButtonHaptic } from '../../../../lib/haptics';
 
 interface PerpPositionsContainerProps {
   sortedPositions: Array<{
@@ -46,7 +47,10 @@ export default function PerpPositionsContainer({
       {showCloseAll && sortedPositions.length > 0 && (
         <View style={styles.perpsHeaderRow}>
           <Text style={styles.sectionLabel}>Perps</Text>
-          <TouchableOpacity onPress={onCloseAll}>
+          <TouchableOpacity onPress={() => {
+            playTextButtonHaptic();
+            onCloseAll?.();
+          }}>
             <Text style={styles.closeAllText}>Close All</Text>
           </TouchableOpacity>
         </View>

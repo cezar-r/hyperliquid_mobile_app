@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { styles } from '../styles/BuySellButtons.styles';
+import { playPrimaryButtonHaptic } from '../../../../lib/haptics';
 
 interface BuySellButtonsProps {
   onBuyPress: () => void;
@@ -15,14 +16,20 @@ export default function BuySellButtons({
     <View style={styles.orderButtonsContainer}>
       <TouchableOpacity
         style={[styles.orderButton, styles.orderButtonBuy]}
-        onPress={onBuyPress}
+        onPress={() => {
+          playPrimaryButtonHaptic();
+          onBuyPress();
+        }}
         activeOpacity={0.8}
       >
         <Text style={styles.orderButtonTextBuy}>BUY</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.orderButton, styles.orderButtonSell]}
-        onPress={onSellPress}
+        onPress={() => {
+          playPrimaryButtonHaptic();
+          onSellPress();
+        }}
         activeOpacity={0.8}
       >
         <Text style={styles.orderButtonTextSell}>SELL</Text>

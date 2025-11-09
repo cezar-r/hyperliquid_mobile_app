@@ -1,6 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text } from 'react-native';
 import { styles } from './styles/PrimaryButton.styles';
+import { playPrimaryButtonHaptic } from '../../../../../lib/haptics';
 
 interface PrimaryButtonProps {
   onPress: () => void;
@@ -16,7 +17,10 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   return (
     <TouchableOpacity
       style={[styles.primaryButton, disabled && styles.primaryButtonDisabled]}
-      onPress={onPress}
+      onPress={() => {
+        playPrimaryButtonHaptic();
+        onPress();
+      }}
       disabled={disabled}
     >
       <Text style={styles.primaryButtonText}>{text}</Text>

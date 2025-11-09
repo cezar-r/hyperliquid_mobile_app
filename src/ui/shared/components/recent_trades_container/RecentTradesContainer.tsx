@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Animated } from 'react-native';
 import TradeCard from '../trade_card/TradeCard';
 import { styles } from './styles/RecentTradesContainer.styles';
 import type { UserFill } from '../../../../types';
+import { playShowMoreButtonHaptic } from '../../../../lib/haptics';
 
 interface RecentTradesContainerProps {
   trades: UserFill[];
@@ -72,7 +73,10 @@ export default function RecentTradesContainer({
 
       {/* Show More/Less Button */}
       {trades.length > 10 && (
-        <TouchableOpacity style={styles.showMoreButton} onPress={onShowMore}>
+        <TouchableOpacity style={styles.showMoreButton} onPress={() => {
+          playShowMoreButtonHaptic();
+          onShowMore();
+        }}>
           <Text style={styles.showMoreText}>
             {showingAll ? (
               'Show Less'

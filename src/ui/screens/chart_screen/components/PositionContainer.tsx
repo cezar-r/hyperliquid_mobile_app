@@ -4,6 +4,7 @@ import { PositionCell } from '../../../shared/components';
 import { getDisplayTicker } from '../../../../lib/formatting';
 import { styles } from '../styles/PositionContainer.styles';
 import { Color } from '../../../shared/styles';
+import { playTextButtonHaptic } from '../../../../lib/haptics';
 
 interface PositionContainerProps {
   marketType: 'perp' | 'spot';
@@ -140,7 +141,10 @@ export default function PositionContainer({
             
             {onMarketClose && (
               <TouchableOpacity
-                onPress={onMarketClose}
+                onPress={() => {
+                  playTextButtonHaptic();
+                  onMarketClose();
+                }}
                 style={styles.marketCloseButton}
               >
                 <Text style={styles.marketCloseText}>

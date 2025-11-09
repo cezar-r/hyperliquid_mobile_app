@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, TouchableOpacity, Text } from 'react-native';
 import { styles } from './styles/ActionButtons.styles';
+import { playPrimaryButtonHaptic, playCancelHaptic } from '../../../../../lib/haptics';
 
 interface ActionButtonsProps {
   onCancel: () => void;
@@ -21,7 +22,10 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
 }) => {
   return (
     <View style={styles.actionButtons}>
-      <TouchableOpacity style={styles.secondaryButton} onPress={onCancel}>
+      <TouchableOpacity style={styles.secondaryButton} onPress={() => {
+        playCancelHaptic();
+        onCancel();
+      }}>
         <Text style={styles.secondaryButtonText}>{cancelText}</Text>
       </TouchableOpacity>
       <TouchableOpacity 
@@ -30,7 +34,10 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           variant === 'danger' && styles.dangerButtonFlex,
           disabled && styles.buttonDisabled
         ]}
-        onPress={onConfirm}
+        onPress={() => {
+          playPrimaryButtonHaptic();
+          onConfirm();
+        }}
         disabled={disabled}
       >
         <Text style={styles.primaryButtonText}>{confirmText}</Text>

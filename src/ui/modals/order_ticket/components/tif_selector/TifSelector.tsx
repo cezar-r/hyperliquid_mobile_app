@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { styles } from './styles/TifSelector.styles';
+import { ToggleContainer } from '../toggle_container/ToggleContainer';
+import { ToggleButton } from '../toggle_button/ToggleButton';
+import { playOrderTicketSelectionChangeHaptic } from '../../../../../lib/haptics';
 
 type TimeInForce = 'Gtc' | 'Ioc' | 'Alo';
 
@@ -11,18 +13,31 @@ interface TifSelectorProps {
 }
 
 export const TifSelector: React.FC<TifSelectorProps> = ({ value, onValueChange }) => {
+  const handleChange = (newValue: TimeInForce) => {
+    playOrderTicketSelectionChangeHaptic();
+    onValueChange(newValue);
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Time in Force</Text>
-      <Picker
-        selectedValue={value}
-        onValueChange={(val) => onValueChange(val as TimeInForce)}
-        style={styles.picker}
-      >
-        <Picker.Item label="GTC (Good till Cancel)" value="Gtc" />
-        <Picker.Item label="IOC (Immediate or Cancel)" value="Ioc" />
-        <Picker.Item label="ALO (Add Liquidity Only)" value="Alo" />
-      </Picker>
+      <ToggleContainer>
+        <ToggleButton
+          label="GTC"
+          isActive={value === 'Gtc'}
+          onPress={() => handleChange('Gtc')}
+        />
+        <ToggleButton
+          label="IOC"
+          isActive={value === 'Ioc'}
+          onPress={() => handleChange('Ioc')}
+        />
+        <ToggleButton
+          label="ALO"
+          isActive={value === 'Alo'}
+          onPress={() => handleChange('Alo')}
+        />
+      </ToggleContainer>
     </View>
   );
 };

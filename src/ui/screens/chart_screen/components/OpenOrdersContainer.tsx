@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { styles } from '../styles/OpenOrdersContainer.styles';
+import { playTextButtonHaptic } from '../../../../lib/haptics';
 
 interface OpenOrder {
   coin: string;
@@ -56,7 +57,10 @@ export default function OpenOrdersContainer({
               <View style={styles.orderRightSide}>
                 <TouchableOpacity
                   style={styles.cancelOrderButton}
-                  onPress={() => onCancelOrder(order.coin, order.oid)}
+                  onPress={() => {
+                    playTextButtonHaptic();
+                    onCancelOrder(order.coin, order.oid);
+                  }}
                   disabled={cancelingOrder === order.oid}
                 >
                   <Text style={styles.cancelOrderButtonText}>

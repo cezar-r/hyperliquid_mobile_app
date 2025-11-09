@@ -2,6 +2,7 @@ import React from 'react';
 import { View } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { styles } from '../styles/MarketDropdown.styles';
+import { playPrimaryButtonHaptic, playOptionSelectionHaptic } from '../../../../lib/haptics';
 
 export type MarketFilter = 'Perp' | 'Spot' | 'Staking' | 'Perp+Spot' | 'Account';
 
@@ -67,12 +68,14 @@ export default function MarketDropdown({
           closeOnBackPressed={true}
           onSelectItem={(item) => {
             // When item is selected, close dropdown and update filter
+            playOptionSelectionHaptic();
             if (item.value) {
               onFilterChange(item.value);
             }
           }}
           onOpen={() => {
             // Ensure state is synced when opened
+            playPrimaryButtonHaptic();
             if (!isVisible) {
               onToggle();
             }

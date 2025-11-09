@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { styles } from '../styles/PortfolioOpenOrdersContainer.styles';
+import { playTextButtonHaptic } from '../../../../lib/haptics';
 
 interface OpenOrder {
   coin: string;
@@ -33,7 +34,10 @@ export default function PortfolioOpenOrdersContainer({
     <View style={styles.positionsContainer}>
       <View style={styles.ordersHeaderRow}>
         <Text style={styles.sectionLabel}>Open Orders ({orders.length})</Text>
-        <TouchableOpacity onPress={onCancelAll}>
+        <TouchableOpacity onPress={() => {
+          playTextButtonHaptic();
+          onCancelAll();
+        }}>
           <Text style={styles.cancelAllText}>Cancel All</Text>
         </TouchableOpacity>
       </View>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { styles } from './styles/QuickSelectButtons.styles';
+import { playPrimaryButtonHaptic } from '../../../../../lib/haptics';
 
 interface QuickSelectButtonsProps {
   selectedValue: number;
@@ -22,7 +23,10 @@ export const QuickSelectButtons: React.FC<QuickSelectButtonsProps> = ({
             styles.quickSelectButton,
             selectedValue === value && styles.quickSelectButtonActive,
           ]}
-          onPress={() => onSelect(value)}
+          onPress={() => {
+            playPrimaryButtonHaptic();
+            onSelect(value);
+          }}
         >
           <Text
             style={[
