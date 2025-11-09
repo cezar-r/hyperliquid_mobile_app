@@ -15,7 +15,7 @@ export const styles = StyleSheet.create({
   },
   starIcon: {
     marginRight: 4,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   balancesLabel: {
     fontSize: 15,

@@ -67,7 +67,7 @@ export default function StarredTickersContainer({
                 color={Color.GOLD}
                 style={styles.starIcon}
               />
-              <Text style={styles.sectionLabel}>Starred Perps</Text>
+              <Text style={styles.sectionLabel}>Perps</Text>
             </View>
           )}
           {marketFilter === 'Perp' && (
@@ -116,7 +116,7 @@ export default function StarredTickersContainer({
                 style={styles.starIcon}
               />
               <Text style={[styles.balancesLabel, { marginBottom: 0, paddingTop: 0 }]}>
-                Starred Spot
+                Spot
               </Text>
             </View>
           )}
