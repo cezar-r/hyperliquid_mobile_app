@@ -21,6 +21,11 @@ export const styles = StyleSheet.create({
   buttonText: {
     fontSize: 17,
     fontWeight: '600',
+  },
+  buttonTextBuy: {
+    color: Color.FG_2,
+  },
+  buttonTextSell: {
     color: Color.FG_1,
   },
 });

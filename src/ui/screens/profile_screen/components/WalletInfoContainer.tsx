@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, TouchableOpacity, Animated } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Octicons } from '@expo/vector-icons';
 import { Color } from '../../../shared/styles';
@@ -13,6 +13,8 @@ interface WalletInfoContainerProps {
 export default function WalletInfoContainer({
   address,
 }: WalletInfoContainerProps): React.JSX.Element {
+  const borderOpacity = useRef(new Animated.Value(0)).current;
+
   const formatAddress = (addr: string | undefined) => {
     if (!addr) return 'Not connected';
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -22,12 +24,39 @@ export default function WalletInfoContainer({
     if (address) {
       playCopyButtonHaptic();
       await Clipboard.setStringAsync(address);
-      Alert.alert('Copied', 'Wallet address copied to clipboard');
+      
+      // Animate border: fade in → hold → fade out
+      Animated.sequence([
+        Animated.timing(borderOpacity, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.delay(200),
+        Animated.timing(borderOpacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
   };
 
+  const animatedBorderColor = borderOpacity.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(109, 202, 190, 0)', Color.BRIGHT_ACCENT],
+  });
+
   return (
-    <View style={styles.section}>
+    <Animated.View
+      style={[
+        styles.section,
+        {
+          borderWidth: 1,
+          borderColor: animatedBorderColor,
+        },
+      ]}
+    >
       <View style={styles.walletInfoRow}>
         <Text style={styles.infoText}>
           {formatAddress(address)}
@@ -40,7 +69,7 @@ export default function WalletInfoContainer({
           <Octicons name="copy" size={16} color={Color.BRIGHT_ACCENT} />
         </TouchableOpacity>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 

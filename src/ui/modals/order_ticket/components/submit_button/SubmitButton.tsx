@@ -31,7 +31,9 @@ export const SubmitButton: React.FC<SubmitButtonProps> = ({
       {isSubmitting ? (
         <ActivityIndicator color={Color.FG_1} />
       ) : (
-        <Text style={styles.buttonText}>{label}</Text>
+        <Text style={[styles.buttonText, side === 'buy' ? styles.buttonTextBuy : styles.buttonTextSell]}>
+          {label}
+        </Text>
       )}
     </TouchableOpacity>
   );
