@@ -20,6 +20,14 @@ import {
   resolveSubscriptionCoin,
   getDefaultCoin,
 } from '../lib/markets';
+import {
+  logWebSocketSubscription,
+  logWebSocketUnsubscription,
+  logWebSocketData,
+  logWebSocketConnection,
+  logWebSocketMode,
+  logDataUpdate,
+} from '../lib/logger';
 import type {
   WebSocketState,
   MarketType,
@@ -113,10 +121,7 @@ export function WebSocketProvider({
       isMounted: boolean
     ): Promise<void> {
       try {
-        console.log('[Phase 4] Subscribing to asset contexts...', {
-          perpCount: perpMarkets.length,
-          spotCount: spotMarkets.length,
-        });
+        logWebSocketSubscription('asset contexts', `perp: ${perpMarkets.length}, spot: ${spotMarkets.length}`);
 
         // console.log(JSON.stringify(perpMarkets, null, 2));
 
@@ -158,7 +163,7 @@ export function WebSocketProvider({
         );
 
         allPerpAssetCtxSubsRef.current = perpSubs.filter((sub) => sub !== null);
-        console.log('[Phase 4] ✓ Subscribed to', allPerpAssetCtxSubsRef.current.length, 'perp asset contexts');
+        logWebSocketData('activeAssetCtx (perp)', allPerpAssetCtxSubsRef.current.length, 'subscriptions active');
 
         // Subscribe to spot asset contexts
         const spotSubs = await Promise.all(
@@ -202,7 +207,7 @@ export function WebSocketProvider({
         );
 
         allSpotAssetCtxSubsRef.current = spotSubs.filter((sub) => sub !== null);
-        console.log('[Phase 4] ✓ Subscribed to', allSpotAssetCtxSubsRef.current.length, 'spot asset contexts');
+        logWebSocketData('activeSpotAssetCtx', allSpotAssetCtxSubsRef.current.length, 'subscriptions active');
       } catch (error) {
         console.error('[Phase 4] Error subscribing to asset contexts:', error);
       }
@@ -210,7 +215,7 @@ export function WebSocketProvider({
 
     async function initialize(): Promise<void> {
       try {
-        console.log('[Phase 4] Initializing WebSocket...');
+        logWebSocketConnection('disconnected', 'Initializing WebSocket...');
 
         const httpTransport = createHttpTransport();
         const infoClient = createInfoClient(httpTransport);
@@ -221,10 +226,7 @@ export function WebSocketProvider({
           fetchSpotMarkets(infoClient),
         ]);
 
-        console.log('[Phase 4] Loaded markets:', {
-          perp: perpResult.markets.length,
-          spot: spotResult.markets.length,
-        });
+        logDataUpdate('WebSocket', `Markets loaded - perp: ${perpResult.markets.length}, spot: ${spotResult.markets.length}`);
 
         const savedMarketType = await AsyncStorage.getItem(MARKET_TYPE_KEY);
         const marketType: MarketType =
@@ -268,9 +270,10 @@ export function WebSocketProvider({
 
         if (!mounted) return;
 
-        console.log('[Phase 4] WebSocket connected');
+        logWebSocketConnection('connected');
         setState((prev) => ({ ...prev, isConnected: true, error: null }));
 
+        logWebSocketSubscription('allMids');
         const allMidsSub = await client.allMids((data: any) => {
           if (!mounted) return;
           
@@ -295,6 +298,7 @@ export function WebSocketProvider({
               });
             }
 
+            logWebSocketData('allMids', Object.keys(priceMap).length);
             return { ...prev, prices: priceMap };
           });
         });
@@ -447,7 +451,7 @@ export function WebSocketProvider({
         state.spotMarkets
       );
 
-      console.log('[Phase 4] Subscribing to orderbook:', subscriptionCoin, 'opts:', opts);
+      logWebSocketSubscription('l2Book (orderbook)', `coin: ${subscriptionCoin}`);
 
       const params: any = { coin: subscriptionCoin };
       // if (opts?.nSigFigs !== undefined) params.nSigFigs = opts.nSigFigs;
@@ -470,6 +474,8 @@ export function WebSocketProvider({
             time: data.time,
             levels: data.levels,
           };
+          const totalLevels = data.levels?.[0]?.length + data.levels?.[1]?.length || 0;
+          logWebSocketData('l2Book (orderbook)', totalLevels, `levels for ${data.coin}`);
           setState((prev) => ({ ...prev, orderbook }));
         }
       );
@@ -490,7 +496,7 @@ export function WebSocketProvider({
     orderbookSubIdRef.current = null;
     // Don't clear activeOrderbookCoinRef here - it tracks the CURRENTLY ACTIVE subscription
     setState((prev) => ({ ...prev, orderbook: null }));
-    console.log('[Phase 4] Unsubscribed from orderbook');
+    logWebSocketUnsubscription('l2Book (orderbook)');
   }, []);
 
   const subscribeToTrades = useCallback(
@@ -513,7 +519,7 @@ export function WebSocketProvider({
         state.spotMarkets
       );
 
-      console.log('[Phase 4] Subscribing to trades:', subscriptionCoin);
+      logWebSocketSubscription('trades', `coin: ${subscriptionCoin}`);
 
       activeTradesCoinRef.current = subscriptionCoin;
 
@@ -540,6 +546,7 @@ export function WebSocketProvider({
             return prev;
           }
 
+          logWebSocketData('trades', validTrades.length, `for ${subscriptionCoin}`);
           const combined = [...validTrades, ...prev.recentTrades].slice(0, 50);
           return { ...prev, recentTrades: combined };
         });
@@ -561,7 +568,7 @@ export function WebSocketProvider({
     tradesSubIdRef.current = null;
     // Don't clear activeTradesCoinRef here - it tracks the CURRENTLY ACTIVE subscription
     setState((prev) => ({ ...prev, recentTrades: [] }));
-    console.log('[Phase 4] Unsubscribed from trades');
+    logWebSocketUnsubscription('trades');
   }, []);
 
   const subscribeToCandles = useCallback(
@@ -588,10 +595,7 @@ export function WebSocketProvider({
         state.spotMarkets
       );
 
-      console.log('[Phase 5] Subscribing to candles:', {
-        coin: subscriptionCoin,
-        interval,
-      });
+      logWebSocketSubscription('candle', `coin: ${subscriptionCoin}, interval: ${interval}`);
 
       const sub = await client.candle(
         { coin: subscriptionCoin, interval },
@@ -606,6 +610,7 @@ export function WebSocketProvider({
             v: data.v,
             n: data.n,
           };
+          logWebSocketData('candle', 1, `${subscriptionCoin} @ ${interval}`);
           onCandle(candle);
         }
       );
@@ -624,7 +629,7 @@ export function WebSocketProvider({
       }
     });
     candleSubIdRef.current = null;
-    console.log('[Phase 5] Unsubscribed from candles');
+    logWebSocketUnsubscription('candle');
   }, []);
 
   const subscribeToUserEvents = useCallback(
@@ -641,10 +646,10 @@ export function WebSocketProvider({
         userEventsSubIdRef.current = null;
       }
 
-      console.log('[UserAccount] Subscribing to userEvents:', userAddress);
+      logWebSocketSubscription('userEvents', `user: ${userAddress}`);
 
       const sub = await (client as any).user({ user: userAddress as `0x${string}` }, (data: any) => {
-        console.log('[UserAccount] User event received:', data);
+        logWebSocketData('userEvents', 1);
         onEvent(data);
       });
 
@@ -679,10 +684,10 @@ export function WebSocketProvider({
         userFillsSubIdRef.current = null;
       }
 
-      console.log('[UserAccount] Subscribing to userFills:', userAddress);
+      logWebSocketSubscription('userFills', `user: ${userAddress}`);
 
       const sub = await client.userFills({ user: userAddress as `0x${string}` }, (data: any) => {
-        console.log('[UserAccount] User fill received:', data);
+        logWebSocketData('userFills', 1);
         onFill(data);
       });
 
@@ -717,10 +722,10 @@ export function WebSocketProvider({
         userFundingsSubIdRef.current = null;
       }
 
-      console.log('[UserAccount] Subscribing to userFundings:', userAddress);
+      logWebSocketSubscription('userFundings', `user: ${userAddress}`);
 
       const sub = await client.userFundings({ user: userAddress as `0x${string}` }, (data: any) => {
-        console.log('[UserAccount] User funding received:', data);
+        logWebSocketData('userFundings', 1);
         onFunding(data);
       });
 
@@ -956,7 +961,7 @@ export function WebSocketProvider({
   const enterChartMode = useCallback(async (): Promise<void> => {
     if (subscriptionModeRef.current === 'chart') return;
     subscriptionModeRef.current = 'chart';
-    console.log('[Phase 4] → Entering Chart Mode (single asset context)');
+    logWebSocketMode('Chart Mode (single asset context)');
     await unsubscribeAllMids();
     await unsubscribeAllAssetCtx();
     await subscribeSingleAssetCtx();
@@ -965,7 +970,7 @@ export function WebSocketProvider({
   const exitChartMode = useCallback(async (): Promise<void> => {
     if (subscriptionModeRef.current === 'global') return;
     subscriptionModeRef.current = 'global';
-    console.log('[Phase 4] → Exiting Chart Mode (restoring global subscriptions)');
+    logWebSocketMode('Global Mode (all markets)');
     await unsubscribeSingleAssetCtx();
     await resubscribeGlobal();
   }, [unsubscribeSingleAssetCtx, resubscribeGlobal]);

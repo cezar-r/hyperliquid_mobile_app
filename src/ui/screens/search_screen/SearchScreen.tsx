@@ -10,6 +10,15 @@ import type { PerpMarket, SpotMarket } from '../../../types';
 import { getStarredTickers } from '../../../lib/starredTickers';
 import { getDisplayTicker } from '../../../lib/formatting';
 import { playToggleHaptic, playNavToChartHaptic } from '../../../lib/haptics';
+import {
+  logScreenMount,
+  logScreenUnmount,
+  logScreenFocus,
+  logScreenBlur,
+  logRender,
+  logUserAction,
+  logScreenFullyRendered,
+} from '../../../lib/logger';
 import { styles } from './styles/SearchScreen.styles';
 import { Color } from '../../shared/styles';
 import { PanelSelector, MarketCell, EmptyState, SkeletonScreen } from '../../shared/components';
@@ -48,6 +57,14 @@ export default function SearchScreen(): React.JSX.Element {
 
   // For skeleton loading
   const [isReady] = useState(true);
+
+  // Screen lifecycle logging
+  useEffect(() => {
+    logScreenMount('SearchScreen');
+    return () => {
+      logScreenUnmount('SearchScreen');
+    };
+  }, []);
 
   // Store sort preferences per market type
   const [perpSort, setPerpSort] = useState<SortType>(SortType.VOLUME);
@@ -94,27 +111,19 @@ export default function SearchScreen(): React.JSX.Element {
   // Load starred tickers when screen comes into focus or market type changes
   useFocusEffect(
     useCallback(() => {
+      logScreenFocus('SearchScreen');
       const loadStarredTickers = async () => {
         const starred = await getStarredTickers(wsState.marketType);
         setStarredTickers(starred);
       };
 
       loadStarredTickers();
+      
+      return () => {
+        logScreenBlur('SearchScreen');
+      };
     }, [wsState.marketType])
   );
-
-  // Debug logging for spot markets (reduced)
-  React.useEffect(() => {
-    if (wsState.marketType === 'spot' && wsState.spotMarkets.length > 0) {
-      const spotContextsCount = wsState.spotMarkets.filter((m) =>
-        wsState.assetContexts[m.name]
-      ).length;
-      const spotPricesCount = wsState.spotMarkets.filter((m) => wsState.prices[m.name]).length;
-      console.log(
-        `[SearchScreen] Spot markets: ${wsState.spotMarkets.length}, with contexts: ${spotContextsCount}, with prices: ${spotPricesCount}`
-      );
-    }
-  }, [wsState.marketType, wsState.spotMarkets.length]);
 
   const currentMarkets = useMemo(
     () => (wsState.marketType === 'perp' ? wsState.perpMarkets : wsState.spotMarkets),
@@ -276,8 +285,17 @@ export default function SearchScreen(): React.JSX.Element {
     starredTickers,
   ]);
 
+  // Log rendering (must come after getSortedAndFilteredMarkets is defined)
+  useEffect(() => {
+    if (getSortedAndFilteredMarkets.length > 0) {
+      logRender('SearchScreen', `${getSortedAndFilteredMarkets.length} markets (${wsState.marketType})`);
+      logScreenFullyRendered('SearchScreen');
+    }
+  }, [getSortedAndFilteredMarkets.length, wsState.marketType]);
+
   const handleMarketSelect = useCallback(
     (marketName: string): void => {
+      logUserAction('SearchScreen', 'Navigate to chart', marketName);
       // Play haptic feedback
       playNavToChartHaptic();
 
@@ -290,6 +308,7 @@ export default function SearchScreen(): React.JSX.Element {
 
   const handleMarketTypeToggle = useCallback(
     (type: 'perp' | 'spot', animated: boolean = false, direction?: 'left' | 'right'): void => {
+      logUserAction('SearchScreen', 'Market type changed', type);
       // Play haptic feedback
       playToggleHaptic();
 

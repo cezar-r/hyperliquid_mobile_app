@@ -11,6 +11,7 @@ import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { formatPrice, formatSize, formatWithCommas } from '../../../lib/formatting';
 import { getSkipOpenOrderConfirmations } from '../../../lib/confirmations';
 import { playOrderTicketSelectionChangeHaptic, playSliderChangeHaptic, playOrderSubmitHaptic } from '../../../lib/haptics';
+import { logModalOpen, logModalClose, logUserAction, logApiCall } from '../../../lib/logger';
 import { styles } from './styles/PerpOrderTicket.styles';
 import { InfoContainer, InfoRow } from '../shared/components/info_container/InfoContainer';
 import {
@@ -44,6 +45,18 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
 
   const coin = selectedCoin || '';
   const currentPrice = prices[coin];
+
+  // Log modal open/close
+  useEffect(() => {
+    if (visible) {
+      logModalOpen('PerpOrderTicket');
+    }
+  }, [visible]);
+
+  const handleClose = () => {
+    logModalClose('PerpOrderTicket');
+    onClose();
+  };
   
   // Get tradeable balance
   const tradeableBalance = useMemo(() => {
@@ -354,7 +367,8 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
         grouping: 'na' as const,
       };
 
-      console.log('[PerpOrderTicket] Placing order:', JSON.stringify(orderPayload, null, 2));
+      logApiCall('order (perp)', `${side} ${orderType} - ${coin}`);
+      logUserAction('PerpOrderTicket', 'Submit order', `${side} ${orderType} ${coin}`);
 
       const result = await exchangeClient.order(orderPayload);
       console.log('[PerpOrderTicket] ✓ Order placed:', result);
@@ -431,7 +445,7 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
       
       setTimeout(() => refetchAccount(), 1000);
       
-      onClose();
+      handleClose();
     } catch (err: any) {
       console.error('[PerpOrderTicket] Failed to place order:', err);
       setError(err.message || 'Failed to place order');
@@ -549,7 +563,7 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <ScrollView contentContainerStyle={styles.scrollContent}>
-            <CloseButton onPress={onClose} />
+            <CloseButton onPress={handleClose} />
             
             {/* Side Selector */}
             <ToggleContainer>

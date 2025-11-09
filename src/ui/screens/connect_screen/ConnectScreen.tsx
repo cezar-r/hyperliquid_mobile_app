@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppKit, useAccount } from '@reown/appkit-react-native';
+import { logScreenMount, logScreenUnmount, logUserAction } from '../../../lib/logger';
 import { styles } from './styles/ConnectScreen.styles';
 import { VideoBackground } from './components';
 
@@ -14,11 +15,17 @@ export default function ConnectScreen(): React.JSX.Element {
   const { address, isConnected } = useAccount();
   const hasNavigated = useRef(false);
 
+  // Screen lifecycle logging
+  useEffect(() => {
+    logScreenMount('ConnectScreen');
+    return () => logScreenUnmount('ConnectScreen');
+  }, []);
+
   // When user connects wallet on this screen, navigate back to Splash
   // Splash will handle routing to the correct screen (EnableSessionKey or Home)
   useEffect(() => {
     if (isConnected && address && !hasNavigated.current) {
-      console.log('[ConnectScreen] Wallet connected:', address, '- navigating to Splash');
+      logUserAction('ConnectScreen', 'Wallet connected', address);
       hasNavigated.current = true;
       // Navigate to Splash which will handle the routing logic
       navigation.replace('Splash');
@@ -26,6 +33,7 @@ export default function ConnectScreen(): React.JSX.Element {
   }, [isConnected, address, navigation]);
 
   const handleConnect = async () => {
+    logUserAction('ConnectScreen', 'Connect wallet button pressed');
     try {
       await open();
     } catch (error) {

@@ -17,6 +17,18 @@ import { resolveSubscriptionCoin } from '../../../lib/markets';
 import { generateTickSizeOptions, calculateMantissa, calculateNSigFigs } from '../../../lib/tickSize';
 import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker, convertUTCToLocalChartTime } from '../../../lib/formatting';
 import { isTickerStarred, toggleStarredTicker } from '../../../lib/starredTickers';
+import {
+  logScreenMount,
+  logScreenUnmount,
+  logScreenFocus,
+  logScreenBlur,
+  logRender,
+  logUserAction,
+  logScreenFullyRendered,
+  logApiCall,
+  logApiResponse,
+  logApiError,
+} from '../../../lib/logger';
 import type { Candle, CandleInterval } from '../../../types';
 import { styles } from './styles/ChartScreen.styles';
 import { Color } from '../../shared/styles';
@@ -93,6 +105,14 @@ export default function ChartScreen(): React.JSX.Element {
   // For skeleton loading
   const [isReady, setIsReady] = useState(false);
 
+  // Screen lifecycle logging
+  useEffect(() => {
+    logScreenMount('ChartScreen');
+    return () => {
+      logScreenUnmount('ChartScreen');
+    };
+  }, []);
+
   const [candles, setCandles] = useState<ChartData[]>([]);
   const [interval, setInterval] = useState<CandleInterval | null>(null);
   const [intervalLoaded, setIntervalLoaded] = useState(false);
@@ -132,8 +152,10 @@ export default function ChartScreen(): React.JSX.Element {
   // Engage Chart Mode subscriptions only while this screen is focused
   useFocusEffect(
     React.useCallback(() => {
+      logScreenFocus('ChartScreen');
       enterChartMode?.();
       return () => {
+        logScreenBlur('ChartScreen');
         exitChartMode?.();
       };
     }, [enterChartMode, exitChartMode])
@@ -285,10 +307,7 @@ export default function ChartScreen(): React.JSX.Element {
         };
         const startTime = endTime - lookbacks[candleInterval] * 24 * 60 * 60 * 1000;
 
-        console.log('[Phase 5] Fetching candle snapshot:', {
-          coin: subscriptionCoin,
-          interval: candleInterval,
-        });
+        logApiCall('candleSnapshot', `coin: ${subscriptionCoin}, interval: ${candleInterval}`);
 
         const snapshot = await infoClient.candleSnapshot({
           coin: subscriptionCoin,
@@ -308,10 +327,10 @@ export default function ChartScreen(): React.JSX.Element {
 
           chartData.sort((a, b) => a.timestamp - b.timestamp);
           setCandles(chartData);
-          console.log('[Phase 5] ✓ Loaded', chartData.length, 'candles');
+          logApiResponse('candleSnapshot', chartData.length, 'candles');
         }
       } catch (err: any) {
-        console.error('[Phase 5] Error fetching candles:', err);
+        logApiError('candleSnapshot', err);
         setError(err.message || 'Failed to load chart data');
       } finally {
         setIsLoading(false);
@@ -388,12 +407,28 @@ export default function ChartScreen(): React.JSX.Element {
   ]);
 
   const handleIntervalChange = (newInterval: CandleInterval): void => {
+    logUserAction('ChartScreen', 'Interval changed', newInterval);
     setInterval(newInterval);
     
     AsyncStorage.setItem('chartInterval', newInterval).catch((error) => {
       console.error('[ChartScreen] Failed to save interval:', error);
     });
   };
+
+  // Log rendering
+  useEffect(() => {
+    if (!isLoading && candles.length > 0) {
+      logRender('ChartContent', `${candles.length} candles, panel: ${panel}`);
+      if (state.orderbook) {
+        const totalLevels = state.orderbook.levels?.[0]?.length + state.orderbook.levels?.[1]?.length || 0;
+        logRender('OrderBook', `${totalLevels} levels`);
+      }
+      if (state.recentTrades.length > 0) {
+        logRender('RecentTrades', `${state.recentTrades.length} trades`);
+      }
+      logScreenFullyRendered('ChartScreen');
+    }
+  }, [isLoading, candles.length, panel, state.orderbook, state.recentTrades.length]);
 
   // Handle star toggle
   const handleToggleStar = () => {

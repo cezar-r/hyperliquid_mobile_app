@@ -8,6 +8,7 @@ import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../../../contexts/WalletContext';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { resolveSpotTicker } from '../../../lib/formatting';
+import { logScreenMount, logScreenUnmount, logScreenFocus, logScreenBlur, logRender, logUserAction, logScreenFullyRendered } from '../../../lib/logger';
 import { styles } from './styles/HistoryScreen.styles';
 import type { UserFill, LedgerUpdate } from '../../../types';
 import { PanelSelector, EmptyState, ErrorState, TradeCard, SkeletonScreen } from '../../shared/components';
@@ -25,6 +26,12 @@ export default function HistoryScreen(): React.JSX.Element {
   // For skeleton loading
   const [isReady] = useState(true);
   const [filterHydrated, setFilterHydrated] = useState(false);
+
+  // Screen lifecycle logging
+  useEffect(() => {
+    logScreenMount('HistoryScreen');
+    return () => logScreenUnmount('HistoryScreen');
+  }, []);
 
   // Filter states
   const [viewFilter, setViewFilter] = useState<ViewFilter>('Trades');

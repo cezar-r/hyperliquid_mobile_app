@@ -23,6 +23,15 @@ import {
 import { isTestnet } from '../lib/config';
 import type { AccountData, AccountState } from '../types';
 import { createWalletClient, custom } from 'viem';
+import {
+  logApiCall,
+  logApiResponse,
+  logApiError,
+  logPollingStart,
+  logPollingStop,
+  logPollingCycle,
+  logDataUpdate,
+} from '../lib/logger';
 
 const WALLET_DISCONNECTED_KEY = 'hl_wallet_disconnected';
 
@@ -78,35 +87,44 @@ export function WalletProvider({
       }
 
       if (!silent) {
-        console.log('[Phase 3] Fetching account data for:', userAddress);
+        logApiCall('fetchAccountData', `user: ${userAddress}`);
         setAccount((prev) => ({ ...prev, isLoading: true, error: null }));
       }
 
       try {
+        logApiCall('clearinghouseState', `user: ${userAddress}`);
+        logApiCall('spotClearinghouseState', `user: ${userAddress}`);
+        logApiCall('frontendOpenOrders', `user: ${userAddress}`);
+        logApiCall('userFills', `user: ${userAddress}`);
+        logApiCall('userFunding', `user: ${userAddress}`);
+        logApiCall('delegations', `user: ${userAddress}`);
+        logApiCall('delegatorSummary', `user: ${userAddress}`);
+        logApiCall('delegatorRewards', `user: ${userAddress}`);
+
         const [perpState, spotState, openOrders, userFills, userFundings, stakingDelegations, stakingSummary, stakingRewards] =
           await Promise.all([
             infoClient
               .clearinghouseState({ user: userAddress as `0x${string}` })
               .catch((err) => {
-                if (!silent) console.warn('[Phase 3] clearinghouseState error:', err);
+                if (!silent) logApiError('clearinghouseState', err);
                 return null;
               }),
             infoClient
               .spotClearinghouseState({ user: userAddress as `0x${string}` })
               .catch((err) => {
-                if (!silent) console.warn('[Phase 3] spotClearinghouseState error:', err);
+                if (!silent) logApiError('spotClearinghouseState', err);
                 return null;
               }),
             infoClient
               .frontendOpenOrders({ user: userAddress as `0x${string}` })
               .catch((err) => {
-                if (!silent) console.warn('[Phase 3] frontendOpenOrders error:', err);
+                if (!silent) logApiError('frontendOpenOrders', err);
                 return [];
               }),
             infoClient
               .userFills({ user: userAddress as `0x${string}` })
               .catch((err) => {
-                if (!silent) console.warn('[Phase 3] userFills error:', err);
+                if (!silent) logApiError('userFills', err);
                 return [];
               }),
             infoClient
@@ -115,34 +133,38 @@ export function WalletProvider({
                 startTime: Date.now() - 30 * 24 * 60 * 60 * 1000, // Last 30 days
               })
               .catch((err) => {
-                if (!silent) console.warn('[Phase 3] userFunding error:', err);
+                if (!silent) logApiError('userFunding', err);
                 return [];
               }),
             infoClient
               .delegations({ user: userAddress as `0x${string}` })
               .catch((err) => {
-                if (!silent) console.warn('[Staking] delegations error:', err);
+                if (!silent) logApiError('delegations', err);
                 return [];
               }),
             infoClient
               .delegatorSummary({ user: userAddress as `0x${string}` })
               .catch((err) => {
-                if (!silent) console.warn('[Staking] delegatorSummary error:', err);
+                if (!silent) logApiError('delegatorSummary', err);
                 return null;
               }),
             infoClient
               .delegatorRewards({ user: userAddress as `0x${string}` })
               .catch((err) => {
-                if (!silent) console.warn('[Staking] delegatorRewards error:', err);
+                if (!silent) logApiError('delegatorRewards', err);
                 return [];
               }),
           ]);
 
         if (!silent) {
-          console.log('[Phase 3] Perp state:', perpState);
-          console.log('[Phase 3] Spot state:', spotState);
-          console.log('[Phase 3] Open orders:', openOrders);
-          console.log('[Phase 3] User fills count:', userFills?.length || 0);
+          logApiResponse('clearinghouseState', perpState?.assetPositions?.length || 0, 'positions');
+          logApiResponse('spotClearinghouseState', spotState?.balances?.length || 0, 'balances');
+          logApiResponse('frontendOpenOrders', openOrders?.length || 0, 'orders');
+          logApiResponse('userFills', userFills?.length || 0, 'fills');
+          logApiResponse('userFunding', userFundings?.length || 0, 'fundings');
+          logApiResponse('delegations', stakingDelegations?.length || 0, 'delegations');
+          logApiResponse('delegatorSummary', stakingSummary ? 1 : 0);
+          logApiResponse('delegatorRewards', stakingRewards?.length || 0, 'rewards');
         }
 
         // Map perpPositions from API response structure
@@ -305,15 +327,15 @@ export function WalletProvider({
   useEffect(() => {
     if (!connectedAddress) return;
 
-    console.log('[WalletContext] Starting 5-second account polling');
+    logPollingStart('WalletContext', 5000);
     
     const intervalId = setInterval(() => {
-      console.log('[WalletContext] Polling account data...');
+      logPollingCycle('WalletContext');
       fetchAccountData(connectedAddress, true); // silent refresh
     }, 5000);
 
     return () => {
-      console.log('[WalletContext] Stopping account polling');
+      logPollingStop('WalletContext');
       clearInterval(intervalId);
     };
   }, [connectedAddress, fetchAccountData]);

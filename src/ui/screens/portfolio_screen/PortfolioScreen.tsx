@@ -23,6 +23,15 @@ import {
 } from '../../../lib/formatting';
 import { resolveSubscriptionCoin } from '../../../lib/markets';
 import { playNavToChartHaptic } from '../../../lib/haptics';
+import {
+  logScreenMount,
+  logScreenUnmount,
+  logScreenFocus,
+  logScreenBlur,
+  logRender,
+  logUserAction,
+  logScreenFullyRendered,
+} from '../../../lib/logger';
 import { styles } from './styles/PortfolioScreen.styles';
 import type { PerpPosition, UserFill } from '../../../types';
 import { Color } from '../../shared/styles';
@@ -89,6 +98,14 @@ export default function PortfolioScreen(): React.JSX.Element {
   // For skeleton loading
   const [isReady] = useState(true);
 
+  // Screen lifecycle logging
+  useEffect(() => {
+    logScreenMount('PortfolioScreen');
+    return () => {
+      logScreenUnmount('PortfolioScreen');
+    };
+  }, []);
+
   // Modal states
   const [depositModalVisible, setDepositModalVisible] = useState(false);
   const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
@@ -136,7 +153,9 @@ export default function PortfolioScreen(): React.JSX.Element {
   // Close dropdown when navigating away from screen
   useFocusEffect(
     React.useCallback(() => {
+      logScreenFocus('PortfolioScreen');
       return () => {
+        logScreenBlur('PortfolioScreen');
         // Close dropdown when screen loses focus
         if (marketDropdownVisible) {
           setMarketDropdownVisible(false);
@@ -144,6 +163,14 @@ export default function PortfolioScreen(): React.JSX.Element {
       };
     }, [marketDropdownVisible])
   );
+
+  // Log rendering
+  useEffect(() => {
+    if (account.data) {
+      logRender('PortfolioScreen', `filter: ${marketFilter}, time: ${timeFilter}`);
+      logScreenFullyRendered('PortfolioScreen');
+    }
+  }, [account.data, marketFilter, timeFilter]);
 
   // For value animation
   const [previousValue, setPreviousValue] = useState<number | null>(null);
@@ -229,10 +256,6 @@ export default function PortfolioScreen(): React.JSX.Element {
         console.log(`[${timestamp}] [PortfolioScreen] Skipping fetch for ${timeFilter} - last fetched ${Math.round((now - lastFetch) / 1000)}s ago`);
         return;
       }
-
-      console.log(`[${timestamp}] [PortfolioScreen] Starting fetch for ${timeFilter}`);
-      console.log(`[${timestamp}] [PortfolioScreen] Spot markets count: ${wsState.spotMarkets.length}`);
-      console.log(`[${timestamp}] [PortfolioScreen] Spot balances: ${account.data.spotBalances.map(b => b.coin).join(', ')}`);
       
       setIsFetchingHistorical(true);
       
@@ -568,13 +591,6 @@ export default function PortfolioScreen(): React.JSX.Element {
           }
         });
       }
-
-      if (calcDetails.length > 0) {
-        calcDetails.forEach(detail => console.log(detail));
-      } else {
-        console.log(`    No spot balances to calculate`);
-      }
-      console.log(`[${calcTimestamp}] [PortfolioScreen] => Total Spot PnL: ${spotPnl >= 0 ? '+' : ''}$${spotPnl.toFixed(2)}`);
 
       return spotPnl;
     };

@@ -11,6 +11,15 @@ import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { formatPrice, formatSize, getDisplayTicker } from '../../../lib/formatting';
 import { getStarredTickers } from '../../../lib/starredTickers';
 import { playNavToChartHaptic } from '../../../lib/haptics';
+import {
+  logScreenMount,
+  logScreenUnmount,
+  logScreenFocus,
+  logScreenBlur,
+  logRender,
+  logUserAction,
+  logScreenFullyRendered,
+} from '../../../lib/logger';
 import { styles } from './styles/HomeScreen.styles';
 import type { PerpPosition } from '../../../types';
 import { Color } from '../../shared/styles';
@@ -62,6 +71,14 @@ export default function HomeScreen(): React.JSX.Element {
   // For skeleton loading
   const [isReady] = useState(true);
 
+  // Screen lifecycle logging
+  useEffect(() => {
+    logScreenMount('HomeScreen');
+    return () => {
+      logScreenUnmount('HomeScreen');
+    };
+  }, []);
+
   // For starred tickers
   const [starredPerpTickers, setStarredPerpTickers] = useState<string[]>([]);
   const [starredSpotTickers, setStarredSpotTickers] = useState<string[]>([]);
@@ -102,6 +119,7 @@ export default function HomeScreen(): React.JSX.Element {
   // Load starred tickers and hide small balances preference when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
+      logScreenFocus('HomeScreen');
       const loadStarredTickersAndPreferences = async () => {
         try {
           const perpStarred = await getStarredTickers('perp');
@@ -118,6 +136,10 @@ export default function HomeScreen(): React.JSX.Element {
         }
       };
       loadStarredTickersAndPreferences();
+      
+      return () => {
+        logScreenBlur('HomeScreen');
+      };
     }, [])
   );
 
@@ -141,6 +163,8 @@ export default function HomeScreen(): React.JSX.Element {
     animated: boolean = false,
     direction?: 'left' | 'right'
   ) => {
+    logUserAction('HomeScreen', 'Filter changed', filter);
+    
     if (animated && direction) {
       // Start slide animation
       const slideDistance = direction === 'left' ? -50 : 50;
@@ -647,6 +671,22 @@ export default function HomeScreen(): React.JSX.Element {
       ]
     );
   };
+
+  // Log rendering of components
+  useEffect(() => {
+    if (account.data) {
+      if (marketFilter === 'Perp' || marketFilter === 'Account') {
+        logRender('PerpPositionsContainer', `${sortedPerpPositions.length} positions`);
+      }
+      if (marketFilter === 'Spot' || marketFilter === 'Account') {
+        logRender('SpotBalancesContainer', `${sortedSpotBalances.length} balances`);
+      }
+      if (marketFilter === 'Account') {
+        logRender('StarredTickersContainer', `${starredTickersData.perpData.length + starredTickersData.spotData.length} tickers`);
+      }
+      logScreenFullyRendered('HomeScreen');
+    }
+  }, [account.data, sortedPerpPositions.length, sortedSpotBalances.length, marketFilter]);
 
   // Pan gesture for horizontal swipe
   const panGesture = Gesture.Pan()

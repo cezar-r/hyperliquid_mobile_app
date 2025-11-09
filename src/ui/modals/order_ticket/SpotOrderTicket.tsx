@@ -11,6 +11,7 @@ import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { formatSize, formatWithCommas } from '../../../lib/formatting';
 import { getSkipOpenOrderConfirmations } from '../../../lib/confirmations';
 import { playOrderTicketSelectionChangeHaptic, playSliderChangeHaptic, playOrderSubmitHaptic } from '../../../lib/haptics';
+import { logModalOpen, logModalClose, logUserAction, logApiCall } from '../../../lib/logger';
 import { styles } from './styles/SpotOrderTicket.styles';
 import { InfoContainer, InfoRow } from '../shared/components/info_container/InfoContainer';
 import {
@@ -41,6 +42,18 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
 
   const coin = selectedCoin || '';
   const currentPrice = prices[coin];
+
+  // Log modal open/close
+  useEffect(() => {
+    if (visible) {
+      logModalOpen('SpotOrderTicket');
+    }
+  }, [visible]);
+
+  const handleClose = () => {
+    logModalClose('SpotOrderTicket');
+    onClose();
+  };
   
   // Get spot asset info
   const assetInfo = useMemo(() => {
@@ -303,7 +316,8 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
         grouping: 'na' as const,
       };
 
-      console.log('[SpotOrderTicket] Placing spot order - Asset ID:', spotAssetId, 'Payload:', JSON.stringify(orderPayload, null, 2));
+      logApiCall('order (spot)', `${side} ${orderType} - ${coin}`);
+      logUserAction('SpotOrderTicket', 'Submit order', `${side} ${orderType} ${coin}`);
 
       const result = await exchangeClient.order(orderPayload);
 
@@ -318,7 +332,7 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
       }
 
       Alert.alert('Success', `${side === 'buy' ? 'Buy' : 'Sell'} order placed successfully!`);
-      onClose();
+      handleClose();
     } catch (err: any) {
       console.error('[SpotOrderTicket] Order error:', err);
       
@@ -349,7 +363,7 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
-              <CloseButton onPress={onClose} />
+              <CloseButton onPress={handleClose} />
             </ScrollView>
           </View>
         </View>

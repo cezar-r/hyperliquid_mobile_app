@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount, useAppKit } from '@reown/appkit-react-native';
+import { logScreenMount, logScreenUnmount, logUserAction } from '../../../lib/logger';
 import { styles } from './styles/ProfileScreen.styles';
 import { SkeletonScreen } from '../../shared/components';
 import { WalletInfoContainer, SettingsContainer, DisconnectButton } from './components';
@@ -13,7 +14,11 @@ export default function ProfileScreen(): React.JSX.Element {
   // For skeleton loading
   const [isReady] = useState(true);
 
-  // Defer rendering was removed to avoid initial flicker on first tab visit
+  // Screen lifecycle logging
+  useEffect(() => {
+    logScreenMount('ProfileScreen');
+    return () => logScreenUnmount('ProfileScreen');
+  }, []);
 
   const handleDisconnect = () => {
     Alert.alert(
@@ -25,6 +30,7 @@ export default function ProfileScreen(): React.JSX.Element {
           text: 'Disconnect',
           style: 'destructive',
           onPress: async () => {
+            logUserAction('ProfileScreen', 'Disconnect wallet');
             await disconnect();
           },
         },
