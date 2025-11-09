@@ -3,9 +3,8 @@ import { Alert } from 'react-native';
 import { useAccount } from '@reown/appkit-react-native';
 import { useWallet } from '../../../../../contexts/WalletContext';
 import SettingsRow from '../SettingsRow';
-import { styles } from './styles/EnableTradingRow.styles';
 
-export default function EnableTradingRow(): React.JSX.Element {
+export default function AutoApproveRow(): React.JSX.Element {
   const { address } = useAccount();
   const { hasSessionKey, enableSessionKey, disableSessionKey } = useWallet();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -15,14 +14,14 @@ export default function EnableTradingRow(): React.JSX.Element {
 
     if (nextValue) {
       if (!address) {
-        Alert.alert('Enable Trading', 'No wallet connected.');
+        Alert.alert('Auto-Approve', 'No wallet connected.');
         return;
       }
       try {
         setIsProcessing(true);
         await enableSessionKey(address);
       } catch (error: any) {
-        Alert.alert('Enable Trading Failed', error?.message || 'Failed to enable trading.');
+        Alert.alert('Auto-Approve Failed', error?.message || 'Failed to enable auto-approve.');
       } finally {
         setIsProcessing(false);
       }
@@ -30,8 +29,8 @@ export default function EnableTradingRow(): React.JSX.Element {
     }
 
     Alert.alert(
-      'Disable Trading',
-      'This will clear the session key. You will need to re-enable trading to auto-approve future actions.',
+      'Disable Auto-Approve',
+      'This will clear the session key. You will need to re-enable auto-approve to auto-approve future actions.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -42,7 +41,7 @@ export default function EnableTradingRow(): React.JSX.Element {
               setIsProcessing(true);
               await disableSessionKey();
             } catch (error: any) {
-              Alert.alert('Disable Trading Failed', error?.message || 'Failed to disable trading.');
+              Alert.alert('Disable Auto-Approve Failed', error?.message || 'Failed to disable auto-approve.');
             } finally {
               setIsProcessing(false);
             }
@@ -52,7 +51,7 @@ export default function EnableTradingRow(): React.JSX.Element {
     );
   };
 
-  const label = isProcessing ? 'Enable Trading (processing...)' : 'Enable Trading';
+  const label = isProcessing ? 'Enable Auto-Approve (processing...)' : 'Enable Auto-Approve';
 
   return (
     <SettingsRow
