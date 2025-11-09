@@ -15,7 +15,7 @@ import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { useWallet } from '../../../contexts/WalletContext';
 import { resolveSubscriptionCoin } from '../../../lib/markets';
 import { generateTickSizeOptions, calculateMantissa, calculateNSigFigs } from '../../../lib/tickSize';
-import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker } from '../../../lib/formatting';
+import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker, convertUTCToLocalChartTime } from '../../../lib/formatting';
 import { isTickerStarred, toggleStarredTicker } from '../../../lib/starredTickers';
 import type { Candle, CandleInterval } from '../../../types';
 import { styles } from './styles/ChartScreen.styles';
@@ -437,7 +437,7 @@ export default function ChartScreen(): React.JSX.Element {
   const seenTimes = new Set<number>();
   
   for (let i = validCandles.length - 1; i >= 0; i--) {
-    const timeKey = Math.floor(validCandles[i].timestamp / 1000);
+    const timeKey = convertUTCToLocalChartTime(validCandles[i].timestamp);
     if (!seenTimes.has(timeKey)) {
       seenTimes.add(timeKey);
       dedupedCandles.unshift(validCandles[i]);
@@ -445,7 +445,7 @@ export default function ChartScreen(): React.JSX.Element {
   }
 
   const lwcCandles: LWCandle[] = dedupedCandles.map((c) => ({
-    time: Math.floor(c.timestamp / 1000),
+    time: convertUTCToLocalChartTime(c.timestamp),
     open: c.open,
     high: c.high,
     low: c.low,
@@ -540,7 +540,7 @@ export default function ChartScreen(): React.JSX.Element {
       visibleFills.forEach((fill: any) => {
         const isBuy = fill.side === 'B' || fill.side === 'buy';
         markers.push({
-          time: Math.floor(fill.time / 1000),
+          time: convertUTCToLocalChartTime(fill.time),
           position: isBuy ? 'belowBar' : 'aboveBar',
           color: isBuy ? '#26a69a' : '#ef5350',
           shape: 'circle',

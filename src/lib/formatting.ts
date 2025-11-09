@@ -160,3 +160,14 @@ export function formatWithCommas(value: number, decimals: number = 2): string {
   });
 }
 
+/**
+ * Converts UTC timestamp (ms) to local timezone timestamp (seconds) for chart display
+ * @param utcTimestampMs - UTC timestamp in milliseconds
+ * @returns Local timezone timestamp in seconds
+ */
+export function convertUTCToLocalChartTime(utcTimestampMs: number): number {
+  const timezoneOffsetMs = new Date().getTimezoneOffset() * 60 * 1000;
+  const localTimestampMs = utcTimestampMs - timezoneOffsetMs;
+  return Math.floor(localTimestampMs / 1000);
+}
+

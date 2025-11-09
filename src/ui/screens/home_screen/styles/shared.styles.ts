@@ -4,7 +4,6 @@ import { Color, spacing } from '../../../shared/styles';
 export const sharedStyles = StyleSheet.create({
   // Position Cell Container
   positionCell: {
-    paddingHorizontal: 10,
     paddingVertical: 12,
     width: '100%',
     flexDirection: 'row',
