@@ -80,6 +80,7 @@ export default function PositionContainer({
               slPrice={perpPosition.slPrice}
               showTpSl={true}
               onEditTpSl={onEditTpSl}
+              showSeparator={false}
             />
             
             {onMarketClose && (
@@ -107,6 +108,7 @@ export default function PositionContainer({
             subValue={`${(spotTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ${getDisplayTicker(spotBalance.coin)}`}
             subValueColor={Color.FG_3}
             onPress={() => {}}
+            showSeparator={false}
           />
         ) : (
           <Text style={styles.subtitle}>No balance for {selectedCoin.split('/')[0]}</Text>

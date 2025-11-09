@@ -12,7 +12,6 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     color: Color.FG_3,
     fontWeight: '600',
-    marginBottom: 10,
   },
   subtitle: {
     fontSize: fontSizes.sm,
@@ -23,7 +22,7 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
     alignItems: 'center',
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
   },
   marketCloseText: {
     fontSize: fontSizes.sm,

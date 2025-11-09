@@ -4,6 +4,8 @@ import { Color, fontSizes, spacing } from '../../../styles';
 export const styles = StyleSheet.create({
   filterContainer: {
     paddingTop: spacing.md,
+    // borderColor: "#FFFFFF",
+    // borderWidth: 3,
   },
   panelSelector: {
     flexDirection: 'row',
@@ -12,7 +14,7 @@ export const styles = StyleSheet.create({
   },
   panelButton: {
     flex: 1,
-    paddingVertical: spacing.sm,
+    paddingBottom: spacing.xs,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
   },

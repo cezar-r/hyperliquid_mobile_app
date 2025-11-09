@@ -25,6 +25,9 @@ interface PositionCellProps {
   slPrice?: number | null;
   showTpSl?: boolean;
   onEditTpSl?: () => void;
+  
+  // UI props
+  showSeparator?: boolean;
 }
 
 // Helper to format numbers
@@ -61,6 +64,7 @@ export default function PositionCell({
   slPrice,
   showTpSl = false,
   onEditTpSl,
+  showSeparator = true,
 }: PositionCellProps): React.JSX.Element {
   const displayTicker = displayName || ticker;
   
@@ -128,7 +132,7 @@ export default function PositionCell({
           </Text>
         </View>
       </TouchableOpacity>
-      <View style={styles.separator} />
+      {showSeparator && <View style={styles.separator} />}
     </View>
   );
 }
