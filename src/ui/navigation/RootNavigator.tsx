@@ -9,6 +9,7 @@ import SplashScreen from '../screens/splash_screen/SplashScreen';
 import ConnectScreen from '../screens/connect_screen/ConnectScreen';
 import EnableSessionKeyScreen from '../screens/enable_session_key_screen/EnableSessionKeyScreen';
 import ChartScreen from '../screens/chart_screen/ChartScreen';
+import PortfolioScreen from '../screens/portfolio_screen/PortfolioScreen';
 import SettingsScreen from '../screens/settings_screen/SettingsScreen';
 import TabNavigator from './TabNavigator';
 
@@ -26,6 +27,11 @@ function AuthenticatedScreens(): React.JSX.Element {
       <Stack.Screen 
         name="ChartDetail" 
         component={ChartScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="Portfolio" 
+        component={PortfolioScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen 

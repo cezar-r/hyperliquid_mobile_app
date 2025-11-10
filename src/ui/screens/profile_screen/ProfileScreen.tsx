@@ -7,7 +7,7 @@ import { logScreenMount, logScreenUnmount, logUserAction } from '../../../lib/lo
 import { playPrimaryButtonHaptic } from '../../../lib/haptics';
 import { styles } from './styles/ProfileScreen.styles';
 import { SkeletonScreen } from '../../shared/components';
-import { WalletInfoContainer, SettingsNavigationRow, DisconnectButton } from './components';
+import { WalletInfoContainer, PortfolioNavigationRow, SettingsNavigationRow, DisconnectButton } from './components';
 
 export default function ProfileScreen(): React.JSX.Element {
   const { address } = useAccount();
@@ -22,6 +22,11 @@ export default function ProfileScreen(): React.JSX.Element {
     logScreenMount('ProfileScreen');
     return () => logScreenUnmount('ProfileScreen');
   }, []);
+
+  const handleNavigateToPortfolio = () => {
+    playPrimaryButtonHaptic();
+    navigation.navigate('Portfolio');
+  };
 
   const handleNavigateToSettings = () => {
     playPrimaryButtonHaptic();
@@ -59,6 +64,7 @@ export default function ProfileScreen(): React.JSX.Element {
       >
         <WalletInfoContainer address={address} />
         
+        <PortfolioNavigationRow onPress={handleNavigateToPortfolio} />
         <SettingsNavigationRow onPress={handleNavigateToSettings} />
       </ScrollView>
 

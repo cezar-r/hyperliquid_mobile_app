@@ -1192,6 +1192,20 @@ export default function PortfolioScreen(): React.JSX.Element {
 
   return (
     <SafeAreaView edges={['top']} style={styles.container}>
+      {/* Header with Back Button */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.backButtonText}>‹</Text>
+        </TouchableOpacity>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Portfolio</Text>
+        </View>
+      </View>
+
       <View style={styles.contentContainer}>
         {/* Time Period Filter */}
         <TimeFilterSelector selectedFilter={timeFilter} onFilterChange={handleTimeFilterChange} />

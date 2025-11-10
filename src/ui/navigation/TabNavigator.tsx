@@ -5,7 +5,7 @@ import { MaterialCommunityIcons, MaterialIcons, Ionicons } from '@expo/vector-ic
 import { useNavigationState } from '@react-navigation/native';
 import {
   HomeScreen,
-  PortfolioScreen,
+  BrowserScreen,
   SearchScreen,
   HistoryScreen,
   ProfileScreen,
@@ -17,7 +17,7 @@ import { playNavbarHaptic } from '../../lib/haptics';
 
 export type TabParamList = {
   Home: undefined;
-  Portfolio: undefined;
+  Browser: undefined;
   Search: undefined;
   History: undefined;
   Profile: undefined;
@@ -184,12 +184,12 @@ export default function TabNavigator(): React.JSX.Element {
           }}
         />
         <Tab.Screen
-          name="Portfolio"
-          component={PortfolioScreen}
+          name="Browser"
+          component={BrowserScreen}
           options={{
             headerShown: false,
             tabBarIcon: ({ focused }) => (
-              <TabIcon iconType="MaterialIcons" iconName="account-balance-wallet" focused={focused} />
+              <TabIcon iconType="Ionicons" iconName="globe-outline" focused={focused} />
             ),
           }}
         />

@@ -1,3 +1,4 @@
+export { default as BrowserScreen } from './browser_screen/BrowserScreen';
 export { default as ChartScreen } from './chart_screen/ChartScreen';
 export { default as ConnectScreen } from './connect_screen/ConnectScreen';
 export { default as EnableSessionKeyScreen } from './enable_session_key_screen/EnableSessionKeyScreen';
