@@ -6,7 +6,7 @@ export const styles = StyleSheet.create({
   balanceContainer: {
     alignItems: 'center',
     paddingTop: 20,
-    paddingBottom: 30,
+    paddingBottom: 14,
   },
   balanceAmount: {
     fontSize: 52,
