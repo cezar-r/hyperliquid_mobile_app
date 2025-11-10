@@ -9,7 +9,6 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
@@ -18,6 +17,10 @@ export const styles = StyleSheet.create({
     borderTopColor: Color.BG_3,
     alignItems: 'center',
     zIndex: 1001,
+    justifyContent: 'space-between',
+  },
+  containerDetailView: {
+    paddingBottom: spacing.xl, // Extra padding when tab bar is not visible
   },
   // Collapsed state - search icon button
   searchIconButton: {
@@ -56,15 +59,18 @@ export const styles = StyleSheet.create({
   // Trade / X button
   actionButton: {
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: 48,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 100,
-    flex: 1,
+    width: 200,
   },
   tradeButton: {
     backgroundColor: Color.BRIGHT_ACCENT,
+  },
+  tradeButtonDisabled: {
+    backgroundColor: Color.BG_3,
+    opacity: 0.5,
   },
   closeButton: {
     backgroundColor: Color.BG_2,
@@ -75,6 +81,12 @@ export const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     fontWeight: '600',
     color: Color.FG_2,
+    letterSpacing: 0.5,
+  },
+  tradeButtonTextDisabled: {
+    fontSize: fontSizes.md,
+    fontWeight: '600',
+    color: Color.FG_3,
     letterSpacing: 0.5,
   },
   closeButtonText: {

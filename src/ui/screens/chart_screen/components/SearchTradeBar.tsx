@@ -12,6 +12,7 @@ interface SearchTradeBarProps {
   onSearchActivate: () => void;
   onSearchDeactivate: () => void;
   onTradePress: () => void;
+  isDetailView?: boolean;
 }
 
 export default function SearchTradeBar({
@@ -21,6 +22,7 @@ export default function SearchTradeBar({
   onSearchActivate,
   onSearchDeactivate,
   onTradePress,
+  isDetailView = false,
 }: SearchTradeBarProps): React.JSX.Element {
   const handleSearchPress = () => {
     playPrimaryButtonHaptic();
@@ -33,12 +35,13 @@ export default function SearchTradeBar({
   };
 
   const handleTradePress = () => {
+    if (searchActive) return; // Disabled during search
     playPrimaryButtonHaptic();
     onTradePress();
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDetailView && styles.containerDetailView]}>
       {!searchActive ? (
         // Chart view: Search icon button + Trade button
         <>
@@ -58,7 +61,7 @@ export default function SearchTradeBar({
           </TouchableOpacity>
         </>
       ) : (
-        // Search view: X button + Trade button
+        // Search view: X button + Trade button (disabled)
         <>
           <TouchableOpacity
             style={styles.searchIconButton}
@@ -68,11 +71,12 @@ export default function SearchTradeBar({
             <Ionicons name="close" size={24} color={Color.FG_1} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.actionButton, styles.tradeButton]}
+            style={[styles.actionButton, styles.tradeButton, styles.tradeButtonDisabled]}
             onPress={handleTradePress}
-            activeOpacity={0.8}
+            activeOpacity={1}
+            disabled={true}
           >
-            <Text style={styles.tradeButtonText}>Trade</Text>
+            <Text style={styles.tradeButtonTextDisabled}>Trade</Text>
           </TouchableOpacity>
         </>
       )}

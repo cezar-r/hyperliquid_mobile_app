@@ -8,7 +8,7 @@ import {
   InteractionManager,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { LWCandle, ChartMarker, ChartPriceLine, LightweightChartBridgeRef } from '../../chart/LightweightChartBridge';
 import { TPSLEditModal, ClosePositionModal, PerpOrderTicket, SpotOrderTicket } from '../../modals';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
@@ -100,16 +100,21 @@ function calculateUnrealizedPnL(position: any, currentPrice: number | string): {
 
 export default function ChartScreen(): React.JSX.Element {
   const navigation = useNavigation();
+  const route = useRoute();
   const { state, infoClient, enterChartMode, exitChartMode, subscribeToCandles, unsubscribeFromCandles, subscribeToOrderbook, unsubscribeFromOrderbook, subscribeToTrades, unsubscribeFromTrades, selectCoin, setMarketType } =
     useWebSocket();
   const { account, exchangeClient, refetchAccount } = useWallet();
   const { selectedCoin, marketType, spotMarkets } = state;
+
+  // Check if we're on ChartDetail (from Home/Portfolio) or Chart tab
+  const isDetailView = route.name === 'ChartDetail';
 
   // For skeleton loading
   const [isReady, setIsReady] = useState(false);
 
   // Search functionality
   const [searchActive, setSearchActive] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(1)).current; // 1 = chart visible, 0 = search visible
   
   // Ref to track current ticker for stale data filtering
   const currentTickerRef = useRef<string | null>(null);
@@ -549,6 +554,15 @@ export default function ChartScreen(): React.JSX.Element {
       setIsStarred(!newStarredState);
     });
   };
+
+  // Animate fade when search state changes
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: searchActive ? 0 : 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [searchActive, fadeAnim]);
 
   // Search handlers
   const handleSearchActivate = () => {
@@ -1068,32 +1082,25 @@ export default function ChartScreen(): React.JSX.Element {
     return isSpot ? getDisplayTicker(coin) : coin;
   };
 
-  // Render SearchScreen when search is active
-  if (searchActive) {
-    return (
-      <View style={{ flex: 1 }}>
-        <SearchScreen 
-          onTickerSelect={() => {
-            // Close search and re-enter chart mode when ticker is selected
-            setSearchActive(false);
-            enterChartMode?.();
-          }}
-        />
-        <SearchTradeBar
-          searchActive={searchActive}
-          searchQuery=""
-          onSearchQueryChange={() => {}}
-          onSearchActivate={handleSearchActivate}
-          onSearchDeactivate={handleSearchDeactivate}
-          onTradePress={handleTradePress}
-        />
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.container}>
+    <View style={{ flex: 1 }}>
+      {/* Chart View */}
+      <Animated.View 
+        style={[
+          styles.container, 
+          { 
+            opacity: fadeAnim,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+          }
+        ]}
+        pointerEvents={searchActive ? 'none' : 'auto'}
+      >
       <ChartHeader
+        onBackPress={isDetailView ? () => navigation.goBack() : undefined}
         ticker={selectedCoin}
         displayTicker={marketType === 'spot' && selectedCoin ? getDisplayTicker(selectedCoin) : selectedCoin}
         marketType={marketType}
@@ -1176,16 +1183,6 @@ export default function ChartScreen(): React.JSX.Element {
         />
       </ScrollView>
 
-      {/* Search/Trade Bar */}
-      <SearchTradeBar
-        searchActive={searchActive}
-        searchQuery=""
-        onSearchQueryChange={() => {}}
-        onSearchActivate={handleSearchActivate}
-        onSearchDeactivate={handleSearchDeactivate}
-        onTradePress={handleTradePress}
-      />
-
       {/* Order Ticket Modal */}
       {marketType === 'perp' ? (
         <PerpOrderTicket
@@ -1221,6 +1218,43 @@ export default function ChartScreen(): React.JSX.Element {
           coin={selectedCoin}
         />
       )}
+      </Animated.View>
+
+      {/* Search View */}
+      <Animated.View 
+        style={{ 
+          flex: 1,
+          opacity: fadeAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [1, 0],
+          }),
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+        }}
+        pointerEvents={searchActive ? 'auto' : 'none'}
+      >
+        <SearchScreen 
+          onTickerSelect={() => {
+            // Close search and re-enter chart mode when ticker is selected
+            setSearchActive(false);
+            enterChartMode?.();
+          }}
+        />
+      </Animated.View>
+
+      {/* Search/Trade Bar (Always visible) */}
+      <SearchTradeBar
+        searchActive={searchActive}
+        searchQuery=""
+        onSearchQueryChange={() => {}}
+        onSearchActivate={handleSearchActivate}
+        onSearchDeactivate={handleSearchDeactivate}
+        onTradePress={handleTradePress}
+        isDetailView={isDetailView}
+      />
     </View>
   );
 }
