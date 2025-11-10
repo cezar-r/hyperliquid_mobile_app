@@ -1,4 +1,4 @@
-export { default as BuySellButtons } from './BuySellButtons';
+export { default as SearchTradeBar } from './SearchTradeBar';
 export { default as ChartContent } from './ChartContent';
 export { default as ChartHeader } from './ChartHeader';
 export { default as OpenOrdersContainer } from './OpenOrdersContainer';

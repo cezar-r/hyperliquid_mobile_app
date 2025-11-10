@@ -10,6 +10,7 @@ import {
   HistoryScreen,
   ProfileScreen,
 } from '../screens';
+import ChartScreen from '../screens/chart_screen/ChartScreen';
 
 import { Color } from '../shared/styles';
 import { styles } from './TabNavigator.styles';
@@ -18,7 +19,7 @@ import { playNavbarHaptic } from '../../lib/haptics';
 export type TabParamList = {
   Home: undefined;
   Browser: undefined;
-  Search: undefined;
+  Chart: undefined;
   History: undefined;
   Profile: undefined;
 };
@@ -194,8 +195,8 @@ export default function TabNavigator(): React.JSX.Element {
           }}
         />
         <Tab.Screen
-          name="Search"
-          component={SearchScreen}
+          name="Chart"
+          component={ChartScreen}
           options={{
             headerShown: false,
             tabBarIcon: ({ focused }) => (

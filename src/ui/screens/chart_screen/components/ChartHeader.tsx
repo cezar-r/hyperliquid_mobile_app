@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, Animated } from 'react-native
 import { styles } from '../styles/ChartHeader.styles';
 
 interface ChartHeaderProps {
-  onBackPress: () => void;
+  onBackPress?: () => void;
   ticker: string;
   displayTicker: string;
   marketType: 'perp' | 'spot';
@@ -79,15 +79,17 @@ export default function ChartHeader({
 }: ChartHeaderProps): React.JSX.Element {
   return (
     <View style={styles.tickerHeader}>
-      <View style={styles.backButtonRow}>
-        <TouchableOpacity 
-          onPress={onBackPress}
-          style={styles.backButton}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.backButtonText}>‹</Text>
-        </TouchableOpacity>
-      </View>
+      {onBackPress && (
+        <View style={styles.backButtonRow}>
+          <TouchableOpacity 
+            onPress={onBackPress}
+            style={styles.backButton}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.backButtonText}>‹</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       <View style={styles.tickerTopRow}>
         <View style={styles.tickerLeftGroup}>
           <Text style={styles.tickerName}>{displayTicker}</Text>

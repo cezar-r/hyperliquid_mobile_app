@@ -34,6 +34,7 @@ import type { Candle, CandleInterval } from '../../../types';
 import { styles } from './styles/ChartScreen.styles';
 import { Color } from '../../shared/styles';
 import { PanelSelector, SkeletonScreen, RecentTradesContainer } from '../../shared/components';
+import SearchScreen from '../search_screen/SearchScreen';
 import {
   ChartHeader,
   ChartContent,
@@ -41,12 +42,13 @@ import {
   TradesContent,
   PositionContainer,
   OpenOrdersContainer,
-  BuySellButtons,
+  SearchTradeBar,
 } from './components';
 
 const INTERVALS: CandleInterval[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
 const SHOW_TRADES_KEY = '@show_trades_on_chart';
 const HIDE_SMALL_BALANCES_KEY = '@hide_small_balances';
+const LAST_VISITED_TICKER_KEY = '@last_visited_ticker';
 
 interface ChartData {
   timestamp: number;
@@ -98,13 +100,20 @@ function calculateUnrealizedPnL(position: any, currentPrice: number | string): {
 
 export default function ChartScreen(): React.JSX.Element {
   const navigation = useNavigation();
-  const { state, infoClient, enterChartMode, exitChartMode, subscribeToCandles, unsubscribeFromCandles, subscribeToOrderbook, unsubscribeFromOrderbook, subscribeToTrades, unsubscribeFromTrades } =
+  const { state, infoClient, enterChartMode, exitChartMode, subscribeToCandles, unsubscribeFromCandles, subscribeToOrderbook, unsubscribeFromOrderbook, subscribeToTrades, unsubscribeFromTrades, selectCoin, setMarketType } =
     useWebSocket();
   const { account, exchangeClient, refetchAccount } = useWallet();
   const { selectedCoin, marketType, spotMarkets } = state;
 
   // For skeleton loading
   const [isReady, setIsReady] = useState(false);
+
+  // Search functionality
+  const [searchActive, setSearchActive] = useState(false);
+  
+  // Ref to track current ticker for stale data filtering
+  const currentTickerRef = useRef<string | null>(null);
+  const currentIntervalRef = useRef<CandleInterval | null>(null);
 
   // Screen lifecycle logging and cache initialization
   useEffect(() => {
@@ -119,6 +128,49 @@ export default function ChartScreen(): React.JSX.Element {
       logScreenUnmount('ChartScreen');
     };
   }, []);
+
+  // Load last visited ticker on mount
+  useEffect(() => {
+    const loadLastVisitedTicker = async () => {
+      try {
+        const lastVisited = await AsyncStorage.getItem(LAST_VISITED_TICKER_KEY);
+        if (lastVisited) {
+          const [ticker, market] = lastVisited.split('|');
+          if (ticker && market && (market === 'perp' || market === 'spot')) {
+            // Set market type first, then select coin
+            setMarketType(market as 'perp' | 'spot');
+            selectCoin(ticker);
+            console.log(`[ChartScreen] Loaded last visited ticker: ${ticker} (${market})`);
+          }
+        } else {
+          // Default to BTC perp if no saved ticker
+          setMarketType('perp');
+          selectCoin('BTC');
+        }
+      } catch (error) {
+        console.error('[ChartScreen] Failed to load last visited ticker:', error);
+        // Default to BTC perp on error
+        setMarketType('perp');
+        selectCoin('BTC');
+      }
+    };
+
+    loadLastVisitedTicker();
+  }, []);
+
+  // Save last visited ticker when it changes
+  useEffect(() => {
+    if (selectedCoin && marketType) {
+      const saveLastVisitedTicker = async () => {
+        try {
+          await AsyncStorage.setItem(LAST_VISITED_TICKER_KEY, `${selectedCoin}|${marketType}`);
+        } catch (error) {
+          console.error('[ChartScreen] Failed to save last visited ticker:', error);
+        }
+      };
+      saveLastVisitedTicker();
+    }
+  }, [selectedCoin, marketType]);
 
   const [candles, setCandles] = useState<ChartData[]>([]);
   const [interval, setInterval] = useState<CandleInterval | null>(null);
@@ -378,12 +430,28 @@ export default function ChartScreen(): React.JSX.Element {
     [infoClient, marketType, spotMarkets]
   );
 
+  // Update refs when ticker or interval changes
+  useEffect(() => {
+    currentTickerRef.current = selectedCoin;
+    currentIntervalRef.current = interval;
+  }, [selectedCoin, interval]);
+
   useEffect(() => {
     if (!selectedCoin || !intervalLoaded || !interval) return;
+
+    // Store the ticker and interval for this subscription
+    const subscribedTicker = selectedCoin;
+    const subscribedInterval = interval;
 
     fetchHistoricalCandles(selectedCoin, interval);
 
     const handleLiveCandle = (candle: Candle): void => {
+      // ROBUST FILTER: Only process if still subscribed to this ticker/interval
+      if (currentTickerRef.current !== subscribedTicker || currentIntervalRef.current !== subscribedInterval) {
+        console.log(`[ChartScreen] Ignoring stale candle for ${subscribedTicker} @ ${subscribedInterval} (current: ${currentTickerRef.current} @ ${currentIntervalRef.current})`);
+        return;
+      }
+
       setCandles((prev) => {
         const newCandle: ChartData = {
           timestamp: candle.t,
@@ -480,6 +548,31 @@ export default function ChartScreen(): React.JSX.Element {
       console.error('[ChartScreen] Failed to toggle star:', error);
       setIsStarred(!newStarredState);
     });
+  };
+
+  // Search handlers
+  const handleSearchActivate = () => {
+    // Unsubscribe from current ticker's chart-specific subscriptions
+    unsubscribeFromCandles();
+    unsubscribeFromOrderbook();
+    unsubscribeFromTrades();
+    // Clear refs to reject any stale data
+    currentTickerRef.current = null;
+    currentIntervalRef.current = null;
+    // Exit chart mode when entering search to avoid duplicate subscriptions
+    exitChartMode?.();
+    setSearchActive(true);
+  };
+
+  const handleSearchDeactivate = () => {
+    setSearchActive(false);
+    // Re-enter chart mode when returning to chart
+    enterChartMode?.();
+  };
+
+  const handleTradePress = () => {
+    setOrderTicketDefaultSide('buy');
+    setShowOrderTicket(true);
   };
 
   if (!selectedCoin) {
@@ -975,10 +1068,32 @@ export default function ChartScreen(): React.JSX.Element {
     return isSpot ? getDisplayTicker(coin) : coin;
   };
 
+  // Render SearchScreen when search is active
+  if (searchActive) {
+    return (
+      <View style={{ flex: 1 }}>
+        <SearchScreen 
+          onTickerSelect={() => {
+            // Close search and re-enter chart mode when ticker is selected
+            setSearchActive(false);
+            enterChartMode?.();
+          }}
+        />
+        <SearchTradeBar
+          searchActive={searchActive}
+          searchQuery=""
+          onSearchQueryChange={() => {}}
+          onSearchActivate={handleSearchActivate}
+          onSearchDeactivate={handleSearchDeactivate}
+          onTradePress={handleTradePress}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ChartHeader
-        onBackPress={() => navigation.goBack()}
         ticker={selectedCoin}
         displayTicker={marketType === 'spot' && selectedCoin ? getDisplayTicker(selectedCoin) : selectedCoin}
         marketType={marketType}
@@ -1061,16 +1176,14 @@ export default function ChartScreen(): React.JSX.Element {
         />
       </ScrollView>
 
-      {/* Buy/Sell Buttons */}
-      <BuySellButtons
-        onBuyPress={() => {
-          setOrderTicketDefaultSide('buy');
-          setShowOrderTicket(true);
-        }}
-        onSellPress={() => {
-          setOrderTicketDefaultSide('sell');
-          setShowOrderTicket(true);
-        }}
+      {/* Search/Trade Bar */}
+      <SearchTradeBar
+        searchActive={searchActive}
+        searchQuery=""
+        onSearchQueryChange={() => {}}
+        onSearchActivate={handleSearchActivate}
+        onSearchDeactivate={handleSearchDeactivate}
+        onTradePress={handleTradePress}
       />
 
       {/* Order Ticket Modal */}
