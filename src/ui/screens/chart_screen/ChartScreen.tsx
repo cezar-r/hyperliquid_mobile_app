@@ -167,7 +167,10 @@ export default function ChartScreen(): React.JSX.Element {
     : null;
 
   // Get real-time price from WebSocket
-  const assetCtx = state.assetContexts[selectedCoin || ''] || null;
+  const assetCtx = useMemo(() => {
+    return state.assetContexts[selectedCoin || ''] || null;
+  }, [state.assetContexts, selectedCoin]);
+
   const currentPriceForTick = (selectedCoin && state.prices[selectedCoin]) 
     ? parseFloat(state.prices[selectedCoin])
     : (assetCtx?.markPx || 0);
@@ -493,7 +496,9 @@ export default function ChartScreen(): React.JSX.Element {
   const userFills = (account.data?.userFills || []).filter((f: any) => f.coin === selectedCoin);
 
   // Get real-time price from WebSocket
-  const currentPrice = (selectedCoin && state.prices[selectedCoin]) || assetCtx?.markPx;
+  const currentPrice = useMemo(() => {
+    return (selectedCoin && state.prices[selectedCoin]) || assetCtx?.markPx;
+  }, [selectedCoin, state.prices[selectedCoin || ''], assetCtx?.markPx]);
 
   // Animate price color on change
   useEffect(() => {

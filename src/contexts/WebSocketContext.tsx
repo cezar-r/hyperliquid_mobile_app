@@ -817,6 +817,10 @@ export function WebSocketProvider({
               ...prev.assetContexts,
               [coin]: ctx,
             },
+            prices: {
+              ...prev.prices,
+              [coin]: ctx.markPx.toString(),
+            },
           }));
         });
         singleAssetCtxSubRef.current = sub;
@@ -836,6 +840,10 @@ export function WebSocketProvider({
             assetContexts: {
               ...prev.assetContexts,
               [coin]: ctx,
+            },
+            prices: {
+              ...prev.prices,
+              [coin]: ctx.markPx.toString(),
             },
           }));
         });
