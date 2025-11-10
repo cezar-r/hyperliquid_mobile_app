@@ -48,7 +48,11 @@ function formatPercent(num: number | undefined | null): string {
   return `${(num * 100).toFixed(2)}%`;
 }
 
-export default function SearchScreen(): React.JSX.Element {
+interface SearchScreenProps {
+  onTickerSelect?: (marketName: string) => void;
+}
+
+export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {}): React.JSX.Element {
   const navigation = useNavigation<any>();
   const { state: wsState, selectCoin, setMarketType } = useWebSocket();
   const [searchQuery, setSearchQuery] = useState('');
@@ -301,9 +305,15 @@ export default function SearchScreen(): React.JSX.Element {
 
       Keyboard.dismiss();
       selectCoin(marketName);
-      navigation.navigate('ChartDetail');
+      
+      // If onTickerSelect is provided, call it instead of navigating
+      if (onTickerSelect) {
+        onTickerSelect(marketName);
+      } else {
+        navigation.navigate('ChartDetail');
+      }
     },
-    [selectCoin, navigation]
+    [selectCoin, navigation, onTickerSelect]
   );
 
   const handleMarketTypeToggle = useCallback(

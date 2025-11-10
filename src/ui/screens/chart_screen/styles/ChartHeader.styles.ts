@@ -5,19 +5,18 @@ import { fontSizes, spacing } from '../../../shared/styles';
 export const styles = StyleSheet.create({
   tickerHeader: {
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
+    paddingTop: spacing.xxl,
     paddingBottom: spacing.sm,
     backgroundColor: '#0b0f13',
     marginBottom: 0,
   },
   backButtonRow: {
-    paddingTop: spacing.xl,
+    // paddingTop: spacing.xl,
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingTop: spacing.sm,
     paddingRight: spacing.md,
   },
   backButtonText: {
@@ -30,6 +29,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
+    paddingTop: spacing.xs,
   },
   tickerBottomRow: {
     flexDirection: 'row',

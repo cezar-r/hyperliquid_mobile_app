@@ -21,7 +21,7 @@ export const styles = StyleSheet.create({
   },
   expandedContent: {
     paddingHorizontal: 10,
-    marginTop: -4,
+    marginTop: -8,
     paddingBottom: 4,
   },
   detailRow: {

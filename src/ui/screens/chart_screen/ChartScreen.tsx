@@ -8,7 +8,7 @@ import {
   InteractionManager,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { LWCandle, ChartMarker, ChartPriceLine, LightweightChartBridgeRef } from '../../chart/LightweightChartBridge';
 import { TPSLEditModal, ClosePositionModal, PerpOrderTicket, SpotOrderTicket } from '../../modals';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
@@ -34,6 +34,7 @@ import type { Candle, CandleInterval } from '../../../types';
 import { styles } from './styles/ChartScreen.styles';
 import { Color } from '../../shared/styles';
 import { PanelSelector, SkeletonScreen, RecentTradesContainer } from '../../shared/components';
+import SearchScreen from '../search_screen/SearchScreen';
 import {
   ChartHeader,
   ChartContent,
@@ -41,12 +42,13 @@ import {
   TradesContent,
   PositionContainer,
   OpenOrdersContainer,
-  BuySellButtons,
+  SearchTradeBar,
 } from './components';
 
 const INTERVALS: CandleInterval[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
 const SHOW_TRADES_KEY = '@show_trades_on_chart';
 const HIDE_SMALL_BALANCES_KEY = '@hide_small_balances';
+const LAST_VISITED_TICKER_KEY = '@last_visited_ticker';
 
 interface ChartData {
   timestamp: number;
@@ -98,13 +100,25 @@ function calculateUnrealizedPnL(position: any, currentPrice: number | string): {
 
 export default function ChartScreen(): React.JSX.Element {
   const navigation = useNavigation();
-  const { state, infoClient, enterChartMode, exitChartMode, subscribeToCandles, unsubscribeFromCandles, subscribeToOrderbook, unsubscribeFromOrderbook, subscribeToTrades, unsubscribeFromTrades } =
+  const route = useRoute();
+  const { state, infoClient, enterChartMode, exitChartMode, subscribeToCandles, unsubscribeFromCandles, subscribeToOrderbook, unsubscribeFromOrderbook, subscribeToTrades, unsubscribeFromTrades, selectCoin, setMarketType } =
     useWebSocket();
   const { account, exchangeClient, refetchAccount } = useWallet();
   const { selectedCoin, marketType, spotMarkets } = state;
 
+  // Check if we're on ChartDetail (from Home/Portfolio) or Chart tab
+  const isDetailView = route.name === 'ChartDetail';
+
   // For skeleton loading
   const [isReady, setIsReady] = useState(false);
+
+  // Search functionality
+  const [searchActive, setSearchActive] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(1)).current; // 1 = chart visible, 0 = search visible
+  
+  // Ref to track current ticker for stale data filtering
+  const currentTickerRef = useRef<string | null>(null);
+  const currentIntervalRef = useRef<CandleInterval | null>(null);
 
   // Screen lifecycle logging and cache initialization
   useEffect(() => {
@@ -119,6 +133,49 @@ export default function ChartScreen(): React.JSX.Element {
       logScreenUnmount('ChartScreen');
     };
   }, []);
+
+  // Load last visited ticker on mount
+  useEffect(() => {
+    const loadLastVisitedTicker = async () => {
+      try {
+        const lastVisited = await AsyncStorage.getItem(LAST_VISITED_TICKER_KEY);
+        if (lastVisited) {
+          const [ticker, market] = lastVisited.split('|');
+          if (ticker && market && (market === 'perp' || market === 'spot')) {
+            // Set market type first, then select coin
+            setMarketType(market as 'perp' | 'spot');
+            selectCoin(ticker);
+            console.log(`[ChartScreen] Loaded last visited ticker: ${ticker} (${market})`);
+          }
+        } else {
+          // Default to BTC perp if no saved ticker
+          setMarketType('perp');
+          selectCoin('BTC');
+        }
+      } catch (error) {
+        console.error('[ChartScreen] Failed to load last visited ticker:', error);
+        // Default to BTC perp on error
+        setMarketType('perp');
+        selectCoin('BTC');
+      }
+    };
+
+    loadLastVisitedTicker();
+  }, []);
+
+  // Save last visited ticker when it changes
+  useEffect(() => {
+    if (selectedCoin && marketType) {
+      const saveLastVisitedTicker = async () => {
+        try {
+          await AsyncStorage.setItem(LAST_VISITED_TICKER_KEY, `${selectedCoin}|${marketType}`);
+        } catch (error) {
+          console.error('[ChartScreen] Failed to save last visited ticker:', error);
+        }
+      };
+      saveLastVisitedTicker();
+    }
+  }, [selectedCoin, marketType]);
 
   const [candles, setCandles] = useState<ChartData[]>([]);
   const [interval, setInterval] = useState<CandleInterval | null>(null);
@@ -378,12 +435,28 @@ export default function ChartScreen(): React.JSX.Element {
     [infoClient, marketType, spotMarkets]
   );
 
+  // Update refs when ticker or interval changes
+  useEffect(() => {
+    currentTickerRef.current = selectedCoin;
+    currentIntervalRef.current = interval;
+  }, [selectedCoin, interval]);
+
   useEffect(() => {
     if (!selectedCoin || !intervalLoaded || !interval) return;
+
+    // Store the ticker and interval for this subscription
+    const subscribedTicker = selectedCoin;
+    const subscribedInterval = interval;
 
     fetchHistoricalCandles(selectedCoin, interval);
 
     const handleLiveCandle = (candle: Candle): void => {
+      // ROBUST FILTER: Only process if still subscribed to this ticker/interval
+      if (currentTickerRef.current !== subscribedTicker || currentIntervalRef.current !== subscribedInterval) {
+        console.log(`[ChartScreen] Ignoring stale candle for ${subscribedTicker} @ ${subscribedInterval} (current: ${currentTickerRef.current} @ ${currentIntervalRef.current})`);
+        return;
+      }
+
       setCandles((prev) => {
         const newCandle: ChartData = {
           timestamp: candle.t,
@@ -480,6 +553,40 @@ export default function ChartScreen(): React.JSX.Element {
       console.error('[ChartScreen] Failed to toggle star:', error);
       setIsStarred(!newStarredState);
     });
+  };
+
+  // Animate fade when search state changes
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: searchActive ? 0 : 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [searchActive, fadeAnim]);
+
+  // Search handlers
+  const handleSearchActivate = () => {
+    // Unsubscribe from current ticker's chart-specific subscriptions
+    unsubscribeFromCandles();
+    unsubscribeFromOrderbook();
+    unsubscribeFromTrades();
+    // Clear refs to reject any stale data
+    currentTickerRef.current = null;
+    currentIntervalRef.current = null;
+    // Exit chart mode when entering search to avoid duplicate subscriptions
+    exitChartMode?.();
+    setSearchActive(true);
+  };
+
+  const handleSearchDeactivate = () => {
+    setSearchActive(false);
+    // Re-enter chart mode when returning to chart
+    enterChartMode?.();
+  };
+
+  const handleTradePress = () => {
+    setOrderTicketDefaultSide('buy');
+    setShowOrderTicket(true);
   };
 
   if (!selectedCoin) {
@@ -976,9 +1083,24 @@ export default function ChartScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={{ flex: 1 }}>
+      {/* Chart View */}
+      <Animated.View 
+        style={[
+          styles.container, 
+          { 
+            opacity: fadeAnim,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+          }
+        ]}
+        pointerEvents={searchActive ? 'none' : 'auto'}
+      >
       <ChartHeader
-        onBackPress={() => navigation.goBack()}
+        onBackPress={isDetailView ? () => navigation.goBack() : undefined}
         ticker={selectedCoin}
         displayTicker={marketType === 'spot' && selectedCoin ? getDisplayTicker(selectedCoin) : selectedCoin}
         marketType={marketType}
@@ -1061,18 +1183,6 @@ export default function ChartScreen(): React.JSX.Element {
         />
       </ScrollView>
 
-      {/* Buy/Sell Buttons */}
-      <BuySellButtons
-        onBuyPress={() => {
-          setOrderTicketDefaultSide('buy');
-          setShowOrderTicket(true);
-        }}
-        onSellPress={() => {
-          setOrderTicketDefaultSide('sell');
-          setShowOrderTicket(true);
-        }}
-      />
-
       {/* Order Ticket Modal */}
       {marketType === 'perp' ? (
         <PerpOrderTicket
@@ -1108,6 +1218,43 @@ export default function ChartScreen(): React.JSX.Element {
           coin={selectedCoin}
         />
       )}
+      </Animated.View>
+
+      {/* Search View */}
+      <Animated.View 
+        style={{ 
+          flex: 1,
+          opacity: fadeAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [1, 0],
+          }),
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+        }}
+        pointerEvents={searchActive ? 'auto' : 'none'}
+      >
+        <SearchScreen 
+          onTickerSelect={() => {
+            // Close search and re-enter chart mode when ticker is selected
+            setSearchActive(false);
+            enterChartMode?.();
+          }}
+        />
+      </Animated.View>
+
+      {/* Search/Trade Bar (Always visible) */}
+      <SearchTradeBar
+        searchActive={searchActive}
+        searchQuery=""
+        onSearchQueryChange={() => {}}
+        onSearchActivate={handleSearchActivate}
+        onSearchDeactivate={handleSearchDeactivate}
+        onTradePress={handleTradePress}
+        isDetailView={isDetailView}
+      />
     </View>
   );
 }
