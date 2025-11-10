@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated, FlatList } from 'react-native';
-import TradeCard from '../trade_card/TradeCard';
+import { View, Text, TouchableOpacity, Animated } from 'react-native';
+import { VirtualizedTradesList } from '..';
 import { styles } from './styles/RecentTradesContainer.styles';
 import type { UserFill } from '../../../../types';
 import { playShowMoreButtonHaptic } from '../../../../lib/haptics';
@@ -59,28 +59,18 @@ export default function RecentTradesContainer({
     return <></>;
   }
 
-  const showingAll = displayLimit >= trades.length;
+  const cap = 200;
+  const upperBound = Math.min(trades.length, cap);
+  const effectiveLimit = Math.min(displayLimit, cap);
+  const showingAll = effectiveLimit >= upperBound;
 
   return (
     <View style={styles.recentTradesContainer}>
       <Text style={styles.sectionLabel}>Recent Trades ({trades.length})</Text>
-      <FlatList
-        data={trades.slice(0, displayLimit)}
-        keyExtractor={(fill, index) => {
-          const base =
-            (fill.hash && `h-${fill.hash}`) ||
-            `t-${fill.time}-${fill.coin}-${fill.px}-${fill.sz}-${fill.side}`;
-          const tidPart = typeof fill.tid === 'number' ? `-${fill.tid}` : '';
-          return `${base}${tidPart}-${index}`;
-        }}
-        renderItem={({ item, index }) => (
-          <AnimatedTradeCard
-            fill={item}
-            displayCoin={getDisplayCoin(item.coin)}
-            index={index}
-            previousLimit={previousLimit}
-          />
-        )}
+      <VirtualizedTradesList
+        trades={trades}
+        visibleCount={effectiveLimit}
+        getDisplayCoin={getDisplayCoin}
         scrollEnabled={false}
         initialNumToRender={12}
         maxToRenderPerBatch={12}
@@ -90,7 +80,7 @@ export default function RecentTradesContainer({
       />
 
       {/* Show More/Less Button */}
-      {trades.length > 10 && (
+      {upperBound > 10 && (
         <TouchableOpacity style={styles.showMoreButton} onPress={() => {
           playShowMoreButtonHaptic();
           onShowMore();
@@ -100,12 +90,13 @@ export default function RecentTradesContainer({
               'Show Less'
             ) : (
               <>
-                Show More (
-                {Math.min(
-                  displayLimit === 10 ? 20 : displayLimit === 20 ? 50 : trades.length,
-                  trades.length
-                )}{' '}
-                of {trades.length})
+                {(() => {
+                  const nextCount =
+                    effectiveLimit === 10 ? 20 :
+                    effectiveLimit === 20 ? 50 :
+                    Math.min(effectiveLimit + 300, upperBound);
+                  return `Show More (${nextCount} of ${upperBound})`;
+                })()}
               </>
             )}
           </Text>

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount } from '@reown/appkit-react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -94,6 +94,7 @@ export default function PortfolioScreen(): React.JSX.Element {
   const { account, exchangeClient, refetchAccount } = useWallet();
   const { state: wsState, selectCoin, setMarketType, infoClient } = useWebSocket();
   const navigation = useNavigation<any>();
+  const isFocused = useIsFocused();
 
   // For skeleton loading
   const [isReady] = useState(true);
@@ -126,6 +127,7 @@ export default function PortfolioScreen(): React.JSX.Element {
   const [tradesDisplayLimit, setTradesDisplayLimit] = useState(10);
   const [marketDropdownVisible, setMarketDropdownVisible] = useState(false);
   const [hideSmallBalances, setHideSmallBalances] = useState(false);
+  const [recentTradesSnapshot, setRecentTradesSnapshot] = useState<UserFill[]>([]);
 
   // State for historical spot prices (for time-based PnL) - keyed by timeFilter
   const [historicalSpotPrices, setHistoricalSpotPrices] = useState<{
@@ -455,6 +457,14 @@ export default function PortfolioScreen(): React.JSX.Element {
 
     return fills;
   }, [account.data?.userFills, timeFilter, marketFilter, wsState.perpMarkets, wsState.spotMarkets]);
+
+  // Snapshot recent trades only when screen focuses or filters change, to avoid constant updates
+  useEffect(() => {
+    if (isFocused && marketFilter !== 'Staking') {
+      setRecentTradesSnapshot(filteredFills);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFocused, timeFilter, marketFilter]);
 
   // Helper to check if a fill is a spot trade (handles both base token name and API format)
   const isSpotFill = useCallback(
@@ -1358,21 +1368,22 @@ export default function PortfolioScreen(): React.JSX.Element {
                       <View style={styles.separator} />
 
                       {/* Recent Trades */}
-                      {filteredFills.length > 0 && marketFilter !== 'Staking' && (
+                      {recentTradesSnapshot.length > 0 && marketFilter !== 'Staking' && (
                         <RecentTradesContainer
-                          trades={filteredFills}
+                          trades={recentTradesSnapshot}
                           displayLimit={tradesDisplayLimit}
                           onShowMore={() => {
-                            if (tradesDisplayLimit === 10) {
-                              setTradesDisplayLimit(20);
-                            } else if (tradesDisplayLimit === 20) {
-                              setTradesDisplayLimit(50);
-                            } else if (tradesDisplayLimit === 50) {
-                              setTradesDisplayLimit(Number.MAX_SAFE_INTEGER);
-                            } else {
-                              // Reset to 10 when showing all
-                              setTradesDisplayLimit(10);
+                            const cap = 200;
+                            const total = Math.min(recentTradesSnapshot.length, cap);
+                            // If already at or above the total (cap), collapse
+                            if (tradesDisplayLimit >= total) {
+                              return setTradesDisplayLimit(10);
                             }
+                            if (tradesDisplayLimit === 10) return setTradesDisplayLimit(20);
+                            if (tradesDisplayLimit === 20) return setTradesDisplayLimit(50);
+                            const next = Math.min(tradesDisplayLimit + 300, total);
+                            // Expand up to the cap/total; do not collapse here
+                            setTradesDisplayLimit(next);
                           }}
                           getDisplayCoin={getDisplayCoin}
                         />

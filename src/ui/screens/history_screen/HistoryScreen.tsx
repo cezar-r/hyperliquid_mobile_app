@@ -12,7 +12,7 @@ import { resolveSpotTicker } from '../../../lib/formatting';
 import { logScreenMount, logScreenUnmount, logScreenFocus, logScreenBlur, logRender, logUserAction, logScreenFullyRendered } from '../../../lib/logger';
 import { styles } from './styles/HistoryScreen.styles';
 import type { UserFill, LedgerUpdate } from '../../../types';
-import { PanelSelector, EmptyState, ErrorState, TradeCard, SkeletonScreen } from '../../shared/components';
+import { PanelSelector, EmptyState, ErrorState, SkeletonScreen, VirtualizedTradesList } from '../../shared/components';
 import { LedgerCard, LoadingState } from './components';
 
 type ViewFilter = 'Trades' | 'Ledger';
@@ -24,6 +24,8 @@ export default function HistoryScreen(): React.JSX.Element {
   const { account, infoClient } = useWallet();
   const { state: wsState } = useWebSocket();
   const isFocused = useIsFocused();
+  const tradesListRef = useRef<FlatList<UserFill>>(null);
+  const ledgerListRef = useRef<FlatList<LedgerUpdate>>(null);
 
   // For skeleton loading
   const [isReady] = useState(true);
@@ -181,6 +183,19 @@ export default function HistoryScreen(): React.JSX.Element {
     return tradesSnapshot.slice(0, Math.min(tradesVisibleCount, tradesSnapshot.length));
   }, [tradesSnapshot, tradesVisibleCount]);
 
+  // On returning to this screen, snap the current list to top
+  useEffect(() => {
+    if (isFocused) {
+      requestAnimationFrame(() => {
+        if (viewFilter === 'Trades') {
+          tradesListRef.current?.scrollToOffset({ offset: 0, animated: false });
+        } else {
+          ledgerListRef.current?.scrollToOffset({ offset: 0, animated: false });
+        }
+      });
+    }
+  }, [isFocused]); // only on focus regain
+
   // Pan gesture for swipe navigation
   const panGesture = Gesture.Pan()
     .onEnd((event) => {
@@ -229,27 +244,18 @@ export default function HistoryScreen(): React.JSX.Element {
                 {!account.isLoading && !account.error && account.data && (
                   <>
                     {tradesSnapshot.length > 0 ? (
-                      <FlatList
-                        style={styles.scrollView}
-                        contentContainerStyle={[styles.content, styles.recentTradesContainer]}
-                        data={visibleTrades}
-                        keyExtractor={(fill, idx) => {
-                          const base =
-                            (fill.hash && `h-${fill.hash}`) ||
-                            `t-${fill.time}-${fill.coin}-${fill.px}-${fill.sz}-${fill.side}`;
-                          const tidPart = typeof fill.tid === 'number' ? `-${fill.tid}` : '';
-                          return `${base}${tidPart}-${idx}`;
-                        }}
-                        renderItem={({ item }) => {
-                          const coin = item.coin;
+                      <VirtualizedTradesList
+                        ref={tradesListRef}
+                        trades={tradesSnapshot}
+                        visibleCount={tradesVisibleCount}
+                        getDisplayCoin={(coin) => {
                           const isSpot =
                             (coin.startsWith('@') && spotApiNameSet.has(coin)) ||
                             (!coin.startsWith('@') && spotBaseTokenSet.has(coin));
-                          const displayCoin = isSpot
-                            ? resolveSpotTicker(item.coin, wsState.spotMarkets)
-                            : item.coin;
-                          return <TradeCard fill={item} displayCoin={displayCoin} />;
+                          return isSpot ? resolveSpotTicker(coin, wsState.spotMarkets) : coin;
                         }}
+                        style={styles.scrollView}
+                        contentContainerStyle={[styles.content, styles.recentTradesContainer]}
                         initialNumToRender={12}
                         maxToRenderPerBatch={12}
                         updateCellsBatchingPeriod={16}
@@ -286,12 +292,13 @@ export default function HistoryScreen(): React.JSX.Element {
                 {!isLoadingLedger && !ledgerError && (
                   <>
                     {ledgerUpdates.length > 0 ? (
-                      <FlatList
+                      <FlatList<LedgerUpdate>
+                        ref={ledgerListRef}
                         style={styles.scrollView}
                         contentContainerStyle={[styles.content, styles.recentTradesContainer]}
                         data={ledgerUpdates}
-                        keyExtractor={(update, idx) => `ledger-${update.hash}-${update.time}-${idx}`}
-                        renderItem={({ item }) => (
+                        keyExtractor={(update: LedgerUpdate, idx: number) => `ledger-${update.hash}-${update.time}-${idx}`}
+                        renderItem={({ item }: { item: LedgerUpdate }) => (
                           <LedgerCard update={item} userAddress={address} />
                         )}
                         initialNumToRender={12}

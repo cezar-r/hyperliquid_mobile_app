@@ -8,3 +8,4 @@ export { default as RecentTradesContainer } from './recent_trades_container/Rece
 export { default as SkeletonScreen } from './skeleton_screen/SkeletonScreen';
 export { default as TradeCard } from './trade_card/TradeCard';
 export { Slider } from './slider/Slider';
+export { default as VirtualizedTradesList } from './virtualized_trades_list/VirtualizedTradesList';
