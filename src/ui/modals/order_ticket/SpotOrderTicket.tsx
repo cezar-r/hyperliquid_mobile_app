@@ -8,7 +8,7 @@ import { View, Modal, ScrollView, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWallet } from '../../../contexts/WalletContext';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
-import { formatSize, formatWithCommas } from '../../../lib/formatting';
+import { formatPrice, formatSize, formatWithCommas } from '../../../lib/formatting';
 import { getSkipOpenOrderConfirmations } from '../../../lib/confirmations';
 import { playOrderTicketSelectionChangeHaptic, playSliderChangeHaptic, playOrderSubmitHaptic } from '../../../lib/haptics';
 import { logModalOpen, logModalClose, logUserAction, logApiCall } from '../../../lib/logger';
@@ -79,12 +79,17 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
     return parseFloat(usdc?.total || '0');
   }, [account.data?.spotBalances]);
   
-  // Get token balance
+  // Get token balance (available = total - hold)
   const tokenBalance = useMemo(() => {
     const spotBalances = account.data?.spotBalances || [];
     const baseToken = coin.split('/')[0];
     const token = spotBalances.find((b: any) => b.coin === baseToken);
-    return parseFloat(token?.total || '0');
+    const total = parseFloat(token?.total || '0');
+    const hold = parseFloat(token?.hold || '0');
+    const available = total - hold;
+    console.log('[SpotOrderTicket] Token balance - Total:', total, 'Hold:', hold, 'Available:', available);
+    console.log('[SpotOrderTicket] Raw token data:', JSON.stringify(token, null, 2));
+    return available;
   }, [account.data?.spotBalances, coin]);
   
   const [side, setSide] = useState<OrderSide>('buy');
@@ -167,13 +172,17 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
       const bids = orderbook.levels[0];
       
       if (side === 'buy' && asks.length > 0) {
-        const lowestAsk = asks[0].px;
-        console.log('[SpotOrderTicket] Buy market price from orderbook:', lowestAsk);
-        return lowestAsk;
+        const lowestAsk = parseFloat(asks[0].px);
+        const priceWithSlippage = lowestAsk * 1.02; // 2% slippage for IOC
+        const marketPrice = formatPrice(priceWithSlippage, assetInfo.szDecimals, false);
+        console.log('[SpotOrderTicket] Buy market price from orderbook:', marketPrice);
+        return marketPrice;
       } else if (side === 'sell' && bids.length > 0) {
-        const highestBid = bids[0].px;
-        console.log('[SpotOrderTicket] Sell market price from orderbook:', highestBid);
-        return highestBid;
+        const highestBid = parseFloat(bids[0].px);
+        const priceWithSlippage = highestBid * 0.98; // 2% slippage for IOC
+        const marketPrice = formatPrice(priceWithSlippage, assetInfo.szDecimals, false);
+        console.log('[SpotOrderTicket] Sell market price from orderbook:', marketPrice);
+        return marketPrice;
       }
     }
     
@@ -184,11 +193,13 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
     const midPrice = parseFloat(currentPrice);
     
     if (side === 'buy') {
-      const marketPrice = (midPrice * 1.01).toString();
+      const priceWithSlippage = midPrice * 1.01;
+      const marketPrice = formatPrice(priceWithSlippage, assetInfo.szDecimals, false);
       console.log('[SpotOrderTicket] Buy market price (fallback):', marketPrice);
       return marketPrice;
     } else {
-      const marketPrice = (midPrice * 0.99).toString();
+      const priceWithSlippage = midPrice * 0.99;
+      const marketPrice = formatPrice(priceWithSlippage, assetInfo.szDecimals, false);
       console.log('[SpotOrderTicket] Sell market price (fallback):', marketPrice);
       return marketPrice;
     }
@@ -292,8 +303,9 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
 
     try {
       console.log('[SpotOrderTicket] Placing order - Coin:', coin, 'Universe Index:', assetInfo.index);
+      console.log('[SpotOrderTicket] Current balances - Token:', tokenBalance, 'USDC:', usdcBalance);
 
-      const formattedPrice = price;
+      const formattedPrice = formatPrice(priceValue, assetInfo.szDecimals, false);
       const formattedSize = formatSize(sizeValue, assetInfo.szDecimals, priceValue);
 
       console.log('[SpotOrderTicket] Formatted Price:', formattedPrice, 'Formatted Size:', formattedSize);
@@ -315,6 +327,8 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
         }],
         grouping: 'na' as const,
       };
+
+      console.log('[SpotOrderTicket] Order payload:', JSON.stringify(orderPayload, null, 2));
 
       logApiCall('order (spot)', `${side} ${orderType} - ${coin}`);
       logUserAction('SpotOrderTicket', 'Submit order', `${side} ${orderType} ${coin}`);
