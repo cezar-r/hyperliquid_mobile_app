@@ -31,7 +31,7 @@ function formatDollarAmount(amount: string): string {
   });
 }
 
-export default function TradeCard({ fill, displayCoin }: TradeCardProps): React.JSX.Element {
+function TradeCardComponent({ fill, displayCoin }: TradeCardProps): React.JSX.Element {
   return (
     <View>
       <View style={styles.tradeCard}>
@@ -80,4 +80,6 @@ export default function TradeCard({ fill, displayCoin }: TradeCardProps): React.
   );
 }
 
+export default React.memo(TradeCardComponent);
+ 
 

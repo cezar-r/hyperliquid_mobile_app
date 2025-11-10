@@ -208,6 +208,7 @@ export default function TabNavigator(): React.JSX.Element {
           component={HistoryScreen}
           options={{
             headerShown: false,
+            unmountOnBlur: true,
             tabBarIcon: ({ focused }) => (
               <TabIcon iconType="MaterialCommunityIcons" iconName="history" focused={focused} />
             ),

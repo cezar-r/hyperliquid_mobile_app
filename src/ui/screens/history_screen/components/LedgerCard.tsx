@@ -33,7 +33,7 @@ function truncateAddress(addr: string): string {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
-export default function LedgerCard({ update, userAddress }: LedgerCardProps): React.JSX.Element {
+function LedgerCardComponent({ update, userAddress }: LedgerCardProps): React.JSX.Element {
   const { delta } = update;
 
   const renderContent = () => {
@@ -163,4 +163,6 @@ export default function LedgerCard({ update, userAddress }: LedgerCardProps): Re
     </View>
   );
 }
+
+export default React.memo(LedgerCardComponent);
 

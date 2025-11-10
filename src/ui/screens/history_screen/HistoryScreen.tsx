@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { View, ScrollView, Animated } from 'react-native';
+import { View, FlatList, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useAccount } from '@reown/appkit-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -22,6 +23,7 @@ export default function HistoryScreen(): React.JSX.Element {
   const { address } = useAccount();
   const { account, infoClient } = useWallet();
   const { state: wsState } = useWebSocket();
+  const isFocused = useIsFocused();
 
   // For skeleton loading
   const [isReady] = useState(true);
@@ -44,18 +46,22 @@ export default function HistoryScreen(): React.JSX.Element {
 
   // Defer rendering was removed to avoid initial flicker on first tab visit
 
-  // Helper to check if a fill is a spot trade (handles both base token name and API format)
-  const isSpotFill = useCallback(
-    (coin: string) => {
-      // Check if coin is in API format (@{index})
-      if (coin.startsWith('@')) {
-        return wsState.spotMarkets.some((m) => m.apiName === coin);
-      }
-      // Otherwise check against base token names
-      return wsState.spotMarkets.some((m) => m.name.split('/')[0] === coin);
-    },
-    [wsState.spotMarkets]
-  );
+  // Fast lookup sets for spot markets to avoid per-row array scans
+  const spotApiNameSet = useMemo(() => {
+    const set = new Set<string>();
+    wsState.spotMarkets.forEach((m) => {
+      if (m.apiName) set.add(m.apiName);
+    });
+    return set;
+  }, [wsState.spotMarkets]);
+  const spotBaseTokenSet = useMemo(() => {
+    const set = new Set<string>();
+    wsState.spotMarkets.forEach((m) => {
+      const base = m.name.split('/')[0];
+      set.add(base);
+    });
+    return set;
+  }, [wsState.spotMarkets]);
 
   // Load saved filter on mount
   useEffect(() => {
@@ -158,6 +164,23 @@ export default function HistoryScreen(): React.JSX.Element {
     return account.data?.userFills || [];
   }, [account.data?.userFills]);
 
+  // Snapshot trades only when the screen is focused and Trades tab is visible
+  const [tradesSnapshot, setTradesSnapshot] = useState<UserFill[]>([]);
+  useEffect(() => {
+    if (isFocused && viewFilter === 'Trades') {
+      setTradesSnapshot(account.data?.userFills || []);
+      setTradesVisibleCount(300);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFocused, viewFilter]);
+
+  // Trades pagination window (avoid mounting thousands at once)
+  const [tradesVisibleCount, setTradesVisibleCount] = useState<number>(300);
+  const visibleTrades = useMemo(() => {
+    if (!tradesSnapshot || tradesSnapshot.length === 0) return [];
+    return tradesSnapshot.slice(0, Math.min(tradesVisibleCount, tradesSnapshot.length));
+  }, [tradesSnapshot, tradesVisibleCount]);
+
   // Pan gesture for swipe navigation
   const panGesture = Gesture.Pan()
     .onEnd((event) => {
@@ -194,81 +217,105 @@ export default function HistoryScreen(): React.JSX.Element {
         {/* Content */}
         <GestureDetector gesture={panGesture}>
           <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
-            <ScrollView
-              style={styles.scrollView}
-              contentContainerStyle={styles.content}
-              contentInsetAdjustmentBehavior="never"
-            >
-              {!address && (
-                <EmptyState
-                  message="No wallet connected"
-                  submessage="Connect your wallet to view history"
-                />
-              )}
-
-              {address && viewFilter === 'Trades' && (
-                <>
-                  {account.isLoading && <LoadingState message="Loading trades..." />}
-
-                  {account.error && <ErrorState error={account.error} />}
-
-                  {!account.isLoading && !account.error && account.data && (
-                    <>
-                      {allTrades.length > 0 ? (
-                        <View style={styles.recentTradesContainer}>
-                          {allTrades.map((fill: UserFill, idx: number) => {
-                            const displayCoin = isSpotFill(fill.coin)
-                              ? resolveSpotTicker(fill.coin, wsState.spotMarkets)
-                              : fill.coin;
-                            return (
-                              <TradeCard
-                                key={`fill-${idx}`}
-                                fill={fill}
-                                displayCoin={displayCoin}
-                              />
+            {!address ? (
+              <EmptyState
+                message="No wallet connected"
+                submessage="Connect your wallet to view history"
+              />
+            ) : viewFilter === 'Trades' ? (
+              <>
+                {account.isLoading && <LoadingState message="Loading trades..." />}
+                {account.error && <ErrorState error={account.error} />}
+                {!account.isLoading && !account.error && account.data && (
+                  <>
+                    {tradesSnapshot.length > 0 ? (
+                      <FlatList
+                        style={styles.scrollView}
+                        contentContainerStyle={[styles.content, styles.recentTradesContainer]}
+                        data={visibleTrades}
+                        keyExtractor={(fill, idx) => {
+                          const base =
+                            (fill.hash && `h-${fill.hash}`) ||
+                            `t-${fill.time}-${fill.coin}-${fill.px}-${fill.sz}-${fill.side}`;
+                          const tidPart = typeof fill.tid === 'number' ? `-${fill.tid}` : '';
+                          return `${base}${tidPart}-${idx}`;
+                        }}
+                        renderItem={({ item }) => {
+                          const coin = item.coin;
+                          const isSpot =
+                            (coin.startsWith('@') && spotApiNameSet.has(coin)) ||
+                            (!coin.startsWith('@') && spotBaseTokenSet.has(coin));
+                          const displayCoin = isSpot
+                            ? resolveSpotTicker(item.coin, wsState.spotMarkets)
+                            : item.coin;
+                          return <TradeCard fill={item} displayCoin={displayCoin} />;
+                        }}
+                        initialNumToRender={12}
+                        maxToRenderPerBatch={12}
+                        updateCellsBatchingPeriod={16}
+                        windowSize={7}
+                        removeClippedSubviews
+                        onEndReached={() => {
+                          if (visibleTrades.length < tradesSnapshot.length) {
+                            setTradesVisibleCount((c) =>
+                              Math.min(c + 300, tradesSnapshot.length)
                             );
-                          })}
-                        </View>
-                      ) : (
-                        <EmptyState
-                          message="No trades yet"
-                          submessage="Your trade history will appear here"
-                        />
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-
-              {address && viewFilter === 'Ledger' && (
-                <>
-                  {isLoadingLedger && <LoadingState message="Loading ledger..." />}
-
-                  {ledgerError && <ErrorState error={ledgerError} />}
-
-                  {!isLoadingLedger && !ledgerError && (
-                    <>
-                      {ledgerUpdates.length > 0 ? (
-                        <View style={styles.recentTradesContainer}>
-                          {ledgerUpdates.map((update: LedgerUpdate, idx: number) => (
-                            <LedgerCard
-                              key={`ledger-${update.hash}-${idx}`}
-                              update={update}
-                              userAddress={address}
-                            />
-                          ))}
-                        </View>
-                      ) : (
-                        <EmptyState
-                          message="No ledger activity"
-                          submessage="Deposits, withdrawals, and transfers will appear here"
-                        />
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-            </ScrollView>
+                          }
+                        }}
+                        onEndReachedThreshold={0.5}
+                        ListEmptyComponent={
+                          <EmptyState
+                            message="No trades yet"
+                            submessage="Your trade history will appear here"
+                          />
+                        }
+                      />
+                    ) : (
+                      <EmptyState
+                        message="No trades yet"
+                        submessage="Your trade history will appear here"
+                      />
+                    )}
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                {isLoadingLedger && <LoadingState message="Loading ledger..." />}
+                {ledgerError && <ErrorState error={ledgerError} />}
+                {!isLoadingLedger && !ledgerError && (
+                  <>
+                    {ledgerUpdates.length > 0 ? (
+                      <FlatList
+                        style={styles.scrollView}
+                        contentContainerStyle={[styles.content, styles.recentTradesContainer]}
+                        data={ledgerUpdates}
+                        keyExtractor={(update, idx) => `ledger-${update.hash}-${update.time}-${idx}`}
+                        renderItem={({ item }) => (
+                          <LedgerCard update={item} userAddress={address} />
+                        )}
+                        initialNumToRender={12}
+                        maxToRenderPerBatch={12}
+                        updateCellsBatchingPeriod={16}
+                        windowSize={7}
+                        removeClippedSubviews
+                        ListEmptyComponent={
+                          <EmptyState
+                            message="No ledger activity"
+                            submessage="Deposits, withdrawals, and transfers will appear here"
+                          />
+                        }
+                      />
+                    ) : (
+                      <EmptyState
+                        message="No ledger activity"
+                        submessage="Deposits, withdrawals, and transfers will appear here"
+                      />
+                    )}
+                  </>
+                )}
+              </>
+            )}
           </Animated.View>
         </GestureDetector>
       </View>

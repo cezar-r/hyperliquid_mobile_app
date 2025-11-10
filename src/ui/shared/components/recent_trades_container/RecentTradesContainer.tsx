@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, FlatList } from 'react-native';
 import TradeCard from '../trade_card/TradeCard';
 import { styles } from './styles/RecentTradesContainer.styles';
 import type { UserFill } from '../../../../types';
@@ -64,12 +64,30 @@ export default function RecentTradesContainer({
   return (
     <View style={styles.recentTradesContainer}>
       <Text style={styles.sectionLabel}>Recent Trades ({trades.length})</Text>
-      {trades.slice(0, displayLimit).map((fill, idx) => {
-        const displayCoin = getDisplayCoin(fill.coin);
-        // Use tid if available, otherwise use time + index for unique key
-        const key = fill.tid ? `fill-${fill.tid}` : `fill-${fill.time}-${idx}`;
-        return <AnimatedTradeCard key={key} fill={fill} displayCoin={displayCoin} index={idx} previousLimit={previousLimit} />;
-      })}
+      <FlatList
+        data={trades.slice(0, displayLimit)}
+        keyExtractor={(fill, index) => {
+          const base =
+            (fill.hash && `h-${fill.hash}`) ||
+            `t-${fill.time}-${fill.coin}-${fill.px}-${fill.sz}-${fill.side}`;
+          const tidPart = typeof fill.tid === 'number' ? `-${fill.tid}` : '';
+          return `${base}${tidPart}-${index}`;
+        }}
+        renderItem={({ item, index }) => (
+          <AnimatedTradeCard
+            fill={item}
+            displayCoin={getDisplayCoin(item.coin)}
+            index={index}
+            previousLimit={previousLimit}
+          />
+        )}
+        scrollEnabled={false}
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        updateCellsBatchingPeriod={16}
+        windowSize={5}
+        removeClippedSubviews
+      />
 
       {/* Show More/Less Button */}
       {trades.length > 10 && (
