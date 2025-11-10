@@ -180,7 +180,7 @@ export default function TabNavigator(): React.JSX.Element {
           options={{
             headerShown: false,
             tabBarIcon: ({ focused }) => (
-              <TabIcon iconType="MaterialCommunityIcons" iconName="home" focused={focused} />
+              <TabIcon iconType="MaterialIcons" iconName="home-filled" focused={focused} />
             ),
           }}
         />
