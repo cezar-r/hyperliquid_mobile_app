@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SettingsRow from './SettingsRow';
+import ClearCacheRow from './ClearCacheRow';
 import { styles } from '../styles/SettingsContainer.styles';
 import AutoApproveRow from './auto_approve_row/AutoApproveRow';
 
@@ -106,6 +107,7 @@ export default function SettingsContainer(): React.JSX.Element {
         value={hideSmallBalances}
         onToggle={handleToggleHideSmallBalances}
       />
+      <ClearCacheRow />
     </View>
   );
 }

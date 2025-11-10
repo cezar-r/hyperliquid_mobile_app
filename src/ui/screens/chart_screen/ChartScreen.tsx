@@ -17,6 +17,7 @@ import { resolveSubscriptionCoin } from '../../../lib/markets';
 import { generateTickSizeOptions, calculateMantissa, calculateNSigFigs } from '../../../lib/tickSize';
 import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker, convertUTCToLocalChartTime } from '../../../lib/formatting';
 import { isTickerStarred, toggleStarredTicker } from '../../../lib/starredTickers';
+import { initCandleCache, getCachedCandles, setCachedCandles } from '../../../lib/candleCache';
 import {
   logScreenMount,
   logScreenUnmount,
@@ -105,9 +106,15 @@ export default function ChartScreen(): React.JSX.Element {
   // For skeleton loading
   const [isReady, setIsReady] = useState(false);
 
-  // Screen lifecycle logging
+  // Screen lifecycle logging and cache initialization
   useEffect(() => {
     logScreenMount('ChartScreen');
+    
+    // Initialize SQLite cache
+    initCandleCache().catch((error) => {
+      console.error('[ChartScreen] Failed to initialize candle cache:', error);
+    });
+    
     return () => {
       logScreenUnmount('ChartScreen');
     };
@@ -289,8 +296,9 @@ export default function ChartScreen(): React.JSX.Element {
     async (coin: string, candleInterval: CandleInterval) => {
       if (!infoClient) return;
 
+      const fetchStartTime = Date.now();
+
       try {
-        setIsLoading(true);
         setError(null);
 
         const subscriptionCoin = resolveSubscriptionCoin(
@@ -298,6 +306,23 @@ export default function ChartScreen(): React.JSX.Element {
           coin,
           spotMarkets
         );
+
+        // Try to load from cache first (before setting loading state)
+        console.log(`[ChartScreen] Checking cache for ${coin} ${marketType} ${candleInterval}...`);
+        const cacheCheckStart = Date.now();
+        const cachedCandles = await getCachedCandles(coin, marketType, candleInterval);
+        const cacheCheckTime = Date.now() - cacheCheckStart;
+        
+        if (cachedCandles && cachedCandles.length > 0) {
+          // Immediately display cached candles WITHOUT showing loading state
+          setCandles(cachedCandles);
+          console.log(`[ChartScreen] ✓ Instantly loaded ${cachedCandles.length} cached candles for ${coin} ${candleInterval} (cache check took ${cacheCheckTime}ms)`);
+          // Continue to fetch fresh data in background WITHOUT loading indicator
+        } else {
+          // No cache available, show loading state
+          console.log(`[ChartScreen] No cache found, showing loading state (cache check took ${cacheCheckTime}ms)`);
+          setIsLoading(true);
+        }
 
         const endTime = Date.now();
         const lookbacks: Record<CandleInterval, number> = {
@@ -311,6 +336,7 @@ export default function ChartScreen(): React.JSX.Element {
         const startTime = endTime - lookbacks[candleInterval] * 24 * 60 * 60 * 1000;
 
         logApiCall('candleSnapshot', `coin: ${subscriptionCoin}, interval: ${candleInterval}`);
+        const apiCallStart = Date.now();
 
         const snapshot = await infoClient.candleSnapshot({
           coin: subscriptionCoin,
@@ -318,6 +344,8 @@ export default function ChartScreen(): React.JSX.Element {
           startTime,
           endTime,
         });
+
+        const apiCallTime = Date.now() - apiCallStart;
 
         if (snapshot && Array.isArray(snapshot)) {
           const chartData: ChartData[] = snapshot.map((c: any) => ({
@@ -331,6 +359,14 @@ export default function ChartScreen(): React.JSX.Element {
           chartData.sort((a, b) => a.timestamp - b.timestamp);
           setCandles(chartData);
           logApiResponse('candleSnapshot', chartData.length, 'candles');
+          
+          const totalTime = Date.now() - fetchStartTime;
+          console.log(`[ChartScreen] Total fetch time: ${totalTime}ms (API: ${apiCallTime}ms, cache check: ${cacheCheckTime}ms)`);
+          
+          // Update cache with fresh data (don't await to avoid blocking)
+          setCachedCandles(coin, marketType, candleInterval, chartData).catch(err => {
+            console.error('[ChartScreen] Failed to cache candles:', err);
+          });
         }
       } catch (err: any) {
         logApiError('candleSnapshot', err);

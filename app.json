@@ -94,7 +94,8 @@
             "useFrameworks": "static"
           }
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "extra": {
       "eas": {

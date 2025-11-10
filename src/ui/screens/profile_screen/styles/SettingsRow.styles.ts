@@ -26,5 +26,16 @@ export const styles = StyleSheet.create({
     backgroundColor: Color.BRIGHT_ACCENT,
     borderColor: Color.BRIGHT_ACCENT,
   },
+  arrowIcon: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  arrowText: {
+    fontSize: 24,
+    color: Color.FG_3,
+    fontWeight: '300',
+  },
 });
 

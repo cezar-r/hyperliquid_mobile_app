@@ -187,6 +187,22 @@ export interface Candle {
 
 export type CandleInterval = '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
 
+export interface ChartData {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+export interface CachedCandle {
+  ticker: string;
+  market: MarketType;
+  timeframe: CandleInterval;
+  lastFetchedTs: number;
+  candles: ChartData[];
+}
+
 export interface WebSocketState {
   isConnected: boolean;
   error: string | null;
