@@ -61,7 +61,7 @@ function calculatePositionPnL(
 export default function HomeScreen(): React.JSX.Element {
   const { address } = useAccount();
   const { account, exchangeClient, refetchAccount } = useWallet();
-  const { state: wsState, selectCoin, setMarketType } = useWebSocket();
+  const { state: wsState, selectCoin, setMarketType, infoClient } = useWebSocket();
   const navigation = useNavigation<any>();
   const [closingPosition, setClosingPosition] = useState<string | null>(null);
   const [marketFilter, setMarketFilter] = useState<MarketFilter>('Account');
@@ -70,6 +70,12 @@ export default function HomeScreen(): React.JSX.Element {
 
   // For skeleton loading
   const [isReady] = useState(true);
+
+  // State for historical spot prices (24h only)
+  const [historical24hSpotPrices, setHistorical24hSpotPrices] = useState<Record<string, number>>({});
+  const [isFetchingHistorical, setIsFetchingHistorical] = useState(false);
+  const hasLoadedHistoricalOnce = useRef(false);
+  const lastFetchTime = useRef<number>(0);
 
   // Screen lifecycle logging
   useEffect(() => {
@@ -142,6 +148,88 @@ export default function HomeScreen(): React.JSX.Element {
       };
     }, [])
   );
+
+  // Fetch historical spot prices for 24h PnL calculation
+  useEffect(() => {
+    const fetchHistorical24hPrices = async () => {
+      if (!infoClient || !account.data?.spotBalances) {
+        return;
+      }
+
+      const now = Date.now();
+      
+      // Check if we've fetched recently (within last 10 seconds)
+      if (lastFetchTime.current && now - lastFetchTime.current < 10000) {
+        return;
+      }
+      
+      setIsFetchingHistorical(true);
+      
+      const prices: Record<string, number> = {};
+
+      // 24h: startTime = 24h ago, endTime = 23h 30m ago, interval = 1m
+      const startTime = now - 24 * 60 * 60 * 1000;
+      const endTime = now - 23.5 * 60 * 60 * 1000;
+      const interval = '1m';
+
+      const balancesToFetch = account.data.spotBalances.filter(
+        (balance) => balance.coin !== 'USDC' && parseFloat(balance.total) > 0
+      );
+
+      // Batch requests with delays to avoid rate limiting
+      for (let i = 0; i < balancesToFetch.length; i++) {
+        const balance = balancesToFetch[i];
+
+        // Find the spot market to get the full market name
+        const spotMarket = wsState.spotMarkets.find(
+          (m) => m.name.split('/')[0] === balance.coin
+        );
+        if (!spotMarket) {
+          continue;
+        }
+
+        try {
+          // Use the spot market's apiName for subscription (e.g., "@107" for HYPE/USDC)
+          const subscriptionCoin = spotMarket.apiName || spotMarket.name;
+
+          // Fetch candles with specified interval
+          const candles = await infoClient.candleSnapshot({
+            coin: subscriptionCoin,
+            interval,
+            startTime,
+            endTime,
+          });
+
+          if (candles && candles.length > 0) {
+            // Get the EARLIEST candle's open price (first candle in array)
+            const historicalCandle = candles[0];
+            if (historicalCandle && historicalCandle.o) {
+              const historicalPrice = parseFloat(historicalCandle.o);
+              prices[spotMarket.name] = historicalPrice;
+            }
+          }
+        } catch (error) {
+          console.warn(`[HomeScreen] Error fetching candles for ${spotMarket.name}:`, error);
+        }
+
+        // Add small delay between requests to avoid rate limiting
+        if (i < balancesToFetch.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      // Update state
+      if (Object.keys(prices).length > 0) {
+        setHistorical24hSpotPrices(prices);
+        hasLoadedHistoricalOnce.current = true;
+      }
+
+      lastFetchTime.current = now;
+      setIsFetchingHistorical(false);
+    };
+
+    fetchHistorical24hPrices();
+  }, [infoClient, account.data?.spotBalances, wsState.spotMarkets]);
 
   // Helper to get next/previous filter (circular navigation)
   const getNextFilter = (current: MarketFilter, direction: 'left' | 'right'): MarketFilter => {
@@ -235,6 +323,124 @@ export default function HomeScreen(): React.JSX.Element {
     if (marketFilter === 'Spot') return spotTotalValue;
     return perpAccountValue + spotTotalValue + stakingValue;
   }, [marketFilter, perpAccountValue, spotTotalValue, stakingValue]);
+
+  // Calculate 24h PnL based on market filter
+  const { pnl24h, showPnL } = useMemo(() => {
+    if (!account.data) {
+      return { pnl24h: 0, showPnL: false };
+    }
+
+    let unrealizedPnL = 0;
+    let shouldShowPnL = false;
+
+    // Helper to calculate spot PnL using 24h historical prices
+    const calculateSpot24hPnL = () => {
+      let spotPnl = 0;
+      
+      if (account.data?.spotBalances) {
+        account.data.spotBalances.forEach((balance) => {
+          if (balance.coin !== 'USDC' && parseFloat(balance.total) > 0) {
+            // Find the spot market to get full market name
+            const spotMarket = wsState.spotMarkets.find(
+              (m) => m.name.split('/')[0] === balance.coin
+            );
+            
+            if (!spotMarket) {
+              return;
+            }
+            
+            const marketName = spotMarket.name;
+            const currentPrice = wsState.prices[marketName];
+            
+            if (!currentPrice) {
+              return;
+            }
+            
+            const total = parseFloat(balance.total);
+            const currentValue = total * parseFloat(currentPrice);
+            
+            // Use historical price for 24h calculation
+            const historicalPrice = historical24hSpotPrices[marketName];
+            if (historicalPrice) {
+              const historicalValue = total * historicalPrice;
+              const pnl = currentValue - historicalValue;
+              spotPnl += pnl;
+            }
+          }
+        });
+      }
+
+      return spotPnl;
+    };
+
+    // Calculate PnL based on market filter
+    if (marketFilter === 'Perp') {
+      shouldShowPnL = true;
+      // Calculate unrealized PnL for perp positions
+      account.data.perpPositions.forEach((position) => {
+        const price = wsState.prices[position.coin];
+        if (price) {
+          const { pnl: posPnl } = calculatePositionPnL(position, price);
+          unrealizedPnL += posPnl;
+        }
+      });
+    } else if (marketFilter === 'Spot') {
+      shouldShowPnL = true;
+      // Calculate unrealized PnL for spot balances
+      unrealizedPnL += calculateSpot24hPnL();
+    } else if (marketFilter === 'Account') {
+      shouldShowPnL = true;
+      // Calculate unrealized PnL for perp positions
+      account.data.perpPositions.forEach((position) => {
+        const price = wsState.prices[position.coin];
+        if (price) {
+          const { pnl: posPnl } = calculatePositionPnL(position, price);
+          unrealizedPnL += posPnl;
+        }
+      });
+      // Calculate unrealized PnL for spot balances
+      unrealizedPnL += calculateSpot24hPnL();
+    }
+
+    // Calculate realized PnL from fills in last 24h
+    const now = Date.now();
+    const cutoff24h = now - 24 * 60 * 60 * 1000;
+    const realizedPnL = account.data.userFills
+      ? account.data.userFills
+          .filter((fill) => fill.time >= cutoff24h)
+          .reduce((sum, fill) => {
+            const closedPnl = parseFloat(fill.closedPnl || '0');
+            return sum + closedPnl;
+          }, 0)
+      : 0;
+
+    const totalPnL = unrealizedPnL + realizedPnL;
+
+    return {
+      pnl24h: totalPnL,
+      showPnL: shouldShowPnL,
+    };
+  }, [
+    account.data,
+    wsState.prices,
+    wsState.spotMarkets,
+    marketFilter,
+    historical24hSpotPrices,
+  ]);
+
+  // Determine if we should show loading for spot PnL
+  const isLoadingSpotPnL = useMemo(() => {
+    // Only show loading if we have spot balances and are viewing spot-related filters
+    const hasSpotBalances = account.data?.spotBalances && account.data.spotBalances.some(b => b.coin !== 'USDC' && parseFloat(b.total) > 0);
+    const isSpotFilter = ['Spot', 'Account'].includes(marketFilter);
+    
+    if (!hasSpotBalances || !isSpotFilter) return false;
+    
+    // Only show loading if this has NEVER been loaded before
+    const shouldLoad = !hasLoadedHistoricalOnce.current && isFetchingHistorical;
+    
+    return shouldLoad;
+  }, [isFetchingHistorical, marketFilter, account.data?.spotBalances]);
 
   // Animate balance changes - only when there's an actual change at 2 decimal places
   useEffect(() => {
@@ -733,6 +939,9 @@ export default function HomeScreen(): React.JSX.Element {
                 showDepositButton={marketFilter === 'Account' && displayedBalance === 0}
                 onDepositPress={() => setDepositModalVisible(true)}
                 textColor={textColor}
+                pnl24h={pnl24h}
+                showPnL={showPnL}
+                isLoadingPnL={isLoadingSpotPnL}
               />
 
               {account.isLoading && <LoadingState />}

@@ -25,5 +25,16 @@ export const styles = StyleSheet.create({
     color: Color.BRIGHT_ACCENT,
     fontWeight: '600',
   },
+  pnlText: {
+    fontSize: fontSizes.md,
+    fontWeight: '600',
+    marginTop: 0,
+  },
+  pnlPositive: {
+    color: Color.BRIGHT_ACCENT,
+  },
+  pnlNegative: {
+    color: Color.RED,
+  },
 });
 
