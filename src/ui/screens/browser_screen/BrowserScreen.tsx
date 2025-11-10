@@ -9,7 +9,7 @@ import { logScreenMount, logScreenUnmount, logUserAction } from '../../../lib/lo
 import { Color } from '../../shared/styles';
 import { styles } from './styles/BrowserScreen.styles';
 
-const DEFAULT_URL = 'https://app.hyperliquid.xyz';
+const DEFAULT_URL = 'https://hyperfoundation.org';
 
 // Dark mode injection script
 const getDarkModeScript = () => `
