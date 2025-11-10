@@ -8,6 +8,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
   },
   settingsLabel: {
     fontSize: fontSizes.md,
@@ -34,7 +35,7 @@ export const styles = StyleSheet.create({
   },
   arrowText: {
     fontSize: 24,
-    color: Color.FG_3,
+    color: Color.BRIGHT_ACCENT,
     fontWeight: '300',
   },
 });

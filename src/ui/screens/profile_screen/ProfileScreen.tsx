@@ -2,14 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccount, useAppKit } from '@reown/appkit-react-native';
+import { useNavigation } from '@react-navigation/native';
 import { logScreenMount, logScreenUnmount, logUserAction } from '../../../lib/logger';
+import { playPrimaryButtonHaptic } from '../../../lib/haptics';
 import { styles } from './styles/ProfileScreen.styles';
 import { SkeletonScreen } from '../../shared/components';
-import { WalletInfoContainer, SettingsContainer, DisconnectButton } from './components';
+import { WalletInfoContainer, SettingsNavigationRow, DisconnectButton } from './components';
 
 export default function ProfileScreen(): React.JSX.Element {
   const { address } = useAccount();
   const { disconnect } = useAppKit();
+  const navigation = useNavigation<any>();
   
   // For skeleton loading
   const [isReady] = useState(true);
@@ -19,6 +22,11 @@ export default function ProfileScreen(): React.JSX.Element {
     logScreenMount('ProfileScreen');
     return () => logScreenUnmount('ProfileScreen');
   }, []);
+
+  const handleNavigateToSettings = () => {
+    playPrimaryButtonHaptic();
+    navigation.navigate('Settings');
+  };
 
   const handleDisconnect = () => {
     Alert.alert(
@@ -51,7 +59,7 @@ export default function ProfileScreen(): React.JSX.Element {
       >
         <WalletInfoContainer address={address} />
         
-        <SettingsContainer />
+        <SettingsNavigationRow onPress={handleNavigateToSettings} />
       </ScrollView>
 
       <DisconnectButton onPress={handleDisconnect} />

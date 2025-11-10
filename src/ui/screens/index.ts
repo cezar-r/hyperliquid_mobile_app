@@ -6,5 +6,6 @@ export { default as HomeScreen } from './home_screen/HomeScreen';
 export { default as PortfolioScreen } from './portfolio_screen/PortfolioScreen';
 export { default as ProfileScreen } from './profile_screen/ProfileScreen';
 export { default as SearchScreen } from './search_screen/SearchScreen';
+export { default as SettingsScreen } from './settings_screen/SettingsScreen';
 export { default as SplashScreen } from './splash_screen/SplashScreen';
 

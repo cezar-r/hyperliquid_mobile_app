@@ -3,7 +3,6 @@ import { View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SettingsRow from './SettingsRow';
 import ClearCacheRow from './ClearCacheRow';
-import { styles } from '../styles/SettingsContainer.styles';
 import AutoApproveRow from './auto_approve_row/AutoApproveRow';
 
 const SHOW_TRADES_KEY = '@show_trades_on_chart';
@@ -85,7 +84,7 @@ export default function SettingsContainer(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.section}>
+    <View>
       <AutoApproveRow />
       <SettingsRow
         label="Show Buys and Sells on Chart"
