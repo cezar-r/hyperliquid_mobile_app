@@ -64,5 +64,20 @@
     "prettier": "^3.6.2",
     "typescript": "~5.9.2"
   },
-  "private": true
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/hyperliquid-mobile-companion.git"
+  },
+  "keywords": [
+    "hyperliquid",
+    "cryptocurrency",
+    "trading",
+    "defi",
+    "react-native",
+    "expo",
+    "mobile",
+    "perpetuals",
+    "spot-trading"
+  ]
 }

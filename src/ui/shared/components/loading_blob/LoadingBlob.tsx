@@ -14,6 +14,7 @@ export default function LoadingBlob({ size = 100 }: LoadingBlobProps): React.JSX
   );
 }
 
+// TODO: move this to shared/components/loading_blob/stlyes/LoadingBlob.styles.ts
 const styles = StyleSheet.create({
   loadingGif: {
     width: 100,
