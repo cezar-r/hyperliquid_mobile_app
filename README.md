@@ -20,8 +20,8 @@ Before you begin, ensure you have the following installed:
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/hyperliquid-mobile-companion.git
-cd hyperliquid-mobile-companion
+git clone https://github.com/yourusername/hyperliquid_mobile_app.git
+cd hyperliquid_mobile_app
 ```
 
 ### Step 2: Install Global Dependencies
