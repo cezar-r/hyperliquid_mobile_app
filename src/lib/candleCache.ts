@@ -145,6 +145,47 @@ export async function getCachedCandles(
 }
 
 /**
+ * Retrieve cached candles regardless of freshness (for fallback scenarios)
+ * Returns { candles, lastFetchedTs, isStale } or null if no cache exists
+ */
+export async function getStaleCachedCandles(
+  ticker: string,
+  market: MarketType,
+  timeframe: CandleInterval
+): Promise<{ candles: ChartData[]; lastFetchedTs: number; isStale: boolean } | null> {
+  if (!dbReady || !db) {
+    return null;
+  }
+
+  try {
+    const currentTime = Date.now();
+
+    const result = await db.getFirstAsync<CachedEntry>(
+      `SELECT * FROM ${TABLE_NAME} WHERE ticker = ? AND market = ? AND timeframe = ?`,
+      [ticker, market, timeframe]
+    );
+
+    if (!result) {
+      return null;
+    }
+
+    const candles: ChartData[] = JSON.parse(result.candlesJSON);
+    const isStale = !isWithinInterval(result.last_fetched_ts, timeframe, currentTime);
+
+    console.log(`[CandleCache] Stale cache lookup: ${ticker} ${timeframe} (${candles.length} candles, stale: ${isStale})`);
+
+    return {
+      candles,
+      lastFetchedTs: result.last_fetched_ts,
+      isStale,
+    };
+  } catch (error) {
+    console.error('[CandleCache] Error retrieving stale cached candles:', error);
+    return null;
+  }
+}
+
+/**
  * Store or update candles in the cache
  * Only stores the latest 800 candles to keep cache size reasonable
  */

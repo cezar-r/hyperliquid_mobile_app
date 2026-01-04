@@ -18,7 +18,9 @@ import { resolveSubscriptionCoin, getMarketContextKey, parseMarketKey, findPerpM
 import { generateTickSizeOptions, calculateMantissa, calculateNSigFigs } from '../../../lib/tickSize';
 import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker, getHip3DisplayName, convertUTCToLocalChartTime } from '../../../lib/formatting';
 import { isTickerStarred, toggleStarredTicker } from '../../../lib/starredTickers';
-import { initCandleCache, getCachedCandles, setCachedCandles, isCacheReady } from '../../../lib/candleCache';
+import { initCandleCache, getCachedCandles, setCachedCandles, getStaleCachedCandles, isCacheReady } from '../../../lib/candleCache';
+import { withRetry } from '../../../lib/retry';
+import { isRetryableError, getFinalErrorMessage, parseApiError } from '../../../lib/apiErrors';
 import {
   logScreenMount,
   logScreenUnmount,
@@ -195,6 +197,7 @@ export default function ChartScreen(): React.JSX.Element {
   const [intervalLoaded, setIntervalLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isShowingStaleData, setIsShowingStaleData] = useState(false);
   const [panel, setPanel] = useState<'chart' | 'orderbook' | 'trades'>('chart');
   const [tickSize, setTickSize] = useState<number | null>(null);
   const [showTickDropdown, setShowTickDropdown] = useState(false);
@@ -381,6 +384,7 @@ export default function ChartScreen(): React.JSX.Element {
       if (!infoClient) return;
 
       setError(null);
+      setIsShowingStaleData(false);
 
       // Find the dex for this coin (HIP-3 support)
       const market = marketType === 'perp'
@@ -409,28 +413,42 @@ export default function ChartScreen(): React.JSX.Element {
         setIsLoading(true);
       }
 
-      // Fetch fresh data from API
-      try {
-        const endTime = Date.now();
-        const lookbacks: Record<CandleInterval, number> = {
-          '1m': 90,
-          '5m': 180,
-          '15m': 365,
-          '1h': 365 * 2,
-          '4h': 365 * 4,
-          '1d': 365 * 8,
-        };
-        const startTime = endTime - lookbacks[candleInterval] * 24 * 60 * 60 * 1000;
+      // Prepare API call parameters
+      const endTime = Date.now();
+      const lookbacks: Record<CandleInterval, number> = {
+        '1m': 90,
+        '5m': 180,
+        '15m': 365,
+        '1h': 365 * 2,
+        '4h': 365 * 4,
+        '1d': 365 * 8,
+      };
+      const startTime = endTime - lookbacks[candleInterval] * 24 * 60 * 60 * 1000;
 
+      // Fetch fresh data from API with retry logic
+      try {
         logApiCall('candleSnapshot', `coin: ${subscriptionCoin}, interval: ${candleInterval}`);
         const apiStart = Date.now();
 
-        const snapshot = await infoClient.candleSnapshot({
-          coin: subscriptionCoin,
-          interval: candleInterval,
-          startTime,
-          endTime,
-        });
+        const snapshot = await withRetry(
+          async () => {
+            return await infoClient.candleSnapshot({
+              coin: subscriptionCoin,
+              interval: candleInterval,
+              startTime,
+              endTime,
+            });
+          },
+          {
+            maxAttempts: 3,
+            baseDelayMs: 1000, // 1s, 2s, 4s backoff
+            shouldRetry: (error) => isRetryableError(error),
+            onRetry: (error, attempt, delayMs) => {
+              const parsed = parseApiError(error);
+              console.log(`[ChartScreen] Retry ${attempt}/3 in ${delayMs}ms - ${parsed.technicalMessage}`);
+            },
+          }
+        );
 
         const apiTime = Date.now() - apiStart;
 
@@ -445,6 +463,7 @@ export default function ChartScreen(): React.JSX.Element {
 
           chartData.sort((a, b) => a.timestamp - b.timestamp);
           setCandles(chartData);
+          setIsShowingStaleData(false);
           logApiResponse('candleSnapshot', chartData.length, 'candles');
           console.log(`[ChartScreen] API fetch: ${apiTime}ms, ${chartData.length} candles`);
 
@@ -453,7 +472,24 @@ export default function ChartScreen(): React.JSX.Element {
         }
       } catch (err: any) {
         logApiError('candleSnapshot', err);
-        setError(err.message || 'Failed to load chart data');
+
+        // Try to get stale cached data as fallback
+        let usedStaleFallback = false;
+        if (isCacheReady()) {
+          const staleCacheResult = await getStaleCachedCandles(coin, marketType, candleInterval);
+          if (staleCacheResult && staleCacheResult.candles.length > 0) {
+            setCandles(staleCacheResult.candles);
+            setIsShowingStaleData(true);
+            usedStaleFallback = true;
+
+            const ageMinutes = Math.round((Date.now() - staleCacheResult.lastFetchedTs) / 60000);
+            console.log(`[ChartScreen] Using stale cache (${ageMinutes}m old): ${staleCacheResult.candles.length} candles`);
+          }
+        }
+
+        // Set appropriate error message
+        const errorMessage = getFinalErrorMessage(err, usedStaleFallback);
+        setError(errorMessage);
       } finally {
         setIsLoading(false);
       }
@@ -1147,6 +1183,7 @@ export default function ChartScreen(): React.JSX.Element {
         animatedPriceColor={animatedPriceColor}
         change24h={change24h}
         stats={headerStats}
+        isRefreshing={isShowingStaleData}
       />
 
       <View style={styles.separator} />
@@ -1163,7 +1200,7 @@ export default function ChartScreen(): React.JSX.Element {
             isStarred={isStarred}
             onToggleStar={handleToggleStar}
             isLoading={isLoading}
-            error={error}
+            error={isShowingStaleData ? null : error}
             candles={lwcCandles}
           />
         )}

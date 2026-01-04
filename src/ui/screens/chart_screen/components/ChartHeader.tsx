@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Animated, ActivityIndicator } from 'react-native';
 import { styles } from '../styles/ChartHeader.styles';
+import { Color } from '../../../shared/styles';
 
 interface ChartHeaderProps {
   onBackPress?: () => void;
@@ -18,6 +19,7 @@ interface ChartHeaderProps {
     isPositive?: boolean;
     isNegative?: boolean;
   }>;
+  isRefreshing?: boolean; // Shows loading indicator when retrying API call
 }
 
 // Helper function to format large numbers
@@ -78,6 +80,7 @@ export default function ChartHeader({
   animatedPriceColor,
   change24h,
   stats,
+  isRefreshing = false,
 }: ChartHeaderProps): React.JSX.Element {
   return (
     <View style={styles.tickerHeader}>
@@ -111,6 +114,9 @@ export default function ChartHeader({
             <Text style={change24h >= 0 ? styles.priceChangePositive : styles.priceChangeNegative}>
               {formatPercentage(change24h)}
             </Text>
+          )}
+          {isRefreshing && (
+            <ActivityIndicator size="small" color={Color.FG_3} style={styles.refreshingIndicator} />
           )}
         </View>
       </View>

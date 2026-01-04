@@ -82,6 +82,9 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     paddingTop: spacing.xs,
   },
+  refreshingIndicator: {
+    marginLeft: spacing.xs,
+  },
   marketTypeLabel: {
     fontSize: fontSizes.sm,
     color: Color.BRIGHT_ACCENT,
