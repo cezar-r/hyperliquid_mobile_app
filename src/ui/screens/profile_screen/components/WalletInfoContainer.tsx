@@ -14,6 +14,7 @@ export default function WalletInfoContainer({
   address,
 }: WalletInfoContainerProps): React.JSX.Element {
   const borderOpacity = useRef(new Animated.Value(0)).current;
+  const iconOpacity = useRef(new Animated.Value(0)).current;
 
   const formatAddress = (addr: string | undefined) => {
     if (!addr) return 'Not connected';
@@ -24,9 +25,9 @@ export default function WalletInfoContainer({
     if (address) {
       playCopyButtonHaptic();
       await Clipboard.setStringAsync(address);
-      
-      // Animate border: fade in → hold → fade out
-      Animated.sequence([
+
+      // Animate border and icon: fade in → hold → fade out
+      const animationSequence = Animated.sequence([
         Animated.timing(borderOpacity, {
           toValue: 1,
           duration: 100,
@@ -38,7 +39,23 @@ export default function WalletInfoContainer({
           duration: 150,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]);
+
+      const iconAnimationSequence = Animated.sequence([
+        Animated.timing(iconOpacity, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.delay(200),
+        Animated.timing(iconOpacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]);
+
+      Animated.parallel([animationSequence, iconAnimationSequence]).start();
     }
   };
 
@@ -66,7 +83,27 @@ export default function WalletInfoContainer({
           onPress={handleCopyAddress}
           activeOpacity={0.7}
         >
-          <Octicons name="copy" size={16} color={Color.BRIGHT_ACCENT} />
+          <View style={{ width: 16, height: 16 }}>
+            <Animated.View
+              style={{
+                position: 'absolute',
+                opacity: iconOpacity.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 0],
+                }),
+              }}
+            >
+              <Octicons name="copy" size={16} color={Color.BRIGHT_ACCENT} />
+            </Animated.View>
+            <Animated.View
+              style={{
+                position: 'absolute',
+                opacity: iconOpacity,
+              }}
+            >
+              <Octicons name="check" size={16} color={Color.BRIGHT_ACCENT} />
+            </Animated.View>
+          </View>
         </TouchableOpacity>
       </View>
     </Animated.View>

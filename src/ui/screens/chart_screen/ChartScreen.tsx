@@ -372,12 +372,12 @@ export default function ChartScreen(): React.JSX.Element {
       return { mantissa: undefined, nSigFigs: undefined };
     }
     const calculatedMantissa = calculateMantissa(tickSize);
-    const calculatedNSigFigs = calculateNSigFigs(tickSize, tickSizeOptions);
+    const calculatedNSigFigs = calculateNSigFigs(tickSize, tickSizeOptions, currentPriceForTick);
     return {
       mantissa: calculatedMantissa,
       nSigFigs: calculatedNSigFigs,
     };
-  }, [tickSize, tickSizeOptions]);
+  }, [tickSize, tickSizeOptions, currentPriceForTick]);
 
   const fetchHistoricalCandles = useCallback(
     async (coin: string, candleInterval: CandleInterval) => {

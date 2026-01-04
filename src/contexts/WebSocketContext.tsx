@@ -97,6 +97,8 @@ export function WebSocketProvider({
   const userFillsSubIdRef = useRef<any>(null);
   const userFundingsSubIdRef = useRef<any>(null);
   const activeOrderbookCoinRef = useRef<string | null>(null);
+  const activeOrderbookNSigFigsRef = useRef<number | undefined>(undefined);
+  const activeOrderbookMantissaRef = useRef<number | undefined>(undefined);
   const activeTradesCoinRef = useRef<string | null>(null);
   const allPerpAssetCtxSubsRef = useRef<any[]>([]);
   const allSpotAssetCtxSubsRef = useRef<any[]>([]);
@@ -568,8 +570,14 @@ export function WebSocketProvider({
         subscriptionCoin = `${dex}:${coin}`;
       }
 
-      if (activeOrderbookCoinRef.current === subscriptionCoin && orderbookSubIdRef.current) {
-        return; // Already subscribed
+      // Skip if already subscribed with same params (coin + aggregation)
+      if (
+        activeOrderbookCoinRef.current === subscriptionCoin &&
+        activeOrderbookNSigFigsRef.current === opts?.nSigFigs &&
+        activeOrderbookMantissaRef.current === opts?.mantissa &&
+        orderbookSubIdRef.current
+      ) {
+        return; // Already subscribed with same params
       }
 
       if (orderbookSubIdRef.current) {
@@ -581,34 +589,51 @@ export function WebSocketProvider({
         orderbookSubIdRef.current = null;
       }
 
-      logWebSocketSubscription('l2Book (orderbook)', `coin: ${subscriptionCoin}`);
+      logWebSocketSubscription('l2Book (orderbook)', `coin: ${subscriptionCoin}, nSigFigs: ${opts?.nSigFigs}, mantissa: ${opts?.mantissa}`);
 
-      const params: any = { coin: subscriptionCoin };
+      const params: any = {
+        coin: subscriptionCoin,
+        ...(opts?.nSigFigs !== undefined && { nSigFigs: opts.nSigFigs }),
+        ...(opts?.mantissa !== undefined && { mantissa: opts.mantissa }),
+      };
       console.log('[Phase 4] l2Book params:', params);
 
       activeOrderbookCoinRef.current = subscriptionCoin;
+      activeOrderbookNSigFigsRef.current = opts?.nSigFigs;
+      activeOrderbookMantissaRef.current = opts?.mantissa;
 
-      const sub = await client.l2Book(
-        params,
-        (data: any) => {
-          if (data.coin !== activeOrderbookCoinRef.current) {
-            console.log('[Phase 4] Ignoring stale orderbook data for:', data.coin);
-            return;
+      try {
+        const sub = await client.l2Book(
+          params,
+          (data: any) => {
+            console.log('[Phase 4] l2Book data received:', { dataCoin: data.coin, activeCoin: activeOrderbookCoinRef.current });
+
+            if (data.coin !== activeOrderbookCoinRef.current) {
+              console.log('[Phase 4] Ignoring stale orderbook data for:', data.coin);
+              return;
+            }
+
+            const orderbook: Orderbook = {
+              coin: data.coin,
+              time: data.time,
+              levels: data.levels,
+            };
+            const totalLevels = data.levels?.[0]?.length + data.levels?.[1]?.length || 0;
+            logWebSocketData('l2Book (orderbook)', totalLevels, `levels for ${data.coin}`);
+
+            useWebSocketStore.getState().setOrderbook(orderbook);
           }
+        );
 
-          const orderbook: Orderbook = {
-            coin: data.coin,
-            time: data.time,
-            levels: data.levels,
-          };
-          const totalLevels = data.levels?.[0]?.length + data.levels?.[1]?.length || 0;
-          logWebSocketData('l2Book (orderbook)', totalLevels, `levels for ${data.coin}`);
-
-          useWebSocketStore.getState().setOrderbook(orderbook);
-        }
-      );
-
-      orderbookSubIdRef.current = sub;
+        orderbookSubIdRef.current = sub;
+        console.log('[Phase 4] l2Book subscription created successfully');
+      } catch (error) {
+        console.error('[Phase 4] l2Book subscription failed:', error);
+        // Reset refs on failure
+        activeOrderbookCoinRef.current = null;
+        activeOrderbookNSigFigsRef.current = undefined;
+        activeOrderbookMantissaRef.current = undefined;
+      }
     },
     [] // No dependencies - uses refs
   );
@@ -622,7 +647,10 @@ export function WebSocketProvider({
       }
     });
     orderbookSubIdRef.current = null;
-    useWebSocketStore.getState().setOrderbook(null);
+    // Note: Don't reset activeOrderbookCoinRef/nSigFigs/mantissa here!
+    // Due to async race conditions with useEffect cleanup, subscribeToOrderbook
+    // may have already set these to new values before this unsubscribe completes.
+    // The subscribe function always sets them correctly before subscribing.
     logWebSocketUnsubscription('l2Book (orderbook)');
   }, []);
 

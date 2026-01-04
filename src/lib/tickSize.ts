@@ -234,32 +234,41 @@ export function calculateMantissa(tickSize: number): number | undefined {
 /**
  * Calculates the number of significant figures for a given tick size.
  * Based on Hyperliquid SDK, nSigFigs can be 2, 3, 4, or 5.
- * 
- * Logic: nSigFigs = MAX_SIG_FIGS - index
- * - Index 0 (min tick): undefined (auto/default)
- * - Index 1: 5
- * - Index 2: 4
- * - Index 3: 3
- * - Index 4+: 2
- * 
+ *
+ * The formula accounts for price magnitude:
+ * nSigFigs = floor(log10(price)) + 1 - floor(log10(tickSize))
+ *
  * @param tickSize - The selected tick size
  * @param options - The array of tick size options to find the index
+ * @param currentPrice - The current market price (needed for calculation)
  * @returns The nSigFigs value or undefined
  */
-export function calculateNSigFigs(tickSize: number, options: TickSizeOption[]): number | undefined {
+export function calculateNSigFigs(
+  tickSize: number,
+  options: TickSizeOption[],
+  currentPrice: number
+): number | undefined {
   const option = options.find(opt => opt.value === tickSize);
   if (!option) {
     return undefined;
   }
-  
-  const index = option.index;
-  
+
   // Index 0 (minimum tick) uses auto/default
-  if (index === 0) {
+  if (option.index === 0) {
     return undefined;
   }
-  
-  // Calculate nSigFigs: 6 - index gives us 5, 4, 3, 2...
-  const nSigFigs = 6 - index;
-  return nSigFigs;
+
+  // Guard against invalid price
+  if (currentPrice <= 0) {
+    return undefined;
+  }
+
+  // Calculate nSigFigs based on price and tick size
+  // priceDigits = number of digits in the integer part of price
+  const priceDigits = Math.floor(Math.log10(currentPrice)) + 1;
+  const tickDigits = Math.floor(Math.log10(tickSize));
+  const nSigFigs = priceDigits - tickDigits;
+
+  // Clamp to valid range (2-5)
+  return Math.max(2, Math.min(5, nSigFigs));
 }
