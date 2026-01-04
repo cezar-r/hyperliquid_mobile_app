@@ -16,7 +16,7 @@ import { useWebSocketStore } from '../../../stores/websocketStore';
 import { useWallet } from '../../../contexts/WalletContext';
 import { resolveSubscriptionCoin, getMarketContextKey, parseMarketKey, findPerpMarketByKey } from '../../../lib/markets';
 import { generateTickSizeOptions, calculateMantissa, calculateNSigFigs } from '../../../lib/tickSize';
-import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker, convertUTCToLocalChartTime } from '../../../lib/formatting';
+import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker, getHip3DisplayName, convertUTCToLocalChartTime } from '../../../lib/formatting';
 import { isTickerStarred, toggleStarredTicker } from '../../../lib/starredTickers';
 import { initCandleCache, getCachedCandles, setCachedCandles, isCacheReady } from '../../../lib/candleCache';
 import {
@@ -1139,7 +1139,9 @@ export default function ChartScreen(): React.JSX.Element {
       <ChartHeader
         onBackPress={isDetailView ? () => navigation.goBack() : undefined}
         ticker={parsedCoin}
-        displayTicker={marketType === 'spot' && parsedCoin ? getDisplayTicker(parsedCoin) : parsedCoin}
+        displayTicker={marketType === 'spot' && parsedCoin
+          ? getDisplayTicker(parsedCoin)
+          : getHip3DisplayName(parsedCoin, parsedDex || '')}
         marketType={marketType}
         maxLeverage={maxLeverage}
         dex={parsedDex} // Pass dex for HIP-3 display

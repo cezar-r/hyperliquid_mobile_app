@@ -79,17 +79,23 @@ export default function PerpPositionsContainer({
       </View>
       <View style={sharedStyles.separator} />
 
-      {sortedPositions.map((item) => (
-        <PerpPositionCell
-          key={`perp-${item.position.coin}`}
-          position={item.position}
-          price={item.price}
-          marginUsed={item.marginUsed}
-          pnl={item.pnl}
-          assetContext={item.assetContext}
-          onPress={() => onNavigateToChart(item.position.coin, 'perp')}
-        />
-      ))}
+      {sortedPositions.map((item) => {
+        // For HIP-3 positions, use dex:coin format
+        const marketKey = item.position.dex
+          ? `${item.position.dex}:${item.position.coin}`
+          : item.position.coin;
+        return (
+          <PerpPositionCell
+            key={`perp-${marketKey}`}
+            position={item.position}
+            price={item.price}
+            marginUsed={item.marginUsed}
+            pnl={item.pnl}
+            assetContext={item.assetContext}
+            onPress={() => onNavigateToChart(marketKey, 'perp')}
+          />
+        );
+      })}
     </View>
   );
 }

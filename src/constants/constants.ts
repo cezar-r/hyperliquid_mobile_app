@@ -66,7 +66,7 @@ export const HIP3_SYMBOLS: Record<string, string[]> = {
     'NVDA',
     'TSLA',
     'AAPL',      // Also in the allMids feed
-    'COIN',      // Also in the allMids feed  
+    'COIN',      // Also in the allMids feed
     'GOLD',      // Also in the allMids feed
     'HOOD',      // Also in the allMids feed
     'INTC',      // Also in the allMids feed
@@ -78,4 +78,16 @@ export const HIP3_SYMBOLS: Record<string, string[]> = {
   'vntl': [
     'SPACEX'     // Not yet in allMids feed
   ]
+};
+
+/**
+ * HIP-3 dex collateral token names.
+ * Maps dex name to the collateral token symbol used for margin.
+ *
+ * - xyz: Uses USDC (collateralToken index 0)
+ * - vntl: Uses USDH (collateralToken index 360)
+ */
+export const HIP3_COLLATERAL: Record<string, string> = {
+  'xyz': 'USDC',
+  'vntl': 'USDH',
 };

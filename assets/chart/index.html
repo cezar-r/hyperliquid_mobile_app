@@ -6,13 +6,33 @@
     <title>Lightweight Charts Bridge</title>
     <style>
       html, body, #app { margin: 0; padding: 0; height: 100%; background: #0b0f13; }
-      #container { width: 100%; height: 100%; }
+      #container { width: 100%; height: 100%; position: relative; }
+      #legend {
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        right: 70px;
+        z-index: 10;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 10px;
+        color: #c5ced9;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 6px;
+        pointer-events: none;
+      }
+      #legend .label { color: #888; }
+      #legend .value { font-weight: 500; }
+      #legend .bullish { color: #26a69a; }
+      #legend .bearish { color: #ffffff; }
     </style>
     <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
   </head>
   <body>
     <div id="app">
-      <div id="container"></div>
+      <div id="container">
+        <div id="legend"></div>
+      </div>
     </div>
     <script>
       (function () {
@@ -26,6 +46,7 @@
         let lastBarTime = null;
         let priceLines = [];
         let allMarkers = [];
+        let latestCandle = null;
 
         function computeSMA(data, period) {
           const result = [];
@@ -41,6 +62,52 @@
             }
           }
           return result;
+        }
+
+        function formatPrice(price) {
+          if (price === 0) return '0';
+          const absPrice = Math.abs(price);
+          let decimals;
+          if (absPrice < 0.0001) decimals = 8;
+          else if (absPrice < 0.001) decimals = 7;
+          else if (absPrice < 0.01) decimals = 6;
+          else if (absPrice < 0.1) decimals = 5;
+          else if (absPrice < 1) decimals = 4;
+          else decimals = 2;
+          return price.toFixed(decimals);
+        }
+
+        function updateLegend(candle) {
+          const legend = document.getElementById('legend');
+          const displayCandle = (candle && candle.open !== undefined) ? candle : latestCandle;
+          if (!displayCandle || displayCandle.open === undefined) {
+            legend.innerHTML = '';
+            return;
+          }
+          candle = displayCandle;
+
+          const isBullish = candle.close >= candle.open;
+          const colorClass = isBullish ? 'bullish' : 'bearish';
+          const dollarChange = candle.close - candle.open;
+          const percentChange = ((dollarChange / candle.open) * 100);
+          const sign = dollarChange >= 0 ? '+' : '';
+
+          legend.innerHTML = `
+            <span><span class="label">O</span> <span class="value ${colorClass}">${formatPrice(candle.open)}</span></span>
+            <span><span class="label">H</span> <span class="value ${colorClass}">${formatPrice(candle.high)}</span></span>
+            <span><span class="label">L</span> <span class="value ${colorClass}">${formatPrice(candle.low)}</span></span>
+            <span><span class="label">C</span> <span class="value ${colorClass}">${formatPrice(candle.close)}</span></span>
+            <span class="value ${colorClass}">${sign}${formatPrice(dollarChange)} (${sign}${percentChange.toFixed(2)}%)</span>
+          `;
+        }
+
+        function onCrosshairMove(param) {
+          if (!param || !param.seriesData) {
+            updateLegend(null);
+            return;
+          }
+          const candle = param.seriesData.get(candleSeries);
+          updateLegend(candle);
         }
 
         function updateVisibleMarkers() {
@@ -133,6 +200,9 @@
             
             // Subscribe to visible range changes to update markers dynamically
             chart.timeScale().subscribeVisibleLogicalRangeChange(updateVisibleMarkers);
+
+            // Subscribe to crosshair move to update OHLC legend
+            chart.subscribeCrosshairMove(onCrosshairMove);
           } else {
             chart.applyOptions({ width: opts.width, height: opts.height });
           }
@@ -177,6 +247,8 @@
             candleSeries.setData(extendedData);
             if (candles.length) {
               lastBarTime = candles[candles.length - 1].time;
+              latestCandle = candles[candles.length - 1];
+              updateLegend(null);
             }
           }
 
@@ -189,6 +261,8 @@
               candleSeries.update(bar);
               lastBarTime = bar.time;
             }
+            latestCandle = bar;
+            updateLegend(null);
           }
 
           if (type === 'setSMA') {

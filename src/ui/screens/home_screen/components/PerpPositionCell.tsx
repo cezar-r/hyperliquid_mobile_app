@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Color } from '../../../shared/styles';
 import { sharedStyles } from '../styles/shared.styles';
+import { getHip3DisplayName } from '../../../../lib/formatting';
 import type { PerpPosition } from '../../../../types';
 
 interface PerpPositionCellProps {
@@ -54,12 +55,15 @@ export default function PerpPositionCell({
   const priceChange = parsedPrice - prevDayPx;
   const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
 
+  // Get display name with collateral for HIP-3 positions
+  const displayName = getHip3DisplayName(position.coin, position.dex || '');
+
   return (
     <View>
       <TouchableOpacity style={sharedStyles.positionCell} onPress={onPress}>
         <View style={sharedStyles.leftSide}>
           <View style={sharedStyles.tickerContainer}>
-            <Text style={sharedStyles.ticker}>{position.coin}</Text>
+            <Text style={sharedStyles.ticker}>{displayName}</Text>
             <Text
               style={[
                 sharedStyles.leverage,

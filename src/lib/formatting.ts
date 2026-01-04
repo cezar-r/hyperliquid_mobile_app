@@ -3,7 +3,7 @@
  * Based on SDK test utilities
  */
 
-import { SPOT_TICKER_MAP } from '../constants/constants';
+import { SPOT_TICKER_MAP, HIP3_COLLATERAL } from '../constants/constants';
 
 /**
  * Round to N significant figures
@@ -169,5 +169,32 @@ export function convertUTCToLocalChartTime(utcTimestampMs: number): number {
   const timezoneOffsetMs = new Date().getTimezoneOffset() * 60 * 1000;
   const localTimestampMs = utcTimestampMs - timezoneOffsetMs;
   return Math.floor(localTimestampMs / 1000);
+}
+
+/**
+ * Get display name for HIP-3 markets with collateral suffix.
+ * Returns format: "NAME - COLLATERAL" (e.g., "NVDA - USDC", "SPACEX - USDH")
+ * For default dex (empty string), returns the name unchanged.
+ *
+ * @param name - Market name (e.g., "NVDA", "SPACEX")
+ * @param dex - HIP-3 dex name (e.g., "xyz", "vntl") or empty string for default
+ * @returns Display name with collateral suffix for HIP-3 markets
+ */
+export function getHip3DisplayName(name: string, dex: string): string {
+  if (!dex) return name; // Default dex, no collateral suffix
+  const collateral = HIP3_COLLATERAL[dex] || 'USD';
+  return `${name}-${collateral}`;
+}
+
+/**
+ * Get the collateral token symbol for a HIP-3 dex.
+ * Returns 'USDC' for default dex or unknown dex.
+ *
+ * @param dex - HIP-3 dex name or empty string for default
+ * @returns Collateral token symbol
+ */
+export function getHip3Collateral(dex: string): string {
+  if (!dex) return 'USDC'; // Default dex uses USDC
+  return HIP3_COLLATERAL[dex] || 'USDC';
 }
 

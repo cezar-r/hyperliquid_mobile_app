@@ -8,7 +8,7 @@ import { View, Modal, ScrollView, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWallet } from '../../../contexts/WalletContext';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
-import { formatPrice, formatSize, formatWithCommas } from '../../../lib/formatting';
+import { formatPrice, formatSize, formatWithCommas, getHip3Collateral } from '../../../lib/formatting';
 import { getSkipOpenOrderConfirmations } from '../../../lib/confirmations';
 import { playOrderTicketSelectionChangeHaptic, playSliderChangeHaptic, playOrderSubmitHaptic } from '../../../lib/haptics';
 import { logModalOpen, logModalClose, logUserAction, logApiCall } from '../../../lib/logger';
@@ -679,6 +679,7 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
               sizePercent={sizePercent}
               onSizePercentChange={handleSizePercentChange}
               onSliderChange={playSliderChangeHaptic}
+              collateral={getHip3Collateral(assetInfo.dex)}
             />
 
             {/* Leverage Slider */}

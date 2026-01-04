@@ -8,7 +8,7 @@ import { runOnJS } from 'react-native-reanimated';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
 import type { PerpMarket, SpotMarket } from '../../../types';
 import { getStarredTickers } from '../../../lib/starredTickers';
-import { getDisplayTicker } from '../../../lib/formatting';
+import { getDisplayTicker, getHip3DisplayName } from '../../../lib/formatting';
 import { playToggleHaptic, playNavToChartHaptic } from '../../../lib/haptics';
 import { getMarketContextKey, getPositionContextKey } from '../../../lib/markets';
 import {
@@ -600,14 +600,14 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
         currentSort === SortType.OPEN_INTEREST ||
         currentSort === SortType.MARKET_CAP;
 
-      const displayName = wsState.marketType === 'spot'
-        ? getDisplayTicker(item.name)
-        : item.name;
-      const leverage = wsState.marketType === 'perp'
-        ? (item as PerpMarket).maxLeverage
-        : undefined;
       const dex = wsState.marketType === 'perp'
         ? (item as PerpMarket).dex
+        : undefined;
+      const displayName = wsState.marketType === 'spot'
+        ? getDisplayTicker(item.name)
+        : getHip3DisplayName(item.name, dex || '');
+      const leverage = wsState.marketType === 'perp'
+        ? (item as PerpMarket).maxLeverage
         : undefined;
 
       // For HIP-3 markets, use dex:coin format to preserve dex context

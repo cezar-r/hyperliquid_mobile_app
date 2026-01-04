@@ -12,6 +12,7 @@ interface MarginContainerProps {
   sizePercent: number;
   onSizePercentChange: (percent: number) => void;
   onSliderChange?: () => void;
+  collateral?: string; // Collateral token symbol (e.g., 'USDC', 'USDH')
 }
 
 export const MarginContainer: React.FC<MarginContainerProps> = ({
@@ -21,12 +22,15 @@ export const MarginContainer: React.FC<MarginContainerProps> = ({
   sizePercent,
   onSizePercentChange,
   onSliderChange,
+  collateral = 'USDC',
 }) => {
+  // Use $ for USDC, otherwise show collateral symbol
+  const collateralDisplay = collateral === 'USDC' ? '$' : `${collateral} `;
   return (
     <View style={styles.container}>
       <View style={styles.labelRow}>
         <Text style={styles.labelText}>Margin Required (USD)</Text>
-        <Text style={styles.badge}>Tradeable: ${formatWithCommas(tradeableBalance, 2)}</Text>
+        <Text style={styles.badge}>Tradeable: {collateralDisplay}{formatWithCommas(tradeableBalance, 2)}</Text>
       </View>
       <TextInput
         style={styles.input}
