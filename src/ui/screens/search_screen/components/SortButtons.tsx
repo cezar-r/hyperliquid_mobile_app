@@ -5,7 +5,8 @@ import { Color } from '../../../shared/styles';
 import { styles } from '../styles/SortButtons.styles';
 import { playOptionSelectionHaptic } from '../../../../lib/haptics';
 
-const HyperliquidBlob = require('../../../../../assets/blob-dark.gif');
+const HyperliquidBlobActive = require('../../../../../assets/blob-dark.gif');
+const HyperliquidBlobInactive = require('../../../../../assets/blob_green.gif');
 
 export enum SortType {
   ALPHABETICAL = 'A-Z',
@@ -61,9 +62,10 @@ export default function SortButtons({
           <TouchableOpacity
             style={[
               styles.sortButton,
-              {
-                backgroundColor: showHip3Only ? Color.BRIGHT_ACCENT : 'rgba(255, 255, 255, 0.4)',
+              showHip3Only && {
+                backgroundColor: Color.BRIGHT_ACCENT,
                 borderRadius: 8,
+                paddingHorizontal: 8,
               }
             ]}
             onPress={() => {
@@ -72,8 +74,8 @@ export default function SortButtons({
             }}
           >
             <Image
-              source={HyperliquidBlob}
-              style={{ width: 16, height: 16, opacity: showHip3Only ? 1 : 0.5 }}
+              source={showHip3Only ? HyperliquidBlobActive : HyperliquidBlobInactive}
+              style={showHip3Only ? { width: 21, height: 21 } : { width: 16, height: 16 }}
               resizeMode="contain"
             />
           </TouchableOpacity>

@@ -75,42 +75,54 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
     onClose();
   };
   
-  // Get tradeable balance
+  // Get tradeable balance based on collateral type
   const tradeableBalance = useMemo(() => {
+    const collateral = getHip3Collateral(parsedDex || '');
+
+    // For non-USDC collateral (e.g., USDH), use spot balance
+    if (collateral !== 'USDC') {
+      const spotBalances = account.data?.spotBalances || [];
+      const collateralBalance = spotBalances.find(b => b.coin === collateral);
+      const balance = collateralBalance ? parseFloat(collateralBalance.total) : 0;
+      console.log(`[PerpOrderTicket] Using ${collateral} spot balance:`, balance);
+      return balance;
+    }
+
+    // For USDC collateral, use existing logic (perp withdrawable)
     const withdrawable = account.data?.perpMarginSummary?.withdrawable;
-    
+
     if (withdrawable) {
       const amount = parseFloat(withdrawable);
       console.log('[PerpOrderTicket] Using withdrawable from API:', amount);
       return amount;
     }
-    
+
     const accountValue = account.data?.perpMarginSummary?.accountValue;
     const marginUsed = account.data?.perpMarginSummary?.totalMarginUsed;
     const openOrders = account.data?.openOrders || [];
-    
+
     if (!accountValue) return 0;
-    
+
     const total = parseFloat(accountValue);
     const used = parseFloat(marginUsed || '0');
-    
+
     const openOrdersMargin = openOrders.reduce((sum: number, order: any) => {
       const price = parseFloat(order.limitPx || '0');
       const size = parseFloat(order.sz || '0');
       const notionalValue = price * size;
-      
+
       const positions = account.data?.perpPositions || [];
       const position = positions.find((p: any) => p.position?.coin === order.coin);
       const currentLeverage = position?.leverage?.value || 1;
-      
+
       const marginForOrder = notionalValue / currentLeverage;
       return sum + marginForOrder;
     }, 0);
-    
+
     console.log('[PerpOrderTicket] Fallback Tradeable Balance Calculation:', total - used - openOrdersMargin);
-    
+
     return total - used - openOrdersMargin;
-  }, [account.data]);
+  }, [account.data, parsedDex]);
   
   const [side, setSide] = useState<OrderSide>('buy');
   const [orderType, setOrderType] = useState<OrderType | null>(null);
