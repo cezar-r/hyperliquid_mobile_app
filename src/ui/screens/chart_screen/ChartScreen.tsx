@@ -139,6 +139,15 @@ export default function ChartScreen(): React.JSX.Element {
   useEffect(() => {
     const loadLastVisitedTicker = async () => {
       try {
+        // First check if Zustand state already has a selected coin (set by HomeScreen before navigation)
+        const currentState = useWebSocketStore.getState();
+        if (currentState.selectedCoin) {
+          // Coin already set in state from navigation - don't override it
+          console.log(`[ChartScreen] Using coin from state: ${currentState.selectedCoin}`);
+          return;
+        }
+
+        // Only load from storage if no coin is currently selected
         const lastVisited = await AsyncStorage.getItem(LAST_VISITED_TICKER_KEY);
         if (lastVisited) {
           const [ticker, market] = lastVisited.split('|');
@@ -149,26 +158,15 @@ export default function ChartScreen(): React.JSX.Element {
             console.log(`[ChartScreen] Loaded last visited ticker: ${ticker} (${market})`);
           }
         } else {
-          // Check if Zustand state already has a selected coin (set by HomeScreen before navigation)
-          const currentState = useWebSocketStore.getState();
-          if (currentState.selectedCoin) {
-            // Coin already set in state from navigation - don't override it
-            console.log(`[ChartScreen] Using coin from state: ${currentState.selectedCoin}`);
-          } else {
-            // Default to BTC perp only if nothing is selected
-            setMarketType('perp');
-            selectCoin('BTC');
-          }
+          // Default to BTC perp only if nothing is selected and nothing stored
+          setMarketType('perp');
+          selectCoin('BTC');
         }
       } catch (error) {
         console.error('[ChartScreen] Failed to load last visited ticker:', error);
-        // Check if Zustand state already has a selected coin (set by HomeScreen before navigation)
+        // Default to BTC perp on error if nothing selected
         const currentState = useWebSocketStore.getState();
-        if (currentState.selectedCoin) {
-          // Coin already set in state from navigation - don't override it
-          console.log(`[ChartScreen] Using coin from state: ${currentState.selectedCoin}`);
-        } else {
-          // Default to BTC perp only if nothing is selected
+        if (!currentState.selectedCoin) {
           setMarketType('perp');
           selectCoin('BTC');
         }

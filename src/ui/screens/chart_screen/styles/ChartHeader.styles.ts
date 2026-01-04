@@ -90,6 +90,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
     paddingVertical: spacing.xs,
     borderRadius: 4,
+    marginLeft: -2,
   },
   statsScrollView: {
     flex: 1,

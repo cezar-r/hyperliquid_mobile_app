@@ -16,10 +16,11 @@ export default function ClearCacheRow(): React.JSX.Element {
       
       // Get stats before clearing
       const statsBefore = await getCacheStats();
-      
+      const sizeInMB = (statsBefore.totalSizeBytes / (1024 * 1024)).toFixed(2);
+
       Alert.alert(
         'Clear Cache',
-        `This will clear ${statsBefore.totalEntries} cached chart entries. Are you sure?`,
+        `This will clear ${statsBefore.totalEntries} cached chart entries (${sizeInMB} MB). Are you sure?`,
         [
           { text: 'Cancel', style: 'cancel' },
           {

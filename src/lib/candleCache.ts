@@ -238,34 +238,40 @@ export async function clearAllCache(): Promise<void> {
  */
 export async function getCacheStats(): Promise<{
   totalEntries: number;
+  totalSizeBytes: number;
   oldestEntry: number | null;
   newestEntry: number | null;
 }> {
   if (!db) {
-    return { totalEntries: 0, oldestEntry: null, newestEntry: null };
+    return { totalEntries: 0, totalSizeBytes: 0, oldestEntry: null, newestEntry: null };
   }
-  
+
   try {
     const countResult = await db.getFirstAsync<{ count: number }>(
       `SELECT COUNT(*) as count FROM ${TABLE_NAME}`
     );
-    
+
+    const sizeResult = await db.getFirstAsync<{ totalSize: number }>(
+      `SELECT COALESCE(SUM(LENGTH(candlesJSON)), 0) as totalSize FROM ${TABLE_NAME}`
+    );
+
     const oldestResult = await db.getFirstAsync<{ last_fetched_ts: number }>(
       `SELECT last_fetched_ts FROM ${TABLE_NAME} ORDER BY last_fetched_ts ASC LIMIT 1`
     );
-    
+
     const newestResult = await db.getFirstAsync<{ last_fetched_ts: number }>(
       `SELECT last_fetched_ts FROM ${TABLE_NAME} ORDER BY last_fetched_ts DESC LIMIT 1`
     );
-    
+
     return {
       totalEntries: countResult?.count || 0,
+      totalSizeBytes: sizeResult?.totalSize || 0,
       oldestEntry: oldestResult?.last_fetched_ts || null,
       newestEntry: newestResult?.last_fetched_ts || null,
     };
   } catch (error) {
     console.error('[CandleCache] Error getting cache stats:', error);
-    return { totalEntries: 0, oldestEntry: null, newestEntry: null };
+    return { totalEntries: 0, totalSizeBytes: 0, oldestEntry: null, newestEntry: null };
   }
 }
 
