@@ -53,9 +53,18 @@ const html = require('../../../assets/chart/index.html');
 const LightweightChartBridge = forwardRef<LightweightChartBridgeRef, LightweightChartBridgeProps>(
   ({ candles, smaPeriod = 20, theme = { bg: '#0b0f13', fg: '#c5ced9' }, height = 400 }, ref) => {
     const webRef = useRef<WebView>(null);
+    const webViewReady = useRef(false);
     const size = useMemo(() => ({ width: Dimensions.get('window').width, height }), [height]);
 
+    // Track candles by length + last candle time for efficient change detection
+    const candleKey = useMemo(() => {
+      if (candles.length === 0) return '0';
+      const last = candles[candles.length - 1];
+      return `${candles.length}-${last.time}-${last.close}`;
+    }, [candles]);
+
     function post(type: string, payload?: any) {
+      if (!webViewReady.current) return;
       const msg = JSON.stringify({ type, payload });
       webRef.current?.postMessage(msg);
     }
@@ -68,27 +77,36 @@ const LightweightChartBridge = forwardRef<LightweightChartBridgeRef, Lightweight
       setPriceLines: (l) => post('setPriceLines', { lines: l }),
     }));
 
-    useEffect(() => {
-      // initialize and load initial data
-      const initTimeout = setTimeout(() => {
-        post('init', { theme, width: size.width, height: size.height });
-        post('setData', { candles });
-        if (smaPeriod) post('setSMA', { period: smaPeriod, candles });
-      }, 50);
-      return () => clearTimeout(initTimeout);
-    }, [size.width, size.height]);
+    // Handle WebView ready state
+    const handleMessage = () => {
+      if (!webViewReady.current) {
+        webViewReady.current = true;
+        // Send initial data once WebView is ready
+        const msg = JSON.stringify({ type: 'init', payload: { theme, width: size.width, height: size.height } });
+        webRef.current?.postMessage(msg);
+        const dataMsg = JSON.stringify({ type: 'setData', payload: { candles } });
+        webRef.current?.postMessage(dataMsg);
+        if (smaPeriod) {
+          const smaMsg = JSON.stringify({ type: 'setSMA', payload: { period: smaPeriod, candles } });
+          webRef.current?.postMessage(smaMsg);
+        }
+      }
+    };
 
+    // Update candles when they change (using efficient key comparison)
     useEffect(() => {
+      if (!webViewReady.current || candles.length === 0) return;
       post('setData', { candles });
       if (smaPeriod) post('setSMA', { period: smaPeriod, candles });
-    }, [JSON.stringify(candles), smaPeriod]);
+    }, [candleKey, smaPeriod]);
 
     return (
       <WebView
         ref={webRef}
         originWhitelist={["*"]}
         source={html}
-        onMessage={() => {}}
+        onMessage={handleMessage}
+        onLoad={handleMessage}
         javaScriptEnabled
         scalesPageToFit
         automaticallyAdjustContentInsets={false}

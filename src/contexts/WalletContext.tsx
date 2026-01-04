@@ -34,6 +34,7 @@ import {
   logDataUpdate,
 } from '../lib/logger';
 import { HIP3_DEXES } from '../constants/constants';
+import { useAppVisibility } from '../hooks';
 
 const WALLET_DISCONNECTED_KEY = 'hl_wallet_disconnected';
 
@@ -395,12 +396,21 @@ export function WalletProvider({
     }
   }, [connectedAddress, fetchAccountData]);
 
-  // Auto-refresh account data every 5 seconds when connected
+  // App visibility state - used to pause polling when app is backgrounded
+  const isAppActive = useAppVisibility();
+
+  // Auto-refresh account data every 5 seconds when connected AND app is active
   useEffect(() => {
-    if (!connectedAddress) return;
+    // Don't poll if not connected or app is in background
+    if (!connectedAddress || !isAppActive) {
+      if (!isAppActive && connectedAddress) {
+        console.log('[WalletContext] Pausing polling - app in background');
+      }
+      return;
+    }
 
     logPollingStart('WalletContext', 5000);
-    
+
     const intervalId = setInterval(() => {
       logPollingCycle('WalletContext');
       fetchAccountData(connectedAddress, true); // silent refresh
@@ -410,7 +420,7 @@ export function WalletProvider({
       logPollingStop('WalletContext');
       clearInterval(intervalId);
     };
-  }, [connectedAddress, fetchAccountData]);
+  }, [connectedAddress, fetchAccountData, isAppActive]);
 
   const enableDexAbstraction = useCallback(async (address: string): Promise<void> => {
     if (!mainExchangeClient) {

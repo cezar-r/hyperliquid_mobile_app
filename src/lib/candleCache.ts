@@ -27,34 +27,52 @@ const TABLE_NAME = 'candle_cache';
 const MAX_CACHE_ENTRIES = 100;
 
 let db: SQLite.SQLiteDatabase | null = null;
+let dbReady = false;
+let dbInitPromise: Promise<void> | null = null;
+
+/**
+ * Check if the database is ready for queries
+ */
+export function isCacheReady(): boolean {
+  return dbReady && db !== null;
+}
 
 /**
  * Initialize the SQLite database and create the candle_cache table
  */
 export async function initCandleCache(): Promise<void> {
-  try {
-    const initStart = Date.now();
-    db = await SQLite.openDatabaseAsync(DB_NAME);
-    
-    await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (
-        ticker TEXT NOT NULL,
-        market TEXT NOT NULL,
-        timeframe TEXT NOT NULL,
-        last_fetched_ts INTEGER NOT NULL,
-        candlesJSON TEXT NOT NULL,
-        PRIMARY KEY (ticker, market, timeframe)
-      );
-      
-      CREATE INDEX IF NOT EXISTS idx_last_fetched 
-      ON ${TABLE_NAME} (last_fetched_ts);
-    `);
-    
-    const initTime = Date.now() - initStart;
-    console.log(`[CandleCache] Database initialized successfully (took ${initTime}ms)`);
-  } catch (error) {
-    console.error('[CandleCache] Error initializing database:', error);
-  }
+  // Return existing promise if already initializing
+  if (dbInitPromise) return dbInitPromise;
+
+  dbInitPromise = (async () => {
+    try {
+      const initStart = Date.now();
+      db = await SQLite.openDatabaseAsync(DB_NAME);
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (
+          ticker TEXT NOT NULL,
+          market TEXT NOT NULL,
+          timeframe TEXT NOT NULL,
+          last_fetched_ts INTEGER NOT NULL,
+          candlesJSON TEXT NOT NULL,
+          PRIMARY KEY (ticker, market, timeframe)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_last_fetched
+        ON ${TABLE_NAME} (last_fetched_ts);
+      `);
+
+      dbReady = true;
+      const initTime = Date.now() - initStart;
+      console.log(`[CandleCache] Database initialized successfully (took ${initTime}ms)`);
+    } catch (error) {
+      console.error('[CandleCache] Error initializing database:', error);
+      dbReady = false;
+    }
+  })();
+
+  return dbInitPromise;
 }
 
 /**
@@ -81,44 +99,44 @@ function isWithinInterval(
 
 /**
  * Retrieve cached candles if they exist and are still fresh
+ * Returns null immediately if database is not ready (non-blocking)
  */
 export async function getCachedCandles(
   ticker: string,
   market: MarketType,
   timeframe: CandleInterval
 ): Promise<ChartData[] | null> {
-  if (!db) {
-    console.warn('[CandleCache] Database not initialized');
+  // Return immediately if DB is not ready - don't block the caller
+  if (!dbReady || !db) {
     return null;
   }
-  
+
   try {
     const startTime = Date.now();
     const currentTime = Date.now();
-    
+
     const result = await db.getFirstAsync<CachedEntry>(
       `SELECT * FROM ${TABLE_NAME} WHERE ticker = ? AND market = ? AND timeframe = ?`,
       [ticker, market, timeframe]
     );
-    
+
     const queryTime = Date.now() - startTime;
-    
+
     if (!result) {
-      console.log(`[CandleCache] ❌ No cached data found for ${ticker} ${market} ${timeframe} (query took ${queryTime}ms)`);
+      console.log(`[CandleCache] No cache for ${ticker} ${timeframe} (${queryTime}ms)`);
       return null;
     }
-    
+
     // Check if cache is still fresh
     if (!isWithinInterval(result.last_fetched_ts, timeframe, currentTime)) {
       const age = Math.round((currentTime - result.last_fetched_ts) / 1000);
-      console.log(`[CandleCache] ❌ Cached data for ${ticker} ${market} ${timeframe} is stale (${age}s old, query took ${queryTime}ms)`);
+      console.log(`[CandleCache] Stale cache for ${ticker} ${timeframe} (${age}s old)`);
       return null;
     }
-    
+
     const candles: ChartData[] = JSON.parse(result.candlesJSON);
-    const age = Math.round((currentTime - result.last_fetched_ts) / 1000);
-    console.log(`[CandleCache] ✓ Using cached candles for ${ticker} ${market} ${timeframe} (${candles.length} candles, ${age}s old, query took ${queryTime}ms)`);
-    
+    console.log(`[CandleCache] ✓ Cache hit: ${ticker} ${timeframe} (${candles.length} candles, ${queryTime}ms)`);
+
     return candles;
   } catch (error) {
     console.error('[CandleCache] Error retrieving cached candles:', error);
@@ -136,28 +154,27 @@ export async function setCachedCandles(
   timeframe: CandleInterval,
   candles: ChartData[]
 ): Promise<void> {
-  if (!db) {
-    console.warn('[CandleCache] Database not initialized');
+  if (!dbReady || !db) {
     return;
   }
-  
+
   try {
     const startTime = Date.now();
     const currentTime = Date.now();
-    
+
     // Only cache the latest 800 candles to keep cache size reasonable and fast
     const candlesToCache = candles.slice(-800);
     const candlesJSON = JSON.stringify(candlesToCache);
-    
+
     // Use REPLACE to insert or update
     await db.runAsync(
       `REPLACE INTO ${TABLE_NAME} (ticker, market, timeframe, last_fetched_ts, candlesJSON) VALUES (?, ?, ?, ?, ?)`,
       [ticker, market, timeframe, currentTime, candlesJSON]
     );
-    
+
     const writeTime = Date.now() - startTime;
-    console.log(`[CandleCache] ✓ Cached ${candlesToCache.length} candles for ${ticker} ${market} ${timeframe} (from ${candles.length} total, write took ${writeTime}ms)`);
-    
+    console.log(`[CandleCache] ✓ Cached ${candlesToCache.length}/${candles.length} candles for ${ticker} ${timeframe} (${writeTime}ms)`);
+
     // Trigger cleanup to ensure we don't exceed max entries (async, don't await)
     cleanupOldCache().catch(err => console.error('[CandleCache] Cleanup error:', err));
   } catch (error) {

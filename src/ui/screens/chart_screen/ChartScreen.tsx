@@ -17,7 +17,7 @@ import { resolveSubscriptionCoin, getMarketContextKey, parseMarketKey, findPerpM
 import { generateTickSizeOptions, calculateMantissa, calculateNSigFigs } from '../../../lib/tickSize';
 import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker, convertUTCToLocalChartTime } from '../../../lib/formatting';
 import { isTickerStarred, toggleStarredTicker } from '../../../lib/starredTickers';
-import { initCandleCache, getCachedCandles, setCachedCandles } from '../../../lib/candleCache';
+import { initCandleCache, getCachedCandles, setCachedCandles, isCacheReady } from '../../../lib/candleCache';
 import {
   logScreenMount,
   logScreenUnmount,
@@ -367,45 +367,37 @@ export default function ChartScreen(): React.JSX.Element {
     async (coin: string, candleInterval: CandleInterval) => {
       if (!infoClient) return;
 
-      const fetchStartTime = Date.now();
+      setError(null);
 
-      try {
-        setError(null);
+      // Find the dex for this coin (HIP-3 support)
+      const market = marketType === 'perp'
+        ? state.perpMarkets.find(m => m.name === coin)
+        : null;
+      const dex = market?.dex;
 
-        // Find the dex for this coin (HIP-3 support)
-        const market = marketType === 'perp' 
-          ? state.perpMarkets.find(m => m.name === coin)
-          : null;
-        const dex = market?.dex;
+      let subscriptionCoin = resolveSubscriptionCoin(marketType, coin, spotMarkets);
+      if (dex) {
+        subscriptionCoin = `${dex}:${coin}`;
+      }
 
-        // For HIP-3 markets, use prefixed format (e.g., "xyz:AAPL")
-        let subscriptionCoin = resolveSubscriptionCoin(
-          marketType,
-          coin,
-          spotMarkets
-        );
-        
-        if (dex) {
-          subscriptionCoin = `${dex}:${coin}`;
-        }
-
-        // Try to load from cache first (before setting loading state)
-        console.log(`[ChartScreen] Checking cache for ${coin} ${marketType} ${candleInterval}...`);
-        const cacheCheckStart = Date.now();
+      // Quick synchronous cache check - only if DB is ready
+      let hasCachedData = false;
+      if (isCacheReady()) {
         const cachedCandles = await getCachedCandles(coin, marketType, candleInterval);
-        const cacheCheckTime = Date.now() - cacheCheckStart;
-        
         if (cachedCandles && cachedCandles.length > 0) {
-          // Immediately display cached candles WITHOUT showing loading state
           setCandles(cachedCandles);
-          console.log(`[ChartScreen] ✓ Instantly loaded ${cachedCandles.length} cached candles for ${coin} ${candleInterval} (cache check took ${cacheCheckTime}ms)`);
-          // Continue to fetch fresh data in background WITHOUT loading indicator
-        } else {
-          // No cache available, show loading state
-          console.log(`[ChartScreen] No cache found, showing loading state (cache check took ${cacheCheckTime}ms)`);
-          setIsLoading(true);
+          hasCachedData = true;
+          console.log(`[ChartScreen] ✓ Cache hit: ${cachedCandles.length} candles`);
         }
+      }
 
+      // Only show loading if no cached data
+      if (!hasCachedData) {
+        setIsLoading(true);
+      }
+
+      // Fetch fresh data from API
+      try {
         const endTime = Date.now();
         const lookbacks: Record<CandleInterval, number> = {
           '1m': 90,
@@ -418,7 +410,7 @@ export default function ChartScreen(): React.JSX.Element {
         const startTime = endTime - lookbacks[candleInterval] * 24 * 60 * 60 * 1000;
 
         logApiCall('candleSnapshot', `coin: ${subscriptionCoin}, interval: ${candleInterval}`);
-        const apiCallStart = Date.now();
+        const apiStart = Date.now();
 
         const snapshot = await infoClient.candleSnapshot({
           coin: subscriptionCoin,
@@ -427,7 +419,7 @@ export default function ChartScreen(): React.JSX.Element {
           endTime,
         });
 
-        const apiCallTime = Date.now() - apiCallStart;
+        const apiTime = Date.now() - apiStart;
 
         if (snapshot && Array.isArray(snapshot)) {
           const chartData: ChartData[] = snapshot.map((c: any) => ({
@@ -441,14 +433,10 @@ export default function ChartScreen(): React.JSX.Element {
           chartData.sort((a, b) => a.timestamp - b.timestamp);
           setCandles(chartData);
           logApiResponse('candleSnapshot', chartData.length, 'candles');
-          
-          const totalTime = Date.now() - fetchStartTime;
-          console.log(`[ChartScreen] Total fetch time: ${totalTime}ms (API: ${apiCallTime}ms, cache check: ${cacheCheckTime}ms)`);
-          
-          // Update cache with fresh data (don't await to avoid blocking)
-          setCachedCandles(coin, marketType, candleInterval, chartData).catch(err => {
-            console.error('[ChartScreen] Failed to cache candles:', err);
-          });
+          console.log(`[ChartScreen] API fetch: ${apiTime}ms, ${chartData.length} candles`);
+
+          // Update cache in background
+          setCachedCandles(coin, marketType, candleInterval, chartData).catch(() => {});
         }
       } catch (err: any) {
         logApiError('candleSnapshot', err);
@@ -627,36 +615,36 @@ export default function ChartScreen(): React.JSX.Element {
     );
   }
 
-  // Filter and deduplicate candles before sending to chart
-  const validCandles = candles
-    .filter((c) => {
-      if (!c.timestamp || c.timestamp <= 0) return false;
-      if (c.timestamp < 1577836800000) return false;
-      if (!c.open || !c.high || !c.low || !c.close) return false;
-      if (c.open <= 0 || c.high <= 0 || c.low <= 0 || c.close <= 0) return false;
-      return true;
-    })
-    .sort((a, b) => a.timestamp - b.timestamp);
+  // Filter, deduplicate and convert candles - memoized to avoid recalculating on every render
+  const lwcCandles = useMemo((): LWCandle[] => {
+    if (candles.length === 0) return [];
 
-  // Deduplicate by timestamp
-  const dedupedCandles: ChartData[] = [];
-  const seenTimes = new Set<number>();
-  
-  for (let i = validCandles.length - 1; i >= 0; i--) {
-    const timeKey = convertUTCToLocalChartTime(validCandles[i].timestamp);
-    if (!seenTimes.has(timeKey)) {
+    const seenTimes = new Set<number>();
+    const result: LWCandle[] = [];
+
+    // Single pass: filter, dedupe, and convert
+    for (let i = candles.length - 1; i >= 0; i--) {
+      const c = candles[i];
+      // Validation
+      if (!c.timestamp || c.timestamp <= 0 || c.timestamp < 1577836800000) continue;
+      if (!c.open || !c.high || !c.low || !c.close) continue;
+      if (c.open <= 0 || c.high <= 0 || c.low <= 0 || c.close <= 0) continue;
+
+      const timeKey = convertUTCToLocalChartTime(c.timestamp);
+      if (seenTimes.has(timeKey)) continue;
       seenTimes.add(timeKey);
-      dedupedCandles.unshift(validCandles[i]);
-    }
-  }
 
-  const lwcCandles: LWCandle[] = dedupedCandles.map((c) => ({
-    time: convertUTCToLocalChartTime(c.timestamp),
-    open: c.open,
-    high: c.high,
-    low: c.low,
-    close: c.close,
-  }));
+      result.unshift({
+        time: timeKey,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+      });
+    }
+
+    return result;
+  }, [candles]);
 
   // Asset info and position/balance
   // Use parsedCoin for position lookup (API uses coin name without dex prefix)
