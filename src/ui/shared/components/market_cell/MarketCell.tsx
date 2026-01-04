@@ -12,6 +12,7 @@ interface MarketCellProps {
   metricValue?: string;
   metricColor?: string;
   showMetricBelow?: boolean;
+  dex?: string; // HIP-3 dex name (e.g., 'xyz', 'vntl')
   onPress: () => void;
 }
 
@@ -41,6 +42,7 @@ export default function MarketCell({
   metricValue,
   metricColor = Color.FG_3,
   showMetricBelow = false,
+  dex,
   onPress,
 }: MarketCellProps): React.JSX.Element {
   return (
@@ -49,6 +51,11 @@ export default function MarketCell({
         <View style={styles.tickerLeftContainer}>
           <View style={styles.tickerNameRow}>
             <Text style={styles.tickerSymbol}>{displayName}</Text>
+            {dex && (
+              <View style={styles.dexBadge}>
+                <Text style={styles.dexBadgeText}>{dex.toUpperCase()}</Text>
+              </View>
+            )}
             {leverage && (
               <Text style={styles.leverage}>{leverage}x</Text>
             )}

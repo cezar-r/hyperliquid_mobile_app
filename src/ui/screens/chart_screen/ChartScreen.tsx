@@ -13,7 +13,7 @@ import { LWCandle, ChartMarker, ChartPriceLine, LightweightChartBridgeRef } from
 import { TPSLEditModal, ClosePositionModal, PerpOrderTicket, SpotOrderTicket } from '../../modals';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { useWallet } from '../../../contexts/WalletContext';
-import { resolveSubscriptionCoin } from '../../../lib/markets';
+import { resolveSubscriptionCoin, getMarketContextKey, parseMarketKey, findPerpMarketByKey } from '../../../lib/markets';
 import { generateTickSizeOptions, calculateMantissa, calculateNSigFigs } from '../../../lib/tickSize';
 import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker, convertUTCToLocalChartTime } from '../../../lib/formatting';
 import { isTickerStarred, toggleStarredTicker } from '../../../lib/starredTickers';
@@ -225,18 +225,32 @@ export default function ChartScreen(): React.JSX.Element {
     }, [enterChartMode, exitChartMode])
   );
 
+  // Parse selectedCoin to handle HIP-3 dex:coin format
+  const { coin: parsedCoin, dex: parsedDex } = useMemo(() => {
+    return selectedCoin ? parseMarketKey(selectedCoin) : { coin: '', dex: undefined };
+  }, [selectedCoin]);
+
   // Get current asset's market data for szDecimals
-  const perpMarket = marketType === 'perp'
-    ? state.perpMarkets.find(m => m.name === selectedCoin)
+  const perpMarket = marketType === 'perp' && selectedCoin
+    ? findPerpMarketByKey(state.perpMarkets, selectedCoin)
     : null;
+
+  // Get context key for HIP-3 markets (dex:coin format)
+  const contextKey = useMemo(() => {
+    if (!selectedCoin) return '';
+    if (marketType === 'perp' && perpMarket) {
+      return getMarketContextKey(perpMarket);
+    }
+    return selectedCoin;
+  }, [selectedCoin, marketType, perpMarket]);
 
   // Get real-time price from WebSocket
   const assetCtx = useMemo(() => {
-    return state.assetContexts[selectedCoin || ''] || null;
-  }, [state.assetContexts, selectedCoin]);
+    return state.assetContexts[contextKey] || null;
+  }, [state.assetContexts, contextKey]);
 
-  const currentPriceForTick = (selectedCoin && state.prices[selectedCoin]) 
-    ? parseFloat(state.prices[selectedCoin])
+  const currentPriceForTick = (contextKey && state.prices[contextKey]) 
+    ? parseFloat(state.prices[contextKey])
     : (assetCtx?.markPx || 0);
 
   // Calculate tick size options based on current price and szDecimals
@@ -259,15 +273,15 @@ export default function ChartScreen(): React.JSX.Element {
 
   // Load starred state when coin or market type changes
   useEffect(() => {
-    if (!selectedCoin || !marketType) return;
-    
+    if (!parsedCoin || !marketType) return;
+
     const loadStarredState = async () => {
-      const starred = await isTickerStarred(selectedCoin, marketType);
+      const starred = await isTickerStarred(parsedCoin, marketType);
       setIsStarred(starred);
     };
-    
+
     loadStarredState();
-  }, [selectedCoin, marketType]);
+  }, [parsedCoin, marketType]);
 
   // Load saved interval on mount
   useEffect(() => {
@@ -358,11 +372,22 @@ export default function ChartScreen(): React.JSX.Element {
       try {
         setError(null);
 
-        const subscriptionCoin = resolveSubscriptionCoin(
+        // Find the dex for this coin (HIP-3 support)
+        const market = marketType === 'perp' 
+          ? state.perpMarkets.find(m => m.name === coin)
+          : null;
+        const dex = market?.dex;
+
+        // For HIP-3 markets, use prefixed format (e.g., "xyz:AAPL")
+        let subscriptionCoin = resolveSubscriptionCoin(
           marketType,
           coin,
           spotMarkets
         );
+        
+        if (dex) {
+          subscriptionCoin = `${dex}:${coin}`;
+        }
 
         // Try to load from cache first (before setting loading state)
         console.log(`[ChartScreen] Checking cache for ${coin} ${marketType} ${candleInterval}...`);
@@ -432,7 +457,7 @@ export default function ChartScreen(): React.JSX.Element {
         setIsLoading(false);
       }
     },
-    [infoClient, marketType, spotMarkets]
+    [infoClient, marketType, spotMarkets, state.perpMarkets]
   );
 
   // Update refs when ticker or interval changes
@@ -544,12 +569,12 @@ export default function ChartScreen(): React.JSX.Element {
 
   // Handle star toggle
   const handleToggleStar = () => {
-    if (!selectedCoin || !marketType) return;
-    
+    if (!parsedCoin || !marketType) return;
+
     const newStarredState = !isStarred;
     setIsStarred(newStarredState);
-    
-    toggleStarredTicker(selectedCoin, marketType).catch((error) => {
+
+    toggleStarredTicker(parsedCoin, marketType).catch((error) => {
       console.error('[ChartScreen] Failed to toggle star:', error);
       setIsStarred(!newStarredState);
     });
@@ -634,14 +659,23 @@ export default function ChartScreen(): React.JSX.Element {
   }));
 
   // Asset info and position/balance
-  const perpPosition = account.data?.perpPositions?.find?.((p: any) => p.coin === selectedCoin);
+  // Use parsedCoin for position lookup (API uses coin name without dex prefix)
+  // Also check dex field for HIP-3 positions
+  const perpPosition = account.data?.perpPositions?.find?.((p: any) => {
+    if (parsedDex) {
+      // For HIP-3 markets, match both coin and dex
+      return p.coin === parsedCoin && p.dex === parsedDex;
+    }
+    // For default dex, match coin and ensure no dex or empty dex
+    return p.coin === parsedCoin && (!p.dex || p.dex === '');
+  });
   const spotBalances = account.data?.spotBalances || [];
-  const userFills = (account.data?.userFills || []).filter((f: any) => f.coin === selectedCoin);
+  const userFills = (account.data?.userFills || []).filter((f: any) => f.coin === parsedCoin);
 
   // Get real-time price from WebSocket
   const currentPrice = useMemo(() => {
-    return (selectedCoin && state.prices[selectedCoin]) || assetCtx?.markPx;
-  }, [selectedCoin, state.prices[selectedCoin || ''], assetCtx?.markPx]);
+    return (contextKey && state.prices[contextKey]) || assetCtx?.markPx;
+  }, [contextKey, state.prices, assetCtx?.markPx]);
 
   // Animate price color on change
   useEffect(() => {
@@ -1101,10 +1135,11 @@ export default function ChartScreen(): React.JSX.Element {
       >
       <ChartHeader
         onBackPress={isDetailView ? () => navigation.goBack() : undefined}
-        ticker={selectedCoin}
-        displayTicker={marketType === 'spot' && selectedCoin ? getDisplayTicker(selectedCoin) : selectedCoin}
+        ticker={parsedCoin}
+        displayTicker={marketType === 'spot' && parsedCoin ? getDisplayTicker(parsedCoin) : parsedCoin}
         marketType={marketType}
         maxLeverage={maxLeverage}
+        dex={parsedDex} // Pass dex for HIP-3 display
         currentPrice={currentPrice}
         animatedPriceColor={animatedPriceColor}
         change24h={change24h}
@@ -1159,7 +1194,7 @@ export default function ChartScreen(): React.JSX.Element {
         {/* Position / Balances */}
         <PositionContainer
           marketType={marketType}
-          selectedCoin={selectedCoin}
+          selectedCoin={parsedCoin}
           {...(marketType === 'perp' ? perpPosData : {})}
           {...(marketType === 'spot' ? spotBalData : {})}
           onEditTpSl={() => setEditingTPSL(perpPosition)}
@@ -1209,13 +1244,13 @@ export default function ChartScreen(): React.JSX.Element {
       )}
       
       {/* Close Position Modal */}
-      {perpPosition && selectedCoin && (
+      {perpPosition && parsedCoin && (
         <ClosePositionModal
           visible={showCloseModal}
           onClose={() => setShowCloseModal(false)}
           position={perpPosition}
           currentPrice={typeof currentPrice === 'string' ? parseFloat(currentPrice) : (currentPrice || 0)}
-          coin={selectedCoin}
+          coin={parsedCoin}
         />
       )}
       </Animated.View>

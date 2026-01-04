@@ -8,6 +8,7 @@ interface ChartHeaderProps {
   displayTicker: string;
   marketType: 'perp' | 'spot';
   maxLeverage?: number;
+  dex?: string; // HIP-3 dex name (e.g., 'xyz', 'vntl')
   currentPrice: number | string | null;
   animatedPriceColor: Animated.AnimatedInterpolation<string | number>;
   change24h: number | null;
@@ -72,6 +73,7 @@ export default function ChartHeader({
   displayTicker,
   marketType,
   maxLeverage,
+  dex,
   currentPrice,
   animatedPriceColor,
   change24h,
@@ -114,7 +116,9 @@ export default function ChartHeader({
       </View>
       <View style={styles.tickerBottomRow}>
         <Text style={styles.marketTypeLabel}>
-          {marketType === 'perp' ? 'Perpetual' : 'Spot'}
+          {marketType === 'perp' 
+            ? (dex ? dex.toUpperCase() : 'Perpetual') 
+            : 'Spot'}
         </Text>
         <ScrollView
           horizontal={true}

@@ -15,11 +15,14 @@ import {
   createHttpTransport,
 } from '../lib/hyperliquid';
 import {
-  fetchPerpMarkets,
+  fetchAllDexMarkets,
   fetchSpotMarkets,
   resolveSubscriptionCoin,
   getDefaultCoin,
+  getMarketContextKey,
+  createHIP3Market,
 } from '../lib/markets';
+import { HIP3_DEXES, HIP3_SYMBOLS } from '../constants/constants';
 import {
   logWebSocketSubscription,
   logWebSocketUnsubscription,
@@ -96,6 +99,7 @@ export function WebSocketProvider({
   const subscriptionClientRef = useRef<hl.SubscriptionClient | null>(null);
   const infoClientRef = useRef<hl.InfoClient | null>(null);
   const allMidsSubIdRef = useRef<any>(null);
+  const allMidsSubIdsRef = useRef<any[]>([]); // For HIP-3 dex mids subscriptions
   const orderbookSubIdRef = useRef<any>(null);
   const tradesSubIdRef = useRef<any>(null);
   const candleSubIdRef = useRef<any>(null);
@@ -126,12 +130,17 @@ export function WebSocketProvider({
         // console.log(JSON.stringify(perpMarkets, null, 2));
 
 
-        // Subscribe to perp asset contexts
+        // Subscribe to perp asset contexts (including HIP-3 dexes)
         const perpSubs = await Promise.all(
           perpMarkets.map(async (market) => {
             try {
+              // For HIP-3 markets, use prefixed format (e.g., "xyz:AAPL")
+              const subscriptionCoin = market.dex 
+                ? `${market.dex}:${market.name}`
+                : market.name;
+              
               const sub = await client.activeAssetCtx(
-                { coin: market.name },
+                { coin: subscriptionCoin },
                 (data: any) => {
                   if (!isMounted) return;
 
@@ -145,18 +154,22 @@ export function WebSocketProvider({
                     openInterest: parseFloat(data.ctx.openInterest),
                   };
 
+                  // Use unique key for HIP-3 dexes: dex:coin
+                  const contextKey = market.dex ? `${market.dex}:${market.name}` : market.name;
+
                   setState((prev) => ({
                     ...prev,
                     assetContexts: {
                       ...prev.assetContexts,
-                      [market.name]: ctx,
+                      [contextKey]: ctx,
                     },
                   }));
                 }
               );
               return sub;
             } catch (error) {
-              console.error(`[Phase 4] Error subscribing to perp ${market.name}:`, error);
+              const dexInfo = market.dex ? ` (${market.dex})` : '';
+              console.error(`[Phase 4] Error subscribing to perp ${market.name}${dexInfo}:`, error);
               return null;
             }
           })
@@ -222,7 +235,7 @@ export function WebSocketProvider({
         infoClientRef.current = infoClient;
 
         const [perpResult, spotResult] = await Promise.all([
-          fetchPerpMarkets(infoClient),
+          fetchAllDexMarkets(infoClient), // Fetch all dex markets (default + HIP-3)
           fetchSpotMarkets(infoClient),
         ]);
 
@@ -273,12 +286,13 @@ export function WebSocketProvider({
         logWebSocketConnection('connected');
         setState((prev) => ({ ...prev, isConnected: true, error: null }));
 
-        logWebSocketSubscription('allMids');
+        // Subscribe to allMids for default dex
+        logWebSocketSubscription('allMids', 'default dex');
         const allMidsSub = await client.allMids((data: any) => {
           if (!mounted) return;
           
           setState((prev) => {
-            const priceMap: Record<string, string> = {};
+            const priceMap: Record<string, string> = { ...prev.prices };
 
             if (data.mids && typeof data.mids === 'object') {
               Object.entries(data.mids).forEach(([coin, price]) => {
@@ -298,12 +312,85 @@ export function WebSocketProvider({
               });
             }
 
-            logWebSocketData('allMids', Object.keys(priceMap).length);
+            logWebSocketData('allMids (default)', Object.keys(data.mids || {}).length);
             return { ...prev, prices: priceMap };
           });
         });
 
         allMidsSubIdRef.current = allMidsSub;
+
+        // Subscribe to allMids for each HIP-3 dex
+        const hip3MidsSubs = await Promise.all(
+          HIP3_DEXES.map(async (dex) => {
+            try {
+              logWebSocketSubscription('allMids', `dex: ${dex}`);
+              const sub = await client.allMids({ dex }, (data: any) => {
+                if (!mounted) return;
+                
+                setState((prev) => {
+                  const priceMap: Record<string, string> = { ...prev.prices };
+                  const newMarkets: PerpMarket[] = [...prev.perpMarkets];
+                  const newContexts: Record<string, any> = { ...prev.assetContexts };
+                  const whitelist = HIP3_SYMBOLS[dex] || [];
+
+                  if (data.mids && typeof data.mids === 'object') {
+                    Object.entries(data.mids).forEach(([coin, price]) => {
+                      if (typeof price === 'string') {
+                        // Parse dex:symbol format (e.g., "xyz:AAPL")
+                        const parts = coin.split(':');
+                        const symbol = parts.length > 1 ? parts[1] : coin;
+
+                        // Only process if symbol is in whitelist
+                        if (whitelist.includes(symbol)) {
+                          // Store price with dex:symbol key
+                          const key = `${dex}:${symbol}`;
+                          priceMap[key] = price;
+
+                          // Check if market already exists (loaded from meta API)
+                          const existingMarket = newMarkets.find(
+                            m => m.name === symbol && m.dex === dex
+                          );
+
+                          if (existingMarket) {
+                            // Update context for existing market
+                            newContexts[key] = {
+                              ...newContexts[key],
+                              markPx: parseFloat(price),
+                            };
+                          } else {
+                            // Market not in meta API yet - create placeholder
+                            // Note: Trading won't work until meta API returns this market
+                            const newMarket = createHIP3Market(dex, symbol);
+                            newMarkets.push(newMarket);
+                            console.log(`[HIP-3] Created placeholder market ${key} from allMids (trading unavailable until meta API returns index)`);
+
+                            // Create basic context
+                            newContexts[key] = {
+                              markPx: parseFloat(price),
+                              dayNtlVlm: 0,
+                              prevDayPx: parseFloat(price),
+                              funding: 0,
+                              openInterest: 0,
+                            };
+                          }
+                        }
+                      }
+                    });
+                  }
+
+                  logWebSocketData(`allMids (${dex})`, Object.keys(data.mids || {}).length);
+                  return { ...prev, prices: priceMap, perpMarkets: newMarkets, assetContexts: newContexts };
+                });
+              });
+              return sub;
+            } catch (error) {
+              console.error(`[HIP-3] Error subscribing to allMids for ${dex}:`, error);
+              return null;
+            }
+          })
+        );
+
+        allMidsSubIdsRef.current = hip3MidsSubs.filter((sub) => sub !== null);
 
         cleanup.push(() => {
           if (allMidsSubIdRef.current) {
@@ -316,6 +403,16 @@ export function WebSocketProvider({
               });
             allMidsSubIdRef.current = null;
           }
+          
+          // Cleanup HIP-3 mids subscriptions
+          allMidsSubIdsRef.current.forEach((sub) => {
+            sub?.unsubscribe().catch((err: any) => {
+              if (!err.message?.includes('WebSocket connection closed')) {
+                console.error('[HIP-3] Error unsubscribing allMids:', err);
+              }
+            });
+          });
+          allMidsSubIdsRef.current = [];
         });
 
         // Subscribe to asset contexts for all markets
@@ -445,11 +542,22 @@ export function WebSocketProvider({
         orderbookSubIdRef.current = null;
       }
 
-      const subscriptionCoin = resolveSubscriptionCoin(
+      // Find the dex for this coin (HIP-3 support)
+      const market = state.marketType === 'perp' 
+        ? state.perpMarkets.find(m => m.name === coin)
+        : null;
+      const dex = market?.dex;
+
+      // For HIP-3 markets, use prefixed format (e.g., "xyz:AAPL")
+      let subscriptionCoin = resolveSubscriptionCoin(
         state.marketType,
         coin,
         state.spotMarkets
       );
+      
+      if (dex) {
+        subscriptionCoin = `${dex}:${coin}`;
+      }
 
       logWebSocketSubscription('l2Book (orderbook)', `coin: ${subscriptionCoin}`);
 
@@ -482,7 +590,7 @@ export function WebSocketProvider({
 
       orderbookSubIdRef.current = sub;
     },
-    [state.marketType, state.spotMarkets]
+    [state.marketType, state.spotMarkets, state.perpMarkets]
   );
 
   const unsubscribeFromOrderbook = useCallback(async () => {
@@ -513,17 +621,30 @@ export function WebSocketProvider({
         tradesSubIdRef.current = null;
       }
 
-      const subscriptionCoin = resolveSubscriptionCoin(
+      // Find the dex for this coin (HIP-3 support)
+      const market = state.marketType === 'perp' 
+        ? state.perpMarkets.find(m => m.name === coin)
+        : null;
+      const dex = market?.dex;
+
+      // For HIP-3 markets, use prefixed format (e.g., "xyz:AAPL")
+      let subscriptionCoin = resolveSubscriptionCoin(
         state.marketType,
         coin,
         state.spotMarkets
       );
+      
+      if (dex) {
+        subscriptionCoin = `${dex}:${coin}`;
+      }
 
       logWebSocketSubscription('trades', `coin: ${subscriptionCoin}`);
 
       activeTradesCoinRef.current = subscriptionCoin;
 
-      const sub = await client.trades({ coin: subscriptionCoin }, (trades: any) => {
+      const params: any = { coin: subscriptionCoin };
+
+      const sub = await client.trades(params, (trades: any) => {
         setState((prev) => {
           const newTrades: Trade[] = trades.map((t: any) => ({
             coin: t.coin,
@@ -554,7 +675,7 @@ export function WebSocketProvider({
 
       tradesSubIdRef.current = sub;
     },
-    [state.marketType, state.spotMarkets]
+    [state.marketType, state.spotMarkets, state.perpMarkets]
   );
 
   const unsubscribeFromTrades = useCallback(async () => {
@@ -589,16 +710,29 @@ export function WebSocketProvider({
         candleSubIdRef.current = null;
       }
 
-      const subscriptionCoin = resolveSubscriptionCoin(
+      // Find the dex for this coin (HIP-3 support)
+      const market = state.marketType === 'perp' 
+        ? state.perpMarkets.find(m => m.name === coin)
+        : null;
+      const dex = market?.dex;
+
+      // For HIP-3 markets, use prefixed format (e.g., "xyz:AAPL")
+      let subscriptionCoin = resolveSubscriptionCoin(
         state.marketType,
         coin,
         state.spotMarkets
       );
+      
+      if (dex) {
+        subscriptionCoin = `${dex}:${coin}`;
+      }
 
       logWebSocketSubscription('candle', `coin: ${subscriptionCoin}, interval: ${interval}`);
 
+      const params: any = { coin: subscriptionCoin, interval };
+
       const sub = await client.candle(
-        { coin: subscriptionCoin, interval },
+        params,
         (data: any) => {
           const candle: Candle = {
             t: data.t,
@@ -617,7 +751,7 @@ export function WebSocketProvider({
 
       candleSubIdRef.current = sub;
     },
-    [state.marketType, state.spotMarkets]
+    [state.marketType, state.spotMarkets, state.perpMarkets]
   );
 
   const unsubscribeFromCandles = useCallback(async () => {
@@ -777,6 +911,16 @@ export function WebSocketProvider({
       });
       allMidsSubIdRef.current = null;
     }
+    
+    // Unsubscribe HIP-3 mids
+    allMidsSubIdsRef.current.forEach((sub) => {
+      sub?.unsubscribe().catch((err: any) => {
+        if (!err.message?.includes('WebSocket connection closed')) {
+          console.error('[HIP-3] Error unsubscribing allMids:', err);
+        }
+      });
+    });
+    allMidsSubIdsRef.current = [];
   }, []);
 
   const unsubscribeSingleAssetCtx = useCallback(async (): Promise<void> => {
@@ -801,8 +945,15 @@ export function WebSocketProvider({
 
     try {
       if (state.marketType === 'perp') {
-        console.log('[Phase 4] [ChartMode] Subscribing single perp asset ctx:', coin);
-        const sub = await client.activeAssetCtx({ coin }, (data: any) => {
+        // Find the market to get the dex field
+        const market = state.perpMarkets.find(m => m.name === coin);
+        const dex = market?.dex || '';
+        
+        // For HIP-3 markets, use prefixed format (e.g., "xyz:AAPL")
+        const subscriptionCoin = dex ? `${dex}:${coin}` : coin;
+        
+        console.log('[Phase 4] [ChartMode] Subscribing single perp asset ctx:', { coin: subscriptionCoin, originalCoin: coin, dex });
+        const sub = await client.activeAssetCtx({ coin: subscriptionCoin }, (data: any) => {
           const ctx = {
             dayNtlVlm: parseFloat(data.ctx.dayNtlVlm),
             prevDayPx: parseFloat(data.ctx.prevDayPx),
@@ -811,15 +962,19 @@ export function WebSocketProvider({
             funding: parseFloat(data.ctx.funding),
             openInterest: parseFloat(data.ctx.openInterest),
           };
+          
+          const contextKey = dex ? `${dex}:${coin}` : coin;
+          const priceKey = dex ? `${dex}:${coin}` : coin;
+          
           setState((prev) => ({
             ...prev,
             assetContexts: {
               ...prev.assetContexts,
-              [coin]: ctx,
+              [contextKey]: ctx,
             },
             prices: {
               ...prev.prices,
-              [coin]: ctx.markPx.toString(),
+              [priceKey]: ctx.markPx.toString(),
             },
           }));
         });
@@ -852,17 +1007,18 @@ export function WebSocketProvider({
     } catch (error) {
       console.error('[Phase 4] [ChartMode] Error subscribing single asset ctx:', error);
     }
-  }, [state.selectedCoin, state.marketType, state.spotMarkets, unsubscribeSingleAssetCtx]);
+  }, [state.selectedCoin, state.marketType, state.spotMarkets, state.perpMarkets, unsubscribeSingleAssetCtx]);
 
   const resubscribeGlobal = useCallback(async (): Promise<void> => {
     const client = subscriptionClientRef.current;
     if (!client) return;
     console.log('[Phase 4] Restoring global subscriptions (allMids + all asset contexts)');
-    // Re-subscribe allMids
+    
+    // Re-subscribe allMids for default dex
     try {
       const sub = await client.allMids((data: any) => {
         setState((prev) => {
-          const priceMap: Record<string, string> = {};
+          const priceMap: Record<string, string> = { ...prev.prices };
           if (data.mids && typeof data.mids === 'object') {
             Object.entries(data.mids).forEach(([coin, price]) => {
               if (typeof price === 'string') {
@@ -887,16 +1043,88 @@ export function WebSocketProvider({
     } catch (error) {
       console.error('[Phase 4] Error restoring allMids:', error);
     }
+    
+    // Re-subscribe allMids for HIP-3 dexes
+    try {
+      const hip3MidsSubs = await Promise.all(
+        HIP3_DEXES.map(async (dex) => {
+          try {
+            const sub = await client.allMids({ dex }, (data: any) => {
+              setState((prev) => {
+                const priceMap: Record<string, string> = { ...prev.prices };
+                const newMarkets: PerpMarket[] = [...prev.perpMarkets];
+                const newContexts: Record<string, any> = { ...prev.assetContexts };
+                const whitelist = HIP3_SYMBOLS[dex] || [];
+                
+                if (data.mids && typeof data.mids === 'object') {
+                  Object.entries(data.mids).forEach(([coin, price]) => {
+                    if (typeof price === 'string') {
+                      // Parse dex:symbol format
+                      const parts = coin.split(':');
+                      const symbol = parts.length > 1 ? parts[1] : coin;
+
+                      // Only process if symbol is in whitelist
+                      if (whitelist.includes(symbol)) {
+                        const key = `${dex}:${symbol}`;
+                        priceMap[key] = price;
+
+                        // Check if market already exists (loaded from meta API)
+                        const existingMarket = newMarkets.find(
+                          m => m.name === symbol && m.dex === dex
+                        );
+
+                        if (existingMarket) {
+                          // Update context for existing market
+                          newContexts[key] = {
+                            ...newContexts[key],
+                            markPx: parseFloat(price),
+                          };
+                        } else {
+                          // Market not in meta API yet - create placeholder
+                          const newMarket = createHIP3Market(dex, symbol);
+                          newMarkets.push(newMarket);
+
+                          newContexts[key] = {
+                            markPx: parseFloat(price),
+                            dayNtlVlm: 0,
+                            prevDayPx: parseFloat(price),
+                            funding: 0,
+                            openInterest: 0,
+                          };
+                        }
+                      }
+                    }
+                  });
+                }
+                return { ...prev, prices: priceMap, perpMarkets: newMarkets, assetContexts: newContexts };
+              });
+            });
+            return sub;
+          } catch (error) {
+            console.error(`[HIP-3] Error restoring allMids for ${dex}:`, error);
+            return null;
+          }
+        })
+      );
+      allMidsSubIdsRef.current = hip3MidsSubs.filter((sub) => sub !== null);
+    } catch (error) {
+      console.error('[HIP-3] Error restoring HIP-3 allMids:', error);
+    }
 
     // Re-subscribe asset contexts for all markets
     try {
-      // Perp markets
+      // Perp markets (including HIP-3)
       const clientAny: any = client;
       const perpSubs = await Promise.all(
         state.perpMarkets.map(async (market) => {
           try {
+            // For HIP-3 markets, use prefixed format (e.g., "xyz:AAPL")
+            const subscriptionCoin = market.dex 
+              ? `${market.dex}:${market.name}`
+              : market.name;
+            
             const sub = await client.activeAssetCtx(
-              { coin: market.name },
+              { coin: subscriptionCoin },
               (data: any) => {
                 const ctx = {
                   dayNtlVlm: parseFloat(data.ctx.dayNtlVlm),
@@ -906,18 +1134,22 @@ export function WebSocketProvider({
                   funding: parseFloat(data.ctx.funding),
                   openInterest: parseFloat(data.ctx.openInterest),
                 };
+                
+                const contextKey = market.dex ? `${market.dex}:${market.name}` : market.name;
+                
                 setState((prev) => ({
                   ...prev,
                   assetContexts: {
                     ...prev.assetContexts,
-                    [market.name]: ctx,
+                    [contextKey]: ctx,
                   },
                 }));
               }
             );
             return sub;
           } catch (error) {
-            console.error(`[Phase 4] Error re-subscribing perp ${market.name}:`, error);
+            const dexInfo = market.dex ? ` (${market.dex})` : '';
+            console.error(`[Phase 4] Error re-subscribing perp ${market.name}${dexInfo}:`, error);
             return null;
           }
         })

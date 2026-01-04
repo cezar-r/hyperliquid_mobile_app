@@ -23,6 +23,17 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+  dexBadge: {
+    backgroundColor: Color.ACCENT,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  dexBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Color.FG_1,
+  },
   leverage: {
     fontSize: 15,
     fontWeight: 'bold',

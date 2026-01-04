@@ -19,6 +19,7 @@ import {
   createHttpTransport,
   createExchangeClient,
   createInfoClient,
+  enableHip3DexAbstraction,
 } from '../lib/hyperliquid';
 import { isTestnet } from '../lib/config';
 import type { AccountData, AccountState } from '../types';
@@ -32,6 +33,7 @@ import {
   logPollingCycle,
   logDataUpdate,
 } from '../lib/logger';
+import { HIP3_DEXES } from '../constants/constants';
 
 const WALLET_DISCONNECTED_KEY = 'hl_wallet_disconnected';
 
@@ -101,26 +103,56 @@ export function WalletProvider({
         logApiCall('delegatorSummary', `user: ${userAddress}`);
         logApiCall('delegatorRewards', `user: ${userAddress}`);
 
-        const [perpState, spotState, openOrders, userFills, userFundings, stakingDelegations, stakingSummary, stakingRewards] =
-          await Promise.all([
+        // Fetch default perp state and HIP-3 dex states
+        const perpStatePromises = [
+          infoClient
+            .clearinghouseState({ user: userAddress as `0x${string}` })
+            .then(state => ({ state, dex: '' }))
+            .catch((err) => {
+              if (!silent) logApiError('clearinghouseState (default)', err);
+              return { state: null, dex: '' };
+            }),
+          ...HIP3_DEXES.map(dex =>
             infoClient
-              .clearinghouseState({ user: userAddress as `0x${string}` })
+              .clearinghouseState({ user: userAddress as `0x${string}`, dex })
+              .then(state => ({ state, dex }))
               .catch((err) => {
-                if (!silent) logApiError('clearinghouseState', err);
-                return null;
-              }),
+                if (!silent) console.error(`[HIP-3] Failed to fetch clearinghouseState for ${dex}:`, err);
+                return { state: null, dex };
+              })
+          )
+        ];
+
+        // Fetch default orders and HIP-3 dex orders
+        const openOrdersPromises = [
+          infoClient
+            .frontendOpenOrders({ user: userAddress as `0x${string}` })
+            .then(orders => ({ orders, dex: '' }))
+            .catch((err) => {
+              if (!silent) logApiError('frontendOpenOrders (default)', err);
+              return { orders: [], dex: '' };
+            }),
+          ...HIP3_DEXES.map(dex =>
+            infoClient
+              .frontendOpenOrders({ user: userAddress as `0x${string}`, dex })
+              .then(orders => ({ orders, dex }))
+              .catch((err) => {
+                if (!silent) console.error(`[HIP-3] Failed to fetch frontendOpenOrders for ${dex}:`, err);
+                return { orders: [], dex };
+              })
+          )
+        ];
+
+        const [perpStatesResults, spotState, openOrdersResults, userFills, userFundings, stakingDelegations, stakingSummary, stakingRewards] =
+          await Promise.all([
+            Promise.all(perpStatePromises),
             infoClient
               .spotClearinghouseState({ user: userAddress as `0x${string}` })
               .catch((err) => {
                 if (!silent) logApiError('spotClearinghouseState', err);
                 return null;
               }),
-            infoClient
-              .frontendOpenOrders({ user: userAddress as `0x${string}` })
-              .catch((err) => {
-                if (!silent) logApiError('frontendOpenOrders', err);
-                return [];
-              }),
+            Promise.all(openOrdersPromises),
             infoClient
               .userFills({ user: userAddress as `0x${string}` })
               .catch((err) => {
@@ -156,10 +188,38 @@ export function WalletProvider({
               }),
           ]);
 
+        // Combine all perp positions from all dexes
+        let allPerpPositions: any[] = [];
+        perpStatesResults.forEach(({ state, dex }) => {
+          if (state?.assetPositions) {
+            const dexPositions = state.assetPositions.map((item: any) => ({ ...item, dex }));
+            allPerpPositions.push(...dexPositions);
+            if (!silent && dex) {
+              console.log(`[HIP-3] ${dex} positions:`, JSON.stringify(dexPositions, null, 2));
+              console.log(`[HIP-3] ${dex} margin summary:`, JSON.stringify(state.marginSummary, null, 2));
+            }
+          }
+        });
+
+        // Combine all orders from all dexes
+        let allOpenOrders: any[] = [];
+        openOrdersResults.forEach(({ orders, dex }) => {
+          if (orders && orders.length > 0) {
+            const dexOrders = orders.map((order: any) => ({ ...order, dex }));
+            allOpenOrders.push(...dexOrders);
+            if (!silent && dex) {
+              console.log(`[HIP-3] ${dex} orders:`, JSON.stringify(dexOrders, null, 2));
+            }
+          }
+        });
+
+        // Get the default perp state for margin summary
+        const defaultPerpState = perpStatesResults.find(r => r.dex === '')?.state;
+
         if (!silent) {
-          logApiResponse('clearinghouseState', perpState?.assetPositions?.length || 0, 'positions');
+          logApiResponse('clearinghouseState', allPerpPositions.length, 'total positions (all dexes)');
           logApiResponse('spotClearinghouseState', spotState?.balances?.length || 0, 'balances');
-          logApiResponse('frontendOpenOrders', openOrders?.length || 0, 'orders');
+          logApiResponse('frontendOpenOrders', allOpenOrders.length, 'total orders (all dexes)');
           logApiResponse('userFills', userFills?.length || 0, 'fills');
           logApiResponse('userFunding', userFundings?.length || 0, 'fundings');
           logApiResponse('delegations', stakingDelegations?.length || 0, 'delegations');
@@ -168,13 +228,15 @@ export function WalletProvider({
         }
 
         // Map perpPositions from API response structure
-        const perpPositions = (perpState?.assetPositions || []).map((item: any) => {
+        const perpPositions = allPerpPositions.map((item: any) => {
           // API returns { type: "oneWay", position: {...} }
           const pos = item.position || item;
+          const dex = item.dex || '';
           
-          // Find TP/SL orders for this position
-          const tpslOrders = (openOrders || []).filter((order: any) => 
+          // Find TP/SL orders for this position (matching both coin and dex)
+          const tpslOrders = allOpenOrders.filter((order: any) => 
             order.coin === pos.coin && 
+            order.dex === dex &&
             (order.orderType?.includes('Take Profit') || order.orderType?.includes('Stop'))
           );
           
@@ -202,6 +264,7 @@ export function WalletProvider({
             slPrice,
             tpOrderId: tpOrder?.oid || null,
             slOrderId: slOrder?.oid || null,
+            dex, // Add dex field to track which dex this position belongs to
           };
         });
 
@@ -220,14 +283,14 @@ export function WalletProvider({
         const accountData: AccountData = {
           perpPositions,
           perpMarginSummary: {
-            accountValue: perpState?.marginSummary?.accountValue,
-            totalMarginUsed: perpState?.marginSummary?.totalMarginUsed,
-            totalNtlPos: perpState?.marginSummary?.totalNtlPos,
-            totalRawUsd: perpState?.marginSummary?.totalRawUsd,
-            withdrawable: perpState?.withdrawable,
+            accountValue: defaultPerpState?.marginSummary?.accountValue,
+            totalMarginUsed: defaultPerpState?.marginSummary?.totalMarginUsed,
+            totalNtlPos: defaultPerpState?.marginSummary?.totalNtlPos,
+            totalRawUsd: defaultPerpState?.marginSummary?.totalRawUsd,
+            withdrawable: defaultPerpState?.withdrawable,
           },
           spotBalances: spotState?.balances || [],
-          openOrders: openOrders || [],
+          openOrders: allOpenOrders, // Use combined orders from all dexes
           userFills: userFills || [],
           userFundings: mappedUserFundings,
           stakingDelegations: stakingDelegations || [],
@@ -299,6 +362,15 @@ export function WalletProvider({
       setConnectedAddress(address);
       await AsyncStorage.removeItem(WALLET_DISCONNECTED_KEY);
       console.log('[WalletContext] Clients set up for:', address);
+
+      // Enable HIP-3 DEX abstraction for trading on builder dexes
+      try {
+        // Use the main client for enabling (session key may not be set up yet)
+        await enableHip3DexAbstraction(mainClient, address, true);
+      } catch (error) {
+        console.warn('[WalletContext] Could not enable HIP-3 DEX abstraction:', error);
+        // Continue even if this fails - user can still trade on default dex
+      }
 
       await fetchAccountData(address);
     },

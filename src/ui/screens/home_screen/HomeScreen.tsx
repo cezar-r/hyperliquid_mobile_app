@@ -11,6 +11,7 @@ import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { formatPrice, formatSize, getDisplayTicker } from '../../../lib/formatting';
 import { getStarredTickers } from '../../../lib/starredTickers';
 import { playNavToChartHaptic } from '../../../lib/haptics';
+import { getPositionContextKey } from '../../../lib/markets';
 import {
   logScreenMount,
   logScreenUnmount,
@@ -494,7 +495,9 @@ export default function HomeScreen(): React.JSX.Element {
 
     return account.data.perpPositions
       .map((position) => {
-        const price = wsState.prices[position.coin];
+        // Get context key (HIP-3 positions use dex:coin format)
+        const contextKey = getPositionContextKey(position.coin, position.dex);
+        const price = wsState.prices[contextKey];
         const marginUsed = position.marginUsed
           ? parseFloat(position.marginUsed)
           : parseFloat(position.positionValue || '0') / (position.leverage?.value || 1);
@@ -504,7 +507,7 @@ export default function HomeScreen(): React.JSX.Element {
           price,
           marginUsed,
           pnl: price ? calculatePositionPnL(position, price) : { pnl: 0, pnlPercent: 0 },
-          assetContext: wsState.assetContexts[position.coin],
+          assetContext: wsState.assetContexts[contextKey],
         };
       })
       .filter((item) => {

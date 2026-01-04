@@ -10,7 +10,7 @@ export const enum Color {
   MAROON = '#812a41',
   PINK = '#f3d3d8',
   ACCENT = '#17453f',
-  BRIGHT_ACCENT = '#6dcabe',
+  BRIGHT_ACCENT = '#6dcabe', // #50d2c1 ? #6dcabe
   DARK_ACCENT = '#03251f',
   GOLD = '#FFD700',
   PURPLE = '#ba41f2',

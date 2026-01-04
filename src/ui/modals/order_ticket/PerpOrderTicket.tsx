@@ -12,6 +12,7 @@ import { formatPrice, formatSize, formatWithCommas } from '../../../lib/formatti
 import { getSkipOpenOrderConfirmations } from '../../../lib/confirmations';
 import { playOrderTicketSelectionChangeHaptic, playSliderChangeHaptic, playOrderSubmitHaptic } from '../../../lib/haptics';
 import { logModalOpen, logModalClose, logUserAction, logApiCall } from '../../../lib/logger';
+import { getMarketContextKey, getAssetIdForMarket, parseMarketKey, findPerpMarketByKey } from '../../../lib/markets';
 import { styles } from './styles/PerpOrderTicket.styles';
 import { InfoContainer, InfoRow } from '../shared/components/info_container/InfoContainer';
 import {
@@ -43,8 +44,24 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
   const { state: wsState } = useWebSocket();
   const { selectedCoin, prices, perpMarkets } = wsState;
 
-  const coin = selectedCoin || '';
-  const currentPrice = prices[coin];
+  // Parse selectedCoin to handle HIP-3 dex:coin format
+  const { coin: parsedCoin, dex: parsedDex } = useMemo(() => {
+    return selectedCoin ? parseMarketKey(selectedCoin) : { coin: '', dex: undefined };
+  }, [selectedCoin]);
+
+  // Use parsedCoin for display, but selectedCoin (or context key) for lookups
+  const coin = parsedCoin || '';
+
+  // Get current price using correct key for HIP-3 markets
+  const currentPrice = useMemo(() => {
+    if (!coin) return undefined;
+    const market = findPerpMarketByKey(perpMarkets, selectedCoin || '');
+    if (market) {
+      const priceKey = getMarketContextKey(market);
+      return prices[priceKey];
+    }
+    return prices[coin];
+  }, [coin, selectedCoin, perpMarkets, prices]);
 
   // Log modal open/close
   useEffect(() => {
@@ -116,19 +133,33 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
 
   // Get asset info for the coin
   const assetInfo = useMemo(() => {
-    const market = perpMarkets.find(m => m.name === coin);
-    
-    console.log('[PerpOrderTicket] Asset Info - Coin:', coin, 'Market found:', !!market);
+    // Find market using the full selectedCoin key (handles dex:coin format)
+    const market = findPerpMarketByKey(perpMarkets, selectedCoin || '');
+
+    console.log('[PerpOrderTicket] Asset Info - SelectedCoin:', selectedCoin, 'ParsedCoin:', coin, 'ParsedDex:', parsedDex, 'Market found:', !!market);
     if (market) {
-      console.log('[PerpOrderTicket] Asset Index:', market.index, 'Max Leverage:', market.maxLeverage, 'Size Decimals:', market.szDecimals);
+      // Use getAssetIdForMarket to get the correct asset ID (handles HIP-3 formula)
+      const assetId = getAssetIdForMarket(market);
+      console.log('[PerpOrderTicket] Asset ID:', assetId, 'Dex:', market.dex || 'default', 'Meta Index:', market.index, 'Max Leverage:', market.maxLeverage, 'Size Decimals:', market.szDecimals);
+
+      return {
+        index: assetId, // This is now the correct asset ID for order placement
+        maxLeverage: market.maxLeverage ?? 5,
+        szDecimals: market.szDecimals ?? 4,
+        dex: market.dex || '',
+        market: market, // Keep reference to full market for later use
+      };
     }
-    
+
+    console.warn('[PerpOrderTicket] Market not found for coin:', coin, 'selectedCoin:', selectedCoin);
     return {
-      index: market?.index ?? 0,
-      maxLeverage: market?.maxLeverage ?? 5,
-      szDecimals: market?.szDecimals ?? 4,
+      index: 0,
+      maxLeverage: 5,
+      szDecimals: 4,
+      dex: '',
+      market: null,
     };
-  }, [coin, perpMarkets]);
+  }, [coin, selectedCoin, parsedDex, perpMarkets]);
 
   // Set default side when modal opens
   useEffect(() => {
@@ -280,6 +311,13 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
       setError('Please enter price and margin amount');
       return;
     }
+
+    // Check if market has a valid index (HIP-3 markets may have -1 if not loaded from meta)
+    if (assetInfo.market && assetInfo.market.index < 0) {
+      setError(`Market ${coin} is not available for trading yet. Please try again later.`);
+      console.error(`[PerpOrderTicket] Cannot trade market with invalid index: ${coin}, dex: ${assetInfo.dex}`);
+      return;
+    }
     
     const sizeValue = orderStats.size;
     if (isNaN(sizeValue) || sizeValue <= 0) {
@@ -332,11 +370,19 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
     setShowConfirmation(false);
 
     try {
-      console.log('[PerpOrderTicket] Updating leverage - Asset:', assetInfo.index, 'Leverage:', leverage, 'Is Cross:', marginType === 'cross');
-      
+      // HIP-3 markets are isolated-only, force isolated margin
+      const isHip3 = assetInfo.dex && assetInfo.dex !== '';
+      const effectiveMarginType = isHip3 ? 'isolated' : marginType;
+
+      if (isHip3 && marginType === 'cross') {
+        console.log('[PerpOrderTicket] HIP-3 market detected, forcing isolated margin');
+      }
+
+      console.log('[PerpOrderTicket] Updating leverage - Asset:', assetInfo.index, 'Leverage:', leverage, 'Is Cross:', effectiveMarginType === 'cross', 'Dex:', assetInfo.dex || 'default');
+
       await exchangeClient.updateLeverage({
         asset: assetInfo.index,
-        isCross: marginType === 'cross',
+        isCross: effectiveMarginType === 'cross',
         leverage,
       });
       console.log('[PerpOrderTicket] ✓ Leverage updated');
@@ -353,9 +399,21 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
 
       const finalTif = orderType === 'market' ? 'Ioc' : tif;
 
-      const orderPayload = {
+      // Log order context
+      console.log('[PerpOrderTicket] Order context:', {
+        coin,
+        dex: assetInfo.dex || 'default',
+        assetId: assetInfo.index,
+        metaIndex: assetInfo.market?.index,
+        side,
+        orderType,
+        price: formattedPrice,
+        size: formattedSize,
+      });
+
+      const orderPayload: any = {
         orders: [{
-          a: assetInfo.index,
+          a: assetInfo.index, // Now contains the correct HIP-3 asset ID if applicable
           b: side === 'buy',
           p: formattedPrice,
           s: formattedSize,
@@ -367,7 +425,7 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
         grouping: 'na' as const,
       };
 
-      logApiCall('order (perp)', `${side} ${orderType} - ${coin}`);
+      logApiCall('order (perp)', `${side} ${orderType} - ${coin} (dex: ${assetInfo.dex || 'default'})`);
       logUserAction('PerpOrderTicket', 'Submit order', `${side} ${orderType} ${coin}`);
 
       const result = await exchangeClient.order(orderPayload);

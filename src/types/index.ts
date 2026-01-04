@@ -32,6 +32,7 @@ export interface PerpPosition {
   slPrice?: number | null;
   tpOrderId?: number | null;
   slOrderId?: number | null;
+  dex?: string; // Track which dex this position belongs to
 }
 
 export interface SpotBalance {
@@ -77,6 +78,7 @@ export interface OpenOrder {
   origSz: string;
   triggerPx?: string;
   orderType?: string;
+  dex?: string; // Track which dex this order belongs to
 }
 
 export interface StakingSummary {
@@ -129,6 +131,7 @@ export interface PerpMarket {
   szDecimals: number;
   maxLeverage: number;
   onlyIsolated?: boolean;
+  dex: string; // '' for default Hyperliquid perp dex, 'xyz'/'vntl' for HIP-3 dexes
 }
 
 export interface SpotMarket {

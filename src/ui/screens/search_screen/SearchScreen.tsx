@@ -10,6 +10,7 @@ import type { PerpMarket, SpotMarket } from '../../../types';
 import { getStarredTickers } from '../../../lib/starredTickers';
 import { getDisplayTicker } from '../../../lib/formatting';
 import { playToggleHaptic, playNavToChartHaptic } from '../../../lib/haptics';
+import { getMarketContextKey, getPositionContextKey } from '../../../lib/markets';
 import {
   logScreenMount,
   logScreenUnmount,
@@ -80,25 +81,34 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
   const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [starredTickers, setStarredTickers] = useState<string[]>([]);
 
+  // HIP-3 filter state (only applies to perp)
+  const [showHip3Only, setShowHip3Only] = useState(false);
+
   // For swipe animation
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   // Defer rendering was removed to avoid initial flicker on first tab visit
 
-  // Load star filter preference from AsyncStorage on mount
+  // Load filter preferences from AsyncStorage on mount
   React.useEffect(() => {
-    const loadStarFilterPreference = async () => {
+    const loadFilterPreferences = async () => {
       try {
-        const starFilter = await AsyncStorage.getItem('search_star_filter');
+        const [starFilter, hip3Filter] = await Promise.all([
+          AsyncStorage.getItem('search_star_filter'),
+          AsyncStorage.getItem('search_hip3_filter'),
+        ]);
         if (starFilter !== null) {
           setShowStarredOnly(starFilter === 'true');
         }
+        if (hip3Filter !== null) {
+          setShowHip3Only(hip3Filter === 'true');
+        }
       } catch (error) {
-        console.error('[SearchScreen] Failed to load star filter preference:', error);
+        console.error('[SearchScreen] Failed to load filter preferences:', error);
       }
     };
 
-    loadStarFilterPreference();
+    loadFilterPreferences();
   }, []);
 
   // Restore sort preferences when market type changes
@@ -116,6 +126,7 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
   useFocusEffect(
     useCallback(() => {
       logScreenFocus('SearchScreen');
+      
       const loadStarredTickers = async () => {
         const starred = await getStarredTickers(wsState.marketType);
         setStarredTickers(starred);
@@ -184,7 +195,23 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
     let filtered: (PerpMarket | SpotMarket)[] = currentMarkets;
     if (searchQuery.trim()) {
       const lower = searchQuery.toLowerCase();
-      filtered = currentMarkets.filter((m) => m.name.toLowerCase().startsWith(lower));
+      filtered = currentMarkets.filter((m) => {
+        // Support searching by ticker name (e.g., "SPACEX")
+        if (m.name.toLowerCase().startsWith(lower)) {
+          return true;
+        }
+        // For HIP-3 perps, also support searching by prefixed format (e.g., "vntl:SPACEX")
+        if (wsState.marketType === 'perp') {
+          const perpMarket = m as PerpMarket;
+          if (perpMarket.dex) {
+            const prefixedName = `${perpMarket.dex}:${perpMarket.name}`.toLowerCase();
+            if (prefixedName.startsWith(lower)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      });
     }
 
     // Filter out spot tickers with 0 volume
@@ -196,6 +223,23 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
       });
     }
 
+    // Filter by HIP-3 toggle (only applies to perp)
+    if (wsState.marketType === 'perp') {
+      if (showHip3Only) {
+        // Show only HIP-3 markets
+        filtered = filtered.filter((m) => {
+          const perpMarket = m as PerpMarket;
+          return !!perpMarket.dex;
+        });
+      } else {
+        // Default: hide HIP-3 markets
+        filtered = filtered.filter((m) => {
+          const perpMarket = m as PerpMarket;
+          return !perpMarket.dex;
+        });
+      }
+    }
+
     // Filter by starred tickers if active
     if (showStarredOnly) {
       filtered = filtered.filter((m) => starredTickers.includes(m.name));
@@ -203,8 +247,17 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
 
     // Sort the filtered results
     const sorted = [...filtered].sort((a, b) => {
-      const aCtx = wsState.assetContexts[a.name];
-      const bCtx = wsState.assetContexts[b.name];
+      // Use correct context keys for HIP-3 dexes
+      const aContextKey = wsState.marketType === 'perp' 
+        ? getMarketContextKey(a as PerpMarket)
+        : a.name;
+      const bContextKey = wsState.marketType === 'perp'
+        ? getMarketContextKey(b as PerpMarket)
+        : b.name;
+      
+      const aCtx = wsState.assetContexts[aContextKey];
+      const bCtx = wsState.assetContexts[bContextKey];
+      
       let comparison = 0;
 
       switch (currentSort) {
@@ -219,15 +272,23 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
           }
           break;
         case SortType.CHANGE:
+          // Get correct price keys for HIP-3 dexes
+          const aPriceKey = wsState.marketType === 'perp'
+            ? getMarketContextKey(a as PerpMarket)
+            : a.name;
+          const bPriceKey = wsState.marketType === 'perp'
+            ? getMarketContextKey(b as PerpMarket)
+            : b.name;
+          
           // Get current prices based on market type
           const aCurrentPrice =
             wsState.marketType === 'spot'
               ? parseFloat(wsState.prices[a.name] || '0')
-              : aCtx?.markPx || 0;
+              : aCtx?.markPx || parseFloat(wsState.prices[aPriceKey] || '0');
           const bCurrentPrice =
             wsState.marketType === 'spot'
               ? parseFloat(wsState.prices[b.name] || '0')
-              : bCtx?.markPx || 0;
+              : bCtx?.markPx || parseFloat(wsState.prices[bPriceKey] || '0');
 
           const aPrevPrice = aCtx?.prevDayPx || 0;
           const bPrevPrice = bCtx?.prevDayPx || 0;
@@ -245,28 +306,44 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
           comparison = aFunding - bFunding;
           break;
         case SortType.OPEN_INTEREST:
+          // Get correct price keys for HIP-3 dexes
+          const aOIPriceKey = wsState.marketType === 'perp'
+            ? getMarketContextKey(a as PerpMarket)
+            : a.name;
+          const bOIPriceKey = wsState.marketType === 'perp'
+            ? getMarketContextKey(b as PerpMarket)
+            : b.name;
+          
           // Open interest is in tokens, multiply by price for USD value
           const aOIPx =
             wsState.marketType === 'spot'
               ? parseFloat(wsState.prices[a.name] || '0')
-              : aCtx?.markPx || 0;
+              : aCtx?.markPx || parseFloat(wsState.prices[aOIPriceKey] || '0');
           const bOIPx =
             wsState.marketType === 'spot'
               ? parseFloat(wsState.prices[b.name] || '0')
-              : bCtx?.markPx || 0;
+              : bCtx?.markPx || parseFloat(wsState.prices[bOIPriceKey] || '0');
           const aOI = (aCtx?.openInterest || 0) * aOIPx;
           const bOI = (bCtx?.openInterest || 0) * bOIPx;
           comparison = aOI - bOI;
           break;
         case SortType.MARKET_CAP:
+          // Get correct price keys for HIP-3 dexes
+          const aMCPriceKey = wsState.marketType === 'perp'
+            ? getMarketContextKey(a as PerpMarket)
+            : a.name;
+          const bMCPriceKey = wsState.marketType === 'perp'
+            ? getMarketContextKey(b as PerpMarket)
+            : b.name;
+          
           const aMCPx =
             wsState.marketType === 'spot'
               ? parseFloat(wsState.prices[a.name] || '0')
-              : aCtx?.markPx || 0;
+              : aCtx?.markPx || parseFloat(wsState.prices[aMCPriceKey] || '0');
           const bMCPx =
             wsState.marketType === 'spot'
               ? parseFloat(wsState.prices[b.name] || '0')
-              : bCtx?.markPx || 0;
+              : bCtx?.markPx || parseFloat(wsState.prices[bMCPriceKey] || '0');
           const aMC = aCtx?.circulatingSupply ? aCtx.circulatingSupply * aMCPx : 0;
           const bMC = bCtx?.circulatingSupply ? bCtx.circulatingSupply * bMCPx : 0;
           comparison = aMC - bMC;
@@ -287,6 +364,7 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
     isAscending,
     showStarredOnly,
     starredTickers,
+    showHip3Only,
   ]);
 
   // Log rendering (must come after getSortedAndFilteredMarkets is defined)
@@ -366,6 +444,16 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
     });
   }, [showStarredOnly]);
 
+  const handleHip3FilterToggle = useCallback(() => {
+    const newState = !showHip3Only;
+    setShowHip3Only(newState);
+
+    // Persist to AsyncStorage
+    AsyncStorage.setItem('search_hip3_filter', String(newState)).catch((error) => {
+      console.error('[SearchScreen] Failed to save HIP-3 filter preference:', error);
+    });
+  }, [showHip3Only]);
+
   const handleClearSearch = useCallback(() => {
     setSearchQuery('');
   }, []);
@@ -374,14 +462,18 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
 
   const getSortValue = useCallback(
     (item: PerpMarket | SpotMarket) => {
-      const ctx = wsState.assetContexts[item.name];
+      // Get correct context key for HIP-3 dexes
+      const contextKey = wsState.marketType === 'perp' 
+        ? getMarketContextKey(item as PerpMarket)
+        : item.name;
+      const ctx = wsState.assetContexts[contextKey];
 
       // Get price based on market type
       let price = 0;
       if (wsState.marketType === 'spot') {
         price = parseFloat(wsState.prices[item.name] || '0');
       } else {
-        price = ctx?.markPx || 0;
+        price = ctx?.markPx || parseFloat(wsState.prices[contextKey] || '0');
       }
 
       const prevPrice = ctx?.prevDayPx || 0;
@@ -414,7 +506,11 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
 
   const getSortValueColor = useCallback(
     (item: PerpMarket | SpotMarket) => {
-      const ctx = wsState.assetContexts[item.name];
+      // Get context key (HIP-3 dexes use dex:coin format)
+      const contextKey = wsState.marketType === 'perp' 
+        ? getMarketContextKey(item as PerpMarket)
+        : item.name;
+      const ctx = wsState.assetContexts[contextKey];
       const price = ctx?.markPx || 0;
       const prevPrice = ctx?.prevDayPx || 0;
       const pctChange = prevPrice ? (price - prevPrice) / prevPrice : 0;
@@ -430,19 +526,23 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
           return pctChange >= 0 ? Color.BRIGHT_ACCENT : Color.RED;
       }
     },
-    [wsState.assetContexts, currentSort]
+    [wsState.assetContexts, wsState.marketType, currentSort]
   );
 
   const get24hChangeColor = useCallback(
     (item: PerpMarket | SpotMarket) => {
-      const ctx = wsState.assetContexts[item.name];
+      // Get context key (HIP-3 dexes use dex:coin format)
+      const contextKey = wsState.marketType === 'perp' 
+        ? getMarketContextKey(item as PerpMarket)
+        : item.name;
+      const ctx = wsState.assetContexts[contextKey];
 
       // Get price based on market type
       let price = 0;
       if (wsState.marketType === 'spot') {
         price = parseFloat(wsState.prices[item.name] || '0');
       } else {
-        price = ctx?.markPx || 0;
+        price = ctx?.markPx || parseFloat(wsState.prices[contextKey] || '0');
       }
 
       const prevPrice = ctx?.prevDayPx || 0;
@@ -454,14 +554,18 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
 
   const get24hChangeValue = useCallback(
     (item: PerpMarket | SpotMarket) => {
-      const ctx = wsState.assetContexts[item.name];
+      // Get correct context key for HIP-3 dexes
+      const contextKey = wsState.marketType === 'perp' 
+        ? getMarketContextKey(item as PerpMarket)
+        : item.name;
+      const ctx = wsState.assetContexts[contextKey];
 
       // Get price based on market type
       let price = 0;
       if (wsState.marketType === 'spot') {
         price = parseFloat(wsState.prices[item.name] || '0');
       } else {
-        price = ctx?.markPx || 0;
+        price = ctx?.markPx || parseFloat(wsState.prices[contextKey] || '0');
       }
 
       const prevPrice = ctx?.prevDayPx || 0;
@@ -473,14 +577,20 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
 
   const renderItem = useCallback(
     ({ item }: { item: PerpMarket | SpotMarket }) => {
-      const ctx = wsState.assetContexts[item.name];
+      // Get context key (HIP-3 dexes use dex:coin format)
+      const contextKey = wsState.marketType === 'perp'
+        ? getMarketContextKey(item as PerpMarket)
+        : item.name;
+      const ctx = wsState.assetContexts[contextKey];
 
       // Get price - for spot, use prices map, for perp use markPx
       let price = 0;
       if (wsState.marketType === 'spot') {
         price = parseFloat(wsState.prices[item.name] || '0');
       } else {
-        price = ctx?.markPx || 0;
+        // For perps, use context key for price lookup too
+        const priceKey = contextKey;
+        price = ctx?.markPx || parseFloat(wsState.prices[priceKey] || '0');
       }
 
       // Check if we should show metric under ticker (for volume, funding, OI, market cap)
@@ -490,12 +600,18 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
         currentSort === SortType.OPEN_INTEREST ||
         currentSort === SortType.MARKET_CAP;
 
-      const displayName = wsState.marketType === 'spot' 
+      const displayName = wsState.marketType === 'spot'
         ? getDisplayTicker(item.name)
         : item.name;
-      const leverage = wsState.marketType === 'perp' 
-        ? (item as PerpMarket).maxLeverage 
+      const leverage = wsState.marketType === 'perp'
+        ? (item as PerpMarket).maxLeverage
         : undefined;
+      const dex = wsState.marketType === 'perp'
+        ? (item as PerpMarket).dex
+        : undefined;
+
+      // For HIP-3 markets, use dex:coin format to preserve dex context
+      const marketKey = dex ? `${dex}:${item.name}` : item.name;
 
       return (
         <MarketCell
@@ -508,10 +624,11 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
           }
           priceChangeColor={get24hChangeColor(item)}
           leverage={leverage}
+          dex={dex} // Pass dex for HIP-3 badge display
           metricValue={showMetricUnderTicker ? getSortValue(item) : undefined}
           metricColor={getSortValueColor(item)}
           showMetricBelow={showMetricUnderTicker}
-          onPress={() => handleMarketSelect(item.name)}
+          onPress={() => handleMarketSelect(marketKey)}
         />
       );
     },
@@ -581,8 +698,11 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
               currentSort={currentSort}
               isAscending={isAscending}
               showStarredOnly={showStarredOnly}
+              showHip3Only={showHip3Only}
+              showHip3Toggle={wsState.marketType === 'perp'}
               onSortPress={handleSortPress}
               onStarFilterToggle={handleStarFilterToggle}
+              onHip3FilterToggle={handleHip3FilterToggle}
             />
 
             {/* Market List */}

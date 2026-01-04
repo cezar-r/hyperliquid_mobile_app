@@ -1,9 +1,11 @@
 import React from 'react';
-import { View, ScrollView, TouchableOpacity, Text } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Text, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Color } from '../../../shared/styles';
 import { styles } from '../styles/SortButtons.styles';
 import { playOptionSelectionHaptic } from '../../../../lib/haptics';
+
+const HyperliquidBlob = require('../../../../../assets/blob-dark.gif');
 
 export enum SortType {
   ALPHABETICAL = 'A-Z',
@@ -20,8 +22,11 @@ interface SortButtonsProps {
   currentSort: SortType;
   isAscending: boolean;
   showStarredOnly: boolean;
+  showHip3Only: boolean;
+  showHip3Toggle: boolean;
   onSortPress: (sortType: SortType) => void;
   onStarFilterToggle: () => void;
+  onHip3FilterToggle: () => void;
 }
 
 export default function SortButtons({
@@ -29,8 +34,11 @@ export default function SortButtons({
   currentSort,
   isAscending,
   showStarredOnly,
+  showHip3Only,
+  showHip3Toggle,
   onSortPress,
   onStarFilterToggle,
+  onHip3FilterToggle,
 }: SortButtonsProps): React.JSX.Element {
   return (
     <View style={styles.sortHeaderContainer}>
@@ -49,6 +57,27 @@ export default function SortButtons({
             color={showStarredOnly ? Color.GOLD : Color.FG_3}
           />
         </TouchableOpacity>
+        {showHip3Toggle && (
+          <TouchableOpacity
+            style={[
+              styles.sortButton,
+              {
+                backgroundColor: showHip3Only ? Color.BRIGHT_ACCENT : 'rgba(255, 255, 255, 0.4)',
+                borderRadius: 8,
+              }
+            ]}
+            onPress={() => {
+              playOptionSelectionHaptic();
+              onHip3FilterToggle();
+            }}
+          >
+            <Image
+              source={HyperliquidBlob}
+              style={{ width: 16, height: 16, opacity: showHip3Only ? 1 : 0.5 }}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        )}
         {sortOptions.map((sortType) => (
           <TouchableOpacity
             key={sortType}
