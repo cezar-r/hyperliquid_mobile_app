@@ -106,6 +106,29 @@
             candleSeries = chart.addCandlestickSeries({
               upColor: '#26a69a', downColor: '#ffffff', borderVisible: false,
               wickUpColor: '#26a69a', wickDownColor: '#ffffff',
+              priceFormat: {
+                type: 'custom',
+                formatter: (price) => {
+                  if (price === 0) return '0';
+                  const absPrice = Math.abs(price);
+                  let decimals;
+                  if (absPrice < 0.0001) {
+                    decimals = 8;
+                  } else if (absPrice < 0.001) {
+                    decimals = 7;
+                  } else if (absPrice < 0.01) {
+                    decimals = 6;
+                  } else if (absPrice < 0.1) {
+                    decimals = 5;
+                  } else if (absPrice < 1) {
+                    decimals = 4;
+                  } else {
+                    decimals = 2;
+                  }
+                  return price.toFixed(decimals);
+                },
+                minMove: 0.00000001,
+              },
             });
             
             // Subscribe to visible range changes to update markers dynamically

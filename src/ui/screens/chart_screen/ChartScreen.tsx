@@ -12,6 +12,7 @@ import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/nativ
 import { LWCandle, ChartMarker, ChartPriceLine, LightweightChartBridgeRef } from '../../chart/LightweightChartBridge';
 import { TPSLEditModal, ClosePositionModal, PerpOrderTicket, SpotOrderTicket } from '../../modals';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
+import { useWebSocketStore } from '../../../stores/websocketStore';
 import { useWallet } from '../../../contexts/WalletContext';
 import { resolveSubscriptionCoin, getMarketContextKey, parseMarketKey, findPerpMarketByKey } from '../../../lib/markets';
 import { generateTickSizeOptions, calculateMantissa, calculateNSigFigs } from '../../../lib/tickSize';
@@ -148,15 +149,29 @@ export default function ChartScreen(): React.JSX.Element {
             console.log(`[ChartScreen] Loaded last visited ticker: ${ticker} (${market})`);
           }
         } else {
-          // Default to BTC perp if no saved ticker
-          setMarketType('perp');
-          selectCoin('BTC');
+          // Check if Zustand state already has a selected coin (set by HomeScreen before navigation)
+          const currentState = useWebSocketStore.getState();
+          if (currentState.selectedCoin) {
+            // Coin already set in state from navigation - don't override it
+            console.log(`[ChartScreen] Using coin from state: ${currentState.selectedCoin}`);
+          } else {
+            // Default to BTC perp only if nothing is selected
+            setMarketType('perp');
+            selectCoin('BTC');
+          }
         }
       } catch (error) {
         console.error('[ChartScreen] Failed to load last visited ticker:', error);
-        // Default to BTC perp on error
-        setMarketType('perp');
-        selectCoin('BTC');
+        // Check if Zustand state already has a selected coin (set by HomeScreen before navigation)
+        const currentState = useWebSocketStore.getState();
+        if (currentState.selectedCoin) {
+          // Coin already set in state from navigation - don't override it
+          console.log(`[ChartScreen] Using coin from state: ${currentState.selectedCoin}`);
+        } else {
+          // Default to BTC perp only if nothing is selected
+          setMarketType('perp');
+          selectCoin('BTC');
+        }
       }
     };
 
