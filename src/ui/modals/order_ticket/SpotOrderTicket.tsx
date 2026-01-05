@@ -136,19 +136,23 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
     }
   }, [visible]);
 
-  // Load side preference
+  // Load side preference and reset sliders
   useEffect(() => {
-    const loadSidePreference = async () => {
+    const loadPreferences = async () => {
       try {
         const savedSide = await AsyncStorage.getItem('hl_order_side');
         if (savedSide && !defaultSide) setSide(savedSide as OrderSide);
+
+        // Always reset sliders to 0 when opening
+        setSizePercent(0);
+        setSize('');
       } catch (err) {
-        console.error('[SpotOrderTicket] Failed to load side:', err);
+        console.error('[SpotOrderTicket] Failed to load preferences:', err);
       }
     };
-    
+
     if (visible && coin) {
-      loadSidePreference();
+      loadPreferences();
     }
   }, [visible, coin, defaultSide]);
 

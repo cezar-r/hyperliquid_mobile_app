@@ -13,15 +13,15 @@ export const styles = StyleSheet.create({
     borderColor: Color.BG_3,
   },
   buttonActive: {
-    backgroundColor: Color.ACCENT,
+    backgroundColor: Color.BRIGHT_ACCENT,
     borderColor: Color.BRIGHT_ACCENT,
   },
   buttonBuyActive: {
-    backgroundColor: Color.ACCENT,
+    backgroundColor: Color.BRIGHT_ACCENT,
     borderColor: Color.BRIGHT_ACCENT,
   },
   buttonSellActive: {
-    backgroundColor: Color.DARK_RED,
+    backgroundColor: Color.RED,
     borderColor: Color.RED,
   },
   buttonText: {
@@ -30,15 +30,15 @@ export const styles = StyleSheet.create({
     color: Color.FG_3,
   },
   buttonTextActive: {
-    color: Color.BRIGHT_ACCENT,
+    color: Color.FG_2,
     fontWeight: '600',
   },
   buttonTextBuy: {
-    color: Color.BRIGHT_ACCENT,
+    color: Color.FG_2,
     fontWeight: '600',
   },
   buttonTextSell: {
-    color: Color.RED,
+    color: Color.FG_2,
     fontWeight: '600',
   },
 });

@@ -9,12 +9,14 @@ const SHOW_TRADES_KEY = '@show_trades_on_chart';
 const SKIP_OPEN_ORDER_CONFIRMATIONS_KEY = '@skip_open_order_confirmations';
 const SKIP_CLOSE_POSITION_CONFIRMATIONS_KEY = '@skip_close_position_confirmations';
 const HIDE_SMALL_BALANCES_KEY = '@hide_small_balances';
+const SHOW_STAKING_BALANCES_KEY = '@show_staking_balances';
 
 export default function SettingsContainer(): React.JSX.Element {
   const [showTradesOnChart, setShowTradesOnChart] = useState(false);
   const [skipOpenOrderConfirmations, setSkipOpenOrderConfirmations] = useState(false);
   const [skipClosePositionConfirmations, setSkipClosePositionConfirmations] = useState(false);
   const [hideSmallBalances, setHideSmallBalances] = useState(false);
+  const [showStakingBalances, setShowStakingBalances] = useState(true);
 
   // Load preferences on mount
   useEffect(() => {
@@ -38,6 +40,11 @@ export default function SettingsContainer(): React.JSX.Element {
         const hideSmallBalancesValue = await AsyncStorage.getItem(HIDE_SMALL_BALANCES_KEY);
         if (hideSmallBalancesValue !== null) {
           setHideSmallBalances(hideSmallBalancesValue === 'true');
+        }
+
+        const showStakingValue = await AsyncStorage.getItem(SHOW_STAKING_BALANCES_KEY);
+        if (showStakingValue !== null) {
+          setShowStakingBalances(showStakingValue === 'true');
         }
       } catch (error) {
         console.error('Failed to load preferences:', error);
@@ -83,6 +90,15 @@ export default function SettingsContainer(): React.JSX.Element {
     }
   };
 
+  const handleToggleShowStakingBalances = async (value: boolean) => {
+    setShowStakingBalances(value);
+    try {
+      await AsyncStorage.setItem(SHOW_STAKING_BALANCES_KEY, value.toString());
+    } catch (error) {
+      console.error('Failed to save show staking balances preference:', error);
+    }
+  };
+
   return (
     <View>
       <AutoApproveRow />
@@ -105,6 +121,11 @@ export default function SettingsContainer(): React.JSX.Element {
         label="Hide Small Balances"
         value={hideSmallBalances}
         onToggle={handleToggleHideSmallBalances}
+      />
+      <SettingsRow
+        label="Show Staking Balances"
+        value={showStakingBalances}
+        onToggle={handleToggleShowStakingBalances}
       />
       <ClearCacheRow />
     </View>

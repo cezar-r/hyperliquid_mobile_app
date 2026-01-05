@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput } from 'react-native';
-import SliderComponent from '@react-native-community/slider';
+import { CustomSlider } from '../../../../shared/components/custom_slider';
 import { styles } from './styles/SizeContainer.styles';
 import Color from '../../../../shared/styles/colors';
 import { formatWithCommas } from '../../../../../lib/formatting';
@@ -45,19 +45,17 @@ export const SizeContainer: React.FC<SizeContainerProps> = ({
         keyboardType="decimal-pad"
         keyboardAppearance="dark"
       />
-      <SliderComponent
-        style={styles.slider}
-        minimumValue={0}
-        maximumValue={100}
-        step={5}
+      <CustomSlider
         value={sizePercent}
         onValueChange={(value) => {
           if (onSliderChange) onSliderChange();
           onSizePercentChange(value);
         }}
-        minimumTrackTintColor={Color.BRIGHT_ACCENT}
-        maximumTrackTintColor={Color.BG_3}
-        thumbTintColor={Color.BRIGHT_ACCENT}
+        minimumValue={0}
+        maximumValue={100}
+        step={5}
+        showDots={true}
+        dotPositions={[0, 25, 50, 75, 100]}
       />
       <View style={styles.sliderLabels}>
         <Text style={styles.sliderLabelText}>0%</Text>

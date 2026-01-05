@@ -3,7 +3,7 @@
  * Interface for placing perp limit and market orders
  */
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Modal, ScrollView, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWallet } from '../../../contexts/WalletContext';
@@ -207,29 +207,29 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
     }
   }, [visible]);
 
-  // Load other preferences
+  // Load other preferences and reset sliders
   useEffect(() => {
     const loadPreferences = async () => {
       try {
         const savedSide = await AsyncStorage.getItem('hl_order_side');
         const savedMarginType = await AsyncStorage.getItem('hl_order_margin_type');
-        const savedLeverage = await AsyncStorage.getItem(`hl_order_leverage_${coin}`);
-        
+
         if (savedSide && !defaultSide) setSide(savedSide as OrderSide);
         if (savedMarginType) setMarginType(savedMarginType as 'cross' | 'isolated');
-        if (savedLeverage) {
-          const lev = parseInt(savedLeverage, 10);
-          setLeverage(Math.min(lev, assetInfo.maxLeverage));
-        }
+
+        // Always reset sliders to 0 when opening
+        setSizePercent(0);
+        setMarginRequired(0);
+        setLeverage(1);
       } catch (err) {
         console.error('[PerpOrderTicket] Failed to load preferences:', err);
       }
     };
-    
+
     if (visible && coin) {
       loadPreferences();
     }
-  }, [visible, coin, assetInfo.maxLeverage, defaultSide]);
+  }, [visible, coin, defaultSide]);
 
   // Save preferences
   useEffect(() => {
@@ -249,26 +249,6 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
       AsyncStorage.setItem('hl_order_margin_type', marginType);
     }
   }, [marginType, visible]);
-
-  // Save per-ticker leverage
-  const isRestoringRef = useRef(false);
-  const prevCoinRef = useRef(coin);
-  
-  useEffect(() => {
-    if (prevCoinRef.current !== coin) {
-      isRestoringRef.current = true;
-      prevCoinRef.current = coin;
-      setTimeout(() => {
-        isRestoringRef.current = false;
-      }, 0);
-    }
-  }, [coin]);
-  
-  useEffect(() => {
-    if (visible && !isRestoringRef.current) {
-      AsyncStorage.setItem(`hl_order_leverage_${coin}`, leverage.toString());
-    }
-  }, [leverage, coin, visible]);
 
   // Reset when coin changes
   useEffect(() => {

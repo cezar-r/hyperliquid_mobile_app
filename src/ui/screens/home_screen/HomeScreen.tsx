@@ -39,6 +39,7 @@ type MarketFilter = 'Perp' | 'Spot' | 'Account';
 
 const MARKET_FILTER_KEY = 'hl_home_market_filter';
 const HIDE_SMALL_BALANCES_KEY = '@hide_small_balances';
+const SHOW_STAKING_BALANCES_KEY = '@show_staking_balances';
 
 // Helper to calculate PnL for a position
 function calculatePositionPnL(
@@ -68,6 +69,7 @@ export default function HomeScreen(): React.JSX.Element {
   const [marketFilter, setMarketFilter] = useState<MarketFilter>('Account');
   const [depositModalVisible, setDepositModalVisible] = useState(false);
   const [hideSmallBalances, setHideSmallBalances] = useState(false);
+  const [showStakingBalances, setShowStakingBalances] = useState(true);
 
   // For skeleton loading
   const [isReady] = useState(true);
@@ -116,6 +118,11 @@ export default function HomeScreen(): React.JSX.Element {
         if (hideSmallBalancesValue !== null) {
           setHideSmallBalances(hideSmallBalancesValue === 'true');
         }
+
+        const showStakingValue = await AsyncStorage.getItem(SHOW_STAKING_BALANCES_KEY);
+        if (showStakingValue !== null) {
+          setShowStakingBalances(showStakingValue === 'true');
+        }
       } catch (error) {
         console.error('[HomeScreen] Error loading preferences:', error);
       }
@@ -137,6 +144,11 @@ export default function HomeScreen(): React.JSX.Element {
           const hideSmallBalancesValue = await AsyncStorage.getItem(HIDE_SMALL_BALANCES_KEY);
           if (hideSmallBalancesValue !== null) {
             setHideSmallBalances(hideSmallBalancesValue === 'true');
+          }
+
+          const showStakingValue = await AsyncStorage.getItem(SHOW_STAKING_BALANCES_KEY);
+          if (showStakingValue !== null) {
+            setShowStakingBalances(showStakingValue === 'true');
           }
         } catch (error) {
           console.error('[HomeScreen] Error loading starred tickers and preferences:', error);
@@ -975,7 +987,7 @@ export default function HomeScreen(): React.JSX.Element {
                   )}
 
                   {/* Staking Balance */}
-                  {marketFilter === 'Account' && account.data?.stakingDelegations && (
+                  {marketFilter === 'Account' && showStakingBalances && account.data?.stakingDelegations && (
                     <StakingContainer
                       delegations={account.data.stakingDelegations}
                       hypePrice={

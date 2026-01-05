@@ -1,8 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import SliderComponent from '@react-native-community/slider';
+import { CustomSlider } from '../../../../shared/components/custom_slider';
 import { styles } from './styles/LeverageContainer.styles';
-import Color from '../../../../shared/styles/colors';
 
 interface LeverageContainerProps {
   leverage: number;
@@ -23,19 +22,16 @@ export const LeverageContainer: React.FC<LeverageContainerProps> = ({
         <Text style={styles.labelText}>Leverage: {leverage}x</Text>
         <Text style={styles.badge}>Max: {maxLeverage}x</Text>
       </View>
-      <SliderComponent
-        style={styles.slider}
-        minimumValue={1}
-        maximumValue={maxLeverage}
-        step={1}
+      <CustomSlider
         value={Math.min(leverage, maxLeverage)}
         onValueChange={(value) => {
           if (onSliderChange) onSliderChange();
           onLeverageChange(value);
         }}
-        minimumTrackTintColor={Color.BRIGHT_ACCENT}
-        maximumTrackTintColor={Color.BG_3}
-        thumbTintColor={Color.BRIGHT_ACCENT}
+        minimumValue={1}
+        maximumValue={maxLeverage}
+        step={1}
+        showDots={false}
       />
     </View>
   );
