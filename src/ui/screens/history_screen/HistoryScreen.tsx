@@ -9,6 +9,8 @@ import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../../../contexts/WalletContext';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { resolveSpotTicker } from '../../../lib/formatting';
+import { withRetry } from '../../../lib/retry';
+import { isRetryableError, getFinalErrorMessage } from '../../../lib/apiErrors';
 import { logScreenMount, logScreenUnmount, logScreenFocus, logScreenBlur, logRender, logUserAction, logScreenFullyRendered } from '../../../lib/logger';
 import { styles } from './styles/HistoryScreen.styles';
 import type { UserFill, LedgerUpdate } from '../../../types';
@@ -94,16 +96,23 @@ export default function HistoryScreen(): React.JSX.Element {
         // Fetch last 30 days of ledger updates
         const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
 
-        const updates = await infoClient.userNonFundingLedgerUpdates({
-          user: address as `0x${string}`,
-          startTime: thirtyDaysAgo,
-        });
+        const updates = await withRetry(
+          () => infoClient.userNonFundingLedgerUpdates({
+            user: address as `0x${string}`,
+            startTime: thirtyDaysAgo,
+          }),
+          {
+            maxAttempts: 3,
+            baseDelayMs: 1000,
+            shouldRetry: isRetryableError,
+          }
+        );
 
         // Reverse to show newest first
         setLedgerUpdates((updates as LedgerUpdate[]).reverse());
       } catch (err: any) {
         console.error('[HistoryScreen] Failed to fetch ledger history:', err);
-        setLedgerError('Failed to load ledger history');
+        setLedgerError(getFinalErrorMessage(err, false));
       } finally {
         setIsLoadingLedger(false);
       }
@@ -252,7 +261,7 @@ export default function HistoryScreen(): React.JSX.Element {
                           const isSpot =
                             (coin.startsWith('@') && spotApiNameSet.has(coin)) ||
                             (!coin.startsWith('@') && spotBaseTokenSet.has(coin));
-                          return isSpot ? resolveSpotTicker(coin, wsState.spotMarkets) : coin;
+                          return isSpot ? resolveSpotTicker(coin, wsState.spotMarkets) : `${coin}-USDC`;
                         }}
                         style={styles.scrollView}
                         contentContainerStyle={[styles.content, styles.recentTradesContainer]}

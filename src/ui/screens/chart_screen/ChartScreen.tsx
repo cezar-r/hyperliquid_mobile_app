@@ -8,12 +8,13 @@ import {
   InteractionManager,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute, useIsFocused } from '@react-navigation/native';
 import { LWCandle, ChartMarker, ChartPriceLine, LightweightChartBridgeRef } from '../../chart/LightweightChartBridge';
 import { TPSLEditModal, ClosePositionModal, PerpOrderTicket, SpotOrderTicket } from '../../modals';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { useWebSocketStore } from '../../../stores/websocketStore';
 import { useWallet } from '../../../contexts/WalletContext';
+import { useSparklineData } from '../../../contexts/SparklineDataContext';
 import { resolveSubscriptionCoin, getMarketContextKey, parseMarketKey, findPerpMarketByKey } from '../../../lib/markets';
 import { generateTickSizeOptions, calculateMantissa, calculateNSigFigs } from '../../../lib/tickSize';
 import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker, getHip3DisplayName, convertUTCToLocalChartTime } from '../../../lib/formatting';
@@ -104,9 +105,11 @@ function calculateUnrealizedPnL(position: any, currentPrice: number | string): {
 export default function ChartScreen(): React.JSX.Element {
   const navigation = useNavigation();
   const route = useRoute();
+  const isFocused = useIsFocused();
   const { state, infoClient, enterChartMode, exitChartMode, subscribeToCandles, unsubscribeFromCandles, subscribeToOrderbook, unsubscribeFromOrderbook, subscribeToTrades, unsubscribeFromTrades, selectCoin, setMarketType } =
     useWebSocket();
-  const { account, exchangeClient, refetchAccount } = useWallet();
+  const { account, exchangeClient, refetchAccount, pausePolling, resumePolling } = useWallet();
+  const { pauseFetching: pauseSparklineFetching, resumeFetching: resumeSparklineFetching } = useSparklineData();
   const { selectedCoin, marketType, spotMarkets } = state;
 
   // Check if we're on ChartDetail (from Home/Portfolio) or Chart tab
@@ -230,15 +233,20 @@ export default function ChartScreen(): React.JSX.Element {
   }, []);
 
   // Engage Chart Mode subscriptions only while this screen is focused
+  // Also pause sparkline fetching and wallet polling to prioritize chart data
   useFocusEffect(
     React.useCallback(() => {
       logScreenFocus('ChartScreen');
       enterChartMode?.();
+      pauseSparklineFetching();
+      pausePolling(); // Pause wallet polling while on chart
       return () => {
         logScreenBlur('ChartScreen');
         exitChartMode?.();
+        resumeSparklineFetching();
+        resumePolling(); // Resume wallet polling when leaving chart
       };
-    }, [enterChartMode, exitChartMode])
+    }, [enterChartMode, exitChartMode, pauseSparklineFetching, resumeSparklineFetching, pausePolling, resumePolling])
   );
 
   // Parse selectedCoin to handle HIP-3 dex:coin format
@@ -288,16 +296,17 @@ export default function ChartScreen(): React.JSX.Element {
   }, [selectedCoin]);
 
   // Load starred state when coin or market type changes
+  // Use selectedCoin (full key with dex prefix) for HIP-3 support
   useEffect(() => {
-    if (!parsedCoin || !marketType) return;
+    if (!selectedCoin || !marketType) return;
 
     const loadStarredState = async () => {
-      const starred = await isTickerStarred(parsedCoin, marketType);
+      const starred = await isTickerStarred(selectedCoin, marketType);
       setIsStarred(starred);
     };
 
     loadStarredState();
-  }, [parsedCoin, marketType]);
+  }, [selectedCoin, marketType]);
 
   // Load saved interval on mount
   useEffect(() => {
@@ -503,8 +512,10 @@ export default function ChartScreen(): React.JSX.Element {
     currentIntervalRef.current = interval;
   }, [selectedCoin, interval]);
 
+  // Candle and trades subscription - only when focused
+  // Note: mantissa/nSigFigs removed from deps to prevent re-fetching on price updates
   useEffect(() => {
-    if (!selectedCoin || !intervalLoaded || !interval) return;
+    if (!selectedCoin || !intervalLoaded || !interval || !isFocused) return;
 
     // Store the ticker and interval for this subscription
     const subscribedTicker = selectedCoin;
@@ -513,9 +524,8 @@ export default function ChartScreen(): React.JSX.Element {
     fetchHistoricalCandles(selectedCoin, interval);
 
     const handleLiveCandle = (candle: Candle): void => {
-      // ROBUST FILTER: Only process if still subscribed to this ticker/interval
+      // Silently ignore stale candles from previous subscriptions
       if (currentTickerRef.current !== subscribedTicker || currentIntervalRef.current !== subscribedInterval) {
-        console.log(`[ChartScreen] Ignoring stale candle for ${subscribedTicker} @ ${subscribedInterval} (current: ${currentTickerRef.current} @ ${currentIntervalRef.current})`);
         return;
       }
 
@@ -547,37 +557,60 @@ export default function ChartScreen(): React.JSX.Element {
         );
 
         if (existingIndex >= 0) {
+          // Check if values actually changed - avoid unnecessary re-renders
+          const existing = prev[existingIndex];
+          if (existing.open === newCandle.open &&
+              existing.high === newCandle.high &&
+              existing.low === newCandle.low &&
+              existing.close === newCandle.close) {
+            return prev; // No change, return same reference
+          }
           const updated = [...prev];
           updated[existingIndex] = newCandle;
           return updated;
         } else {
-          return [...prev, newCandle].sort((a, b) => a.timestamp - b.timestamp);
+          // New candle - add to end (WebSocket delivers in order)
+          return [...prev, newCandle];
         }
       });
     };
 
     subscribeToCandles(selectedCoin, interval, handleLiveCandle);
-    subscribeToOrderbook(selectedCoin, { mantissa, nSigFigs });
     subscribeToTrades(selectedCoin);
 
     return () => {
       unsubscribeFromCandles();
-      unsubscribeFromOrderbook();
       unsubscribeFromTrades();
     };
   }, [
     selectedCoin,
     interval,
     intervalLoaded,
+    isFocused,
     subscribeToCandles,
     unsubscribeFromCandles,
-    subscribeToOrderbook,
-    unsubscribeFromOrderbook,
     subscribeToTrades,
     unsubscribeFromTrades,
     fetchHistoricalCandles,
+  ]);
+
+  // Orderbook subscription - separate useEffect so mantissa/nSigFigs changes
+  // don't trigger candle re-fetch, only orderbook re-subscription
+  useEffect(() => {
+    if (!selectedCoin || !isFocused) return;
+
+    subscribeToOrderbook(selectedCoin, { mantissa, nSigFigs });
+
+    return () => {
+      unsubscribeFromOrderbook();
+    };
+  }, [
+    selectedCoin,
+    isFocused,
     mantissa,
     nSigFigs,
+    subscribeToOrderbook,
+    unsubscribeFromOrderbook,
   ]);
 
   const handleIntervalChange = (newInterval: CandleInterval): void => {
@@ -589,29 +622,34 @@ export default function ChartScreen(): React.JSX.Element {
     });
   };
 
-  // Log rendering
+  // Memoize orderbook level count to avoid re-renders on every orderbook update
+  const orderbookLevelCount = useMemo(() => {
+    if (!state.orderbook?.levels) return 0;
+    return (state.orderbook.levels[0]?.length || 0) + (state.orderbook.levels[1]?.length || 0);
+  }, [state.orderbook]);
+
+  // Log rendering - uses stable orderbookLevelCount instead of orderbook object reference
   useEffect(() => {
     if (!isLoading && candles.length > 0) {
       logRender('ChartContent', `${candles.length} candles, panel: ${panel}`);
-      if (state.orderbook) {
-        const totalLevels = state.orderbook.levels?.[0]?.length + state.orderbook.levels?.[1]?.length || 0;
-        logRender('OrderBook', `${totalLevels} levels`);
+      if (orderbookLevelCount > 0) {
+        logRender('OrderBook', `${orderbookLevelCount} levels`);
       }
       if (state.recentTrades.length > 0) {
         logRender('RecentTrades', `${state.recentTrades.length} trades`);
       }
       logScreenFullyRendered('ChartScreen');
     }
-  }, [isLoading, candles.length, panel, state.orderbook, state.recentTrades.length]);
+  }, [isLoading, candles.length, panel, orderbookLevelCount, state.recentTrades.length]);
 
-  // Handle star toggle
+  // Handle star toggle - use selectedCoin (full key with dex prefix) for HIP-3 support
   const handleToggleStar = () => {
-    if (!parsedCoin || !marketType) return;
+    if (!selectedCoin || !marketType) return;
 
     const newStarredState = !isStarred;
     setIsStarred(newStarredState);
 
-    toggleStarredTicker(parsedCoin, marketType).catch((error) => {
+    toggleStarredTicker(selectedCoin, marketType).catch((error) => {
       console.error('[ChartScreen] Failed to toggle star:', error);
       setIsStarred(!newStarredState);
     });

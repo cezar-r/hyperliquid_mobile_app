@@ -10,3 +10,5 @@ export { default as TradeCard } from './trade_card/TradeCard';
 export { Slider } from './slider/Slider';
 export { CustomSlider } from './custom_slider';
 export { default as VirtualizedTradesList } from './virtualized_trades_list/VirtualizedTradesList';
+export { Sparkline } from './sparkline';
+export type { SparklineData, SparklinePoint } from './sparkline';

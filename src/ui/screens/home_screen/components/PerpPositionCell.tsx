@@ -2,7 +2,10 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Color } from '../../../shared/styles';
 import { sharedStyles } from '../styles/shared.styles';
+import { positionCellStyles } from '../styles/PositionCell.styles';
 import { getHip3DisplayName } from '../../../../lib/formatting';
+import { Sparkline } from '../../../shared/components';
+import type { SparklineData } from '../../../shared/components';
 import type { PerpPosition } from '../../../../types';
 
 interface PerpPositionCellProps {
@@ -14,6 +17,7 @@ interface PerpPositionCellProps {
     pnlPercent: number;
   };
   assetContext?: any;
+  sparklineData?: SparklineData | null;
   onPress: () => void;
 }
 
@@ -34,12 +38,13 @@ function formatPercent(num: number, decimals: number = 2): string {
   return `${sign}${(num * 100).toFixed(decimals)}%`;
 }
 
-export default function PerpPositionCell({
+function PerpPositionCellComponent({
   position,
   price,
   marginUsed,
   pnl,
   assetContext,
+  sparklineData,
   onPress,
 }: PerpPositionCellProps): React.JSX.Element {
   const positionSize = parseFloat(position.szi);
@@ -59,7 +64,7 @@ export default function PerpPositionCell({
   const displayName = getHip3DisplayName(position.coin, position.dex || '');
 
   return (
-    <View>
+    <View style={positionCellStyles.cellWrapper}>
       <TouchableOpacity style={sharedStyles.positionCell} onPress={onPress}>
         <View style={sharedStyles.leftSide}>
           <View style={sharedStyles.tickerContainer}>
@@ -108,8 +113,19 @@ export default function PerpPositionCell({
           </View>
         </View>
       </TouchableOpacity>
+      {sparklineData && sparklineData.points.length > 0 && (
+        <View style={positionCellStyles.sparklineOverlay} pointerEvents="none">
+          <Sparkline
+            data={sparklineData.points}
+            isPositive={sparklineData.isPositive}
+            fillContainer
+          />
+        </View>
+      )}
       <View style={sharedStyles.separator} />
     </View>
   );
 }
+
+export default React.memo(PerpPositionCellComponent);
 

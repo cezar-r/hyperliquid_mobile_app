@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { View, FlatList, Keyboard, Animated } from 'react-native';
+import { View, FlatList, Keyboard, Animated, ViewToken } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
+import { useSparklineDataOptional } from '../../../contexts/SparklineDataContext';
 import type { PerpMarket, SpotMarket } from '../../../types';
 import { getStarredTickers } from '../../../lib/starredTickers';
 import { getDisplayTicker, getHip3DisplayName } from '../../../lib/formatting';
@@ -56,6 +57,7 @@ interface SearchScreenProps {
 export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {}): React.JSX.Element {
   const navigation = useNavigation<any>();
   const { state: wsState, selectCoin, setMarketType } = useWebSocket();
+  const sparklineContext = useSparklineDataOptional();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentSort, setCurrentSort] = useState<SortType>(SortType.VOLUME);
   const [isAscending, setIsAscending] = useState(false);
@@ -241,8 +243,15 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
     }
 
     // Filter by starred tickers if active
+    // For perp markets, use market key (dex:coin format for HIP-3) to match starred tickers
     if (showStarredOnly) {
-      filtered = filtered.filter((m) => starredTickers.includes(m.name));
+      filtered = filtered.filter((m) => {
+        if (wsState.marketType === 'perp') {
+          const marketKey = getMarketContextKey(m as PerpMarket);
+          return starredTickers.includes(marketKey);
+        }
+        return starredTickers.includes(m.name);
+      });
     }
 
     // Sort the filtered results
@@ -613,6 +622,9 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
       // For HIP-3 markets, use dex:coin format to preserve dex context
       const marketKey = dex ? `${dex}:${item.name}` : item.name;
 
+      // Get sparkline data if available
+      const sparklineData = sparklineContext?.getSparklineData(marketKey, wsState.marketType) ?? null;
+
       return (
         <MarketCell
           displayName={displayName}
@@ -628,6 +640,7 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
           metricValue={showMetricUnderTicker ? getSortValue(item) : undefined}
           metricColor={getSortValueColor(item)}
           showMetricBelow={showMetricUnderTicker}
+          sparklineData={sparklineData}
           onPress={() => handleMarketSelect(marketKey)}
         />
       );
@@ -642,8 +655,40 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
       getSortValueColor,
       get24hChangeColor,
       get24hChangeValue,
+      sparklineContext,
     ]
   );
+
+  // Viewability config for sparkline prefetching
+  const viewabilityConfig = useRef({
+    viewAreaCoveragePercentThreshold: 30,
+    minimumViewTime: 150,
+  }).current;
+
+  // Handle viewable items changed to prefetch sparklines
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (!sparklineContext) return;
+
+      const coins = viewableItems
+        .filter(item => item.isViewable && item.item)
+        .map(item => {
+          const market = item.item as PerpMarket | SpotMarket;
+          const dex = wsState.marketType === 'perp' ? (market as PerpMarket).dex : undefined;
+          return dex ? `${dex}:${market.name}` : market.name;
+        });
+
+      if (coins.length > 0) {
+        sparklineContext.prefetchSparklines(coins, wsState.marketType);
+      }
+    },
+    [sparklineContext, wsState.marketType]
+  );
+
+  // Ref for viewability callback (required for FlatList)
+  const viewabilityConfigCallbackPairs = useRef([
+    { viewabilityConfig, onViewableItemsChanged },
+  ]);
 
   // Pan gesture for horizontal swipe (market type)
   const panGesture = Gesture.Pan()
@@ -717,6 +762,7 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
               windowSize={7}
               maxToRenderPerBatch={20}
               removeClippedSubviews
+              viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
               ListEmptyComponent={
                 <EmptyState
                   message="No markets found"
@@ -728,6 +774,7 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
                 marketType: wsState.marketType,
                 currentSort,
                 isAscending,
+                sparklineContext,
               }}
             />
           </Animated.View>

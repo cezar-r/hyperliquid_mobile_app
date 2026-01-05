@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAccount, useProvider } from '@reown/appkit-react-native';
 import { useWallet } from '../../contexts/WalletContext';
 import { WebSocketProvider } from '../../contexts/WebSocketContext';
+import { SparklineDataProvider } from '../../contexts/SparklineDataContext';
 import { loadSessionKey } from '../../lib/sessionKey';
 import SplashScreen from '../screens/splash_screen/SplashScreen';
 import ConnectScreen from '../screens/connect_screen/ConnectScreen';
@@ -84,27 +85,29 @@ export default function RootNavigator(): React.JSX.Element {
 
   return (
     <WebSocketProvider>
-      <Stack.Navigator 
-        screenOptions={{ headerShown: false }}
-        initialRouteName="Splash"
-      >
-        <Stack.Screen 
-          name="Splash" 
-          component={SplashScreen}
-          options={{ gestureEnabled: false }}
-        />
-        <Stack.Screen name="Connect" component={ConnectScreen} />
-        <Stack.Screen
-          name="EnableSessionKey"
-          component={EnableSessionKeyScreen}
-          options={{ gestureEnabled: false }}
-        />
-        <Stack.Screen 
-          name="Authenticated" 
-          component={AuthenticatedScreens}
-          options={{ gestureEnabled: false, headerShown: false }}
-        />
-      </Stack.Navigator>
+      <SparklineDataProvider>
+        <Stack.Navigator
+          screenOptions={{ headerShown: false }}
+          initialRouteName="Splash"
+        >
+          <Stack.Screen
+            name="Splash"
+            component={SplashScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen name="Connect" component={ConnectScreen} />
+          <Stack.Screen
+            name="EnableSessionKey"
+            component={EnableSessionKeyScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="Authenticated"
+            component={AuthenticatedScreens}
+            options={{ gestureEnabled: false, headerShown: false }}
+          />
+        </Stack.Navigator>
+      </SparklineDataProvider>
     </WebSocketProvider>
   );
 }

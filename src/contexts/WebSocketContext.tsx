@@ -100,6 +100,9 @@ export function WebSocketProvider({
   const activeOrderbookNSigFigsRef = useRef<number | undefined>(undefined);
   const activeOrderbookMantissaRef = useRef<number | undefined>(undefined);
   const activeTradesCoinRef = useRef<string | null>(null);
+  // Track active candle subscription to prevent duplicates
+  const activeCandleCoinRef = useRef<string | null>(null);
+  const activeCandleIntervalRef = useRef<CandleInterval | null>(null);
   const allPerpAssetCtxSubsRef = useRef<any[]>([]);
   const allSpotAssetCtxSubsRef = useRef<any[]>([]);
   const subscriptionModeRef = useRef<'global' | 'chart'>('global');
@@ -114,7 +117,10 @@ export function WebSocketProvider({
   // ============ BATCHING LOGIC ============
   const pendingPricesRef = useRef<Record<string, string>>({});
   const pendingContextsRef = useRef<Record<string, AssetContext>>({});
-  const flushTimeoutRef = useRef<number | null>(null);
+  const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Throttle batch updates to reduce re-renders (500ms instead of RAF at 60fps)
+  const BATCH_FLUSH_INTERVAL_MS = 500;
 
   const flushUpdates = useCallback(() => {
     const store = useWebSocketStore.getState();
@@ -134,7 +140,7 @@ export function WebSocketProvider({
 
   const scheduleBatchFlush = useCallback(() => {
     if (flushTimeoutRef.current === null) {
-      flushTimeoutRef.current = requestAnimationFrame(flushUpdates);
+      flushTimeoutRef.current = setTimeout(flushUpdates, BATCH_FLUSH_INTERVAL_MS);
     }
   }, [flushUpdates]);
 
@@ -491,7 +497,7 @@ export function WebSocketProvider({
 
       // Cancel any pending batch flush
       if (flushTimeoutRef.current !== null) {
-        cancelAnimationFrame(flushTimeoutRef.current);
+        clearTimeout(flushTimeoutRef.current);
         flushTimeoutRef.current = null;
       }
 
@@ -606,10 +612,8 @@ export function WebSocketProvider({
         const sub = await client.l2Book(
           params,
           (data: any) => {
-            console.log('[Phase 4] l2Book data received:', { dataCoin: data.coin, activeCoin: activeOrderbookCoinRef.current });
-
+            // Silently ignore stale orderbook data from previous subscriptions
             if (data.coin !== activeOrderbookCoinRef.current) {
-              console.log('[Phase 4] Ignoring stale orderbook data for:', data.coin);
               return;
             }
 
@@ -705,11 +709,8 @@ export function WebSocketProvider({
           tid: t.tid,
         }));
 
+        // Filter out stale trades from previous subscriptions
         const validTrades = newTrades.filter(t => t.coin === activeTradesCoinRef.current);
-
-        if (validTrades.length !== newTrades.length) {
-          console.log('[Phase 4] Ignoring', newTrades.length - validTrades.length, 'stale trades');
-        }
 
         if (validTrades.length === 0) {
           return;
@@ -746,6 +747,17 @@ export function WebSocketProvider({
       const client = subscriptionClientRef.current;
       if (!client) return;
 
+      // Check if already subscribed to same coin/interval - prevent duplicate subscriptions
+      if (
+        activeCandleCoinRef.current === coin &&
+        activeCandleIntervalRef.current === interval &&
+        candleSubIdRef.current
+      ) {
+        console.log(`[WebSocket] Already subscribed to candles: ${coin} @ ${interval}, skipping`);
+        return;
+      }
+
+      // Unsubscribe from previous subscription if exists
       if (candleSubIdRef.current) {
         await candleSubIdRef.current.unsubscribe().catch((err: any) => {
           if (!err.message?.includes('WebSocket connection closed')) {
@@ -753,6 +765,8 @@ export function WebSocketProvider({
           }
         });
         candleSubIdRef.current = null;
+        activeCandleCoinRef.current = null;
+        activeCandleIntervalRef.current = null;
       }
 
       const market = marketTypeRef.current === 'perp'
@@ -793,6 +807,8 @@ export function WebSocketProvider({
       );
 
       candleSubIdRef.current = sub;
+      activeCandleCoinRef.current = coin;
+      activeCandleIntervalRef.current = interval;
     },
     [] // No dependencies - uses refs
   );
@@ -806,6 +822,8 @@ export function WebSocketProvider({
       }
     });
     candleSubIdRef.current = null;
+    activeCandleCoinRef.current = null;
+    activeCandleIntervalRef.current = null;
     logWebSocketUnsubscription('candle');
   }, []);
 

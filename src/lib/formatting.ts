@@ -181,7 +181,7 @@ export function convertUTCToLocalChartTime(utcTimestampMs: number): number {
  * @returns Display name with collateral suffix for HIP-3 markets
  */
 export function getHip3DisplayName(name: string, dex: string): string {
-  if (!dex) return name; // Default dex, no collateral suffix
+  if (!dex) return `${name}-USDC`; // Default dex also shows -USDC for display
   const collateral = HIP3_COLLATERAL[dex] || 'USD';
   return `${name}-${collateral}`;
 }

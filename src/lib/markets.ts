@@ -6,6 +6,8 @@
 import * as hl from '@nktkas/hyperliquid';
 import type { PerpMarket, SpotMarket, MarketType } from '../types';
 import { HIP3_DEXES, HIP3_SYMBOLS, calculateHip3AssetId } from '../constants/constants';
+import { withRetry } from './retry';
+import { isRetryableError } from './apiErrors';
 
 /**
  * Creates a PerpMarket entry for a HIP-3 dex symbol.
@@ -31,7 +33,10 @@ export async function fetchPerpMarkets(
   dex: string = ''
 ): Promise<{ markets: PerpMarket[]; contexts: Record<string, any> }> {
   try {
-    const [meta, assetCtxs] = await infoClient.metaAndAssetCtxs(dex ? { dex } : undefined);
+    const [meta, assetCtxs] = await withRetry(
+      () => infoClient.metaAndAssetCtxs(dex ? { dex } : undefined),
+      { maxAttempts: 3, baseDelayMs: 1000, shouldRetry: isRetryableError }
+    );
 
     const markets = meta.universe.map((market: any, index: number) => {
       let name = market.name;
@@ -107,7 +112,10 @@ export async function fetchSpotMarkets(
   infoClient: hl.InfoClient
 ): Promise<{ markets: SpotMarket[]; contexts: Record<string, any> }> {
   try {
-    const [spotMeta, assetCtxs] = await infoClient.spotMetaAndAssetCtxs();
+    const [spotMeta, assetCtxs] = await withRetry(
+      () => infoClient.spotMetaAndAssetCtxs(),
+      { maxAttempts: 3, baseDelayMs: 1000, shouldRetry: isRetryableError }
+    );
     
     const tokenMap = new Map(
       spotMeta.tokens.map((t: any) => [t.index, t])

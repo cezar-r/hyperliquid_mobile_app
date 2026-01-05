@@ -4,6 +4,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Color } from '../../../shared/styles';
 import { styles } from '../styles/StarredTickersContainer.styles';
 import { MarketCell } from '../../../shared/components';
+import type { SparklineData } from '../../../shared/components';
+import type { MarketType } from '../../../../types';
 
 // Helper to format large numbers (for volume display)
 function formatLargeNumber(num: number | undefined | null): string {
@@ -26,6 +28,7 @@ type MarketFilter = 'Perp' | 'Spot' | 'Account';
 interface StarredTickersContainerProps {
   perpData: Array<{
     name: string;
+    displayName: string;
     price: number;
     priceChange: number;
     volume: number;
@@ -42,13 +45,15 @@ interface StarredTickersContainerProps {
   }>;
   marketFilter: MarketFilter;
   onNavigateToChart: (coin: string, market: 'perp' | 'spot') => void;
+  getSparklineData?: (coin: string, marketType: MarketType) => SparklineData | null;
 }
 
-export default function StarredTickersContainer({
+function StarredTickersContainer({
   perpData,
   spotData,
   marketFilter,
   onNavigateToChart,
+  getSparklineData,
 }: StarredTickersContainerProps): React.JSX.Element | null {
   if (perpData.length === 0 && spotData.length === 0) {
     return null;
@@ -84,7 +89,7 @@ export default function StarredTickersContainer({
           {perpData.map((item) => (
             <MarketCell
               key={`starred-perp-${item.name}`}
-              displayName={item.name}
+              displayName={item.displayName}
               price={item.price}
               priceChange={item.priceChange}
               priceChangeColor={item.priceChange >= 0 ? Color.BRIGHT_ACCENT : Color.RED}
@@ -92,6 +97,7 @@ export default function StarredTickersContainer({
               metricValue={formatLargeNumber(item.volume)}
               metricColor={Color.FG_3}
               showMetricBelow={true}
+              sparklineData={getSparklineData?.(item.name, 'perp') ?? null}
               onPress={() => onNavigateToChart(item.name, 'perp')}
             />
           ))}
@@ -141,6 +147,7 @@ export default function StarredTickersContainer({
               metricValue={formatLargeNumber(item.volume)}
               metricColor={Color.FG_3}
               showMetricBelow={true}
+              sparklineData={getSparklineData?.(item.name, 'spot') ?? null}
               onPress={() => onNavigateToChart(item.name, 'spot')}
             />
           ))}
@@ -149,4 +156,7 @@ export default function StarredTickersContainer({
     </View>
   );
 }
+
+// Wrap with React.memo to prevent unnecessary re-renders from parent
+export default React.memo(StarredTickersContainer);
 

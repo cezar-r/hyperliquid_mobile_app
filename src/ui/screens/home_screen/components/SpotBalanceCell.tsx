@@ -2,8 +2,10 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Color } from '../../../shared/styles';
 import { sharedStyles } from '../styles/shared.styles';
+import { positionCellStyles } from '../styles/PositionCell.styles';
+import { Sparkline } from '../../../shared/components';
+import type { SparklineData } from '../../../shared/components';
 import type { SpotBalance } from '../../../../types';
-import { getDisplayTicker } from '../../../../lib/formatting';
 
 interface SpotBalanceCellProps {
   balance: SpotBalance;
@@ -16,6 +18,7 @@ interface SpotBalanceCellProps {
   };
   assetContext?: any;
   displayName: string;
+  sparklineData?: SparklineData | null;
   onPress: () => void;
 }
 
@@ -36,7 +39,7 @@ function formatPercent(num: number, decimals: number = 2): string {
   return `${sign}${(num * 100).toFixed(decimals)}%`;
 }
 
-export default function SpotBalanceCell({
+function SpotBalanceCellComponent({
   balance,
   price,
   total,
@@ -44,6 +47,7 @@ export default function SpotBalanceCell({
   pnl,
   assetContext,
   displayName,
+  sparklineData,
   onPress,
 }: SpotBalanceCellProps): React.JSX.Element {
   const parsedPrice = price ? parseFloat(price) : 0;
@@ -54,7 +58,7 @@ export default function SpotBalanceCell({
   const priceChangePct = prevDayPx > 0 ? priceChange / prevDayPx : 0;
 
   return (
-    <View>
+    <View style={positionCellStyles.cellWrapper}>
       <TouchableOpacity style={sharedStyles.positionCell} onPress={onPress}>
         <View style={sharedStyles.leftSide}>
           <View style={sharedStyles.tickerContainer}>
@@ -94,8 +98,19 @@ export default function SpotBalanceCell({
           </View>
         </View>
       </TouchableOpacity>
+      {sparklineData && sparklineData.points.length > 0 && (
+        <View style={positionCellStyles.sparklineOverlay} pointerEvents="none">
+          <Sparkline
+            data={sparklineData.points}
+            isPositive={sparklineData.isPositive}
+            fillContainer
+          />
+        </View>
+      )}
       <View style={sharedStyles.separator} />
     </View>
   );
 }
+
+export default React.memo(SpotBalanceCellComponent);
 

@@ -4,7 +4,8 @@ import { Color } from '../../../shared/styles';
 import { sharedStyles } from '../styles/shared.styles';
 import { styles } from '../styles/PerpPositionsContainer.styles';
 import PerpPositionCell from './PerpPositionCell';
-import type { PerpPosition } from '../../../../types';
+import type { PerpPosition, MarketType } from '../../../../types';
+import type { SparklineData } from '../../../shared/components';
 import { playTextButtonHaptic } from '../../../../lib/haptics';
 
 interface PerpPositionsContainerProps {
@@ -22,6 +23,7 @@ interface PerpPositionsContainerProps {
   onNavigateToChart: (coin: string, market: 'perp' | 'spot') => void;
   showCloseAll: boolean;
   onCloseAll?: () => void;
+  getSparklineData?: (coin: string, marketType: MarketType) => SparklineData | null;
 }
 
 // Helper to format numbers
@@ -35,12 +37,13 @@ function formatNumber(num: number, maxDecimals: number = 5): string {
   });
 }
 
-export default function PerpPositionsContainer({
+function PerpPositionsContainer({
   sortedPositions,
   withdrawableUsdc,
   onNavigateToChart,
   showCloseAll,
   onCloseAll,
+  getSparklineData,
 }: PerpPositionsContainerProps): React.JSX.Element {
   return (
     <View style={styles.container}>
@@ -84,6 +87,7 @@ export default function PerpPositionsContainer({
         const marketKey = item.position.dex
           ? `${item.position.dex}:${item.position.coin}`
           : item.position.coin;
+        const sparklineData = getSparklineData?.(marketKey, 'perp') ?? null;
         return (
           <PerpPositionCell
             key={`perp-${marketKey}`}
@@ -92,6 +96,7 @@ export default function PerpPositionsContainer({
             marginUsed={item.marginUsed}
             pnl={item.pnl}
             assetContext={item.assetContext}
+            sparklineData={sparklineData}
             onPress={() => onNavigateToChart(marketKey, 'perp')}
           />
         );
@@ -99,4 +104,7 @@ export default function PerpPositionsContainer({
     </View>
   );
 }
+
+// Wrap with React.memo to prevent unnecessary re-renders from parent
+export default React.memo(PerpPositionsContainer);
 

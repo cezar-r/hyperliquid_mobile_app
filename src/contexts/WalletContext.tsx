@@ -4,6 +4,7 @@ import React, {
   useState,
   useCallback,
   useEffect,
+  useRef,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as hl from '@nktkas/hyperliquid';
@@ -33,10 +34,22 @@ import {
   logPollingCycle,
   logDataUpdate,
 } from '../lib/logger';
+import { withRetry } from '../lib/retry';
+import { isRetryableError } from '../lib/apiErrors';
 import { HIP3_DEXES } from '../constants/constants';
 import { useAppVisibility } from '../hooks';
 
 const WALLET_DISCONNECTED_KEY = 'hl_wallet_disconnected';
+
+// Helper to compare account data - avoids unnecessary re-renders when polling
+// returns fresh data identical to current data
+const isAccountDataEqual = (prev: AccountData | null, next: AccountData | null): boolean => {
+  if (prev === next) return true;
+  if (!prev || !next) return false;
+  // Compare key fields that affect rendering
+  // Using JSON.stringify for deep comparison (acceptable for polling data size)
+  return JSON.stringify(prev) === JSON.stringify(next);
+};
 
 interface WalletContextValue {
   infoClient: hl.InfoClient;
@@ -54,6 +67,8 @@ interface WalletContextValue {
   disableSessionKey: () => Promise<void>;
   refetchAccount: () => Promise<void>;
   hasSessionKey: boolean;
+  pausePolling: () => void;
+  resumePolling: () => void;
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
@@ -95,27 +110,37 @@ export function WalletProvider({
       }
 
       try {
-        logApiCall('clearinghouseState', `user: ${userAddress}`);
-        logApiCall('spotClearinghouseState', `user: ${userAddress}`);
-        logApiCall('frontendOpenOrders', `user: ${userAddress}`);
-        logApiCall('userFills', `user: ${userAddress}`);
-        logApiCall('userFunding', `user: ${userAddress}`);
-        logApiCall('delegations', `user: ${userAddress}`);
-        logApiCall('delegatorSummary', `user: ${userAddress}`);
-        logApiCall('delegatorRewards', `user: ${userAddress}`);
+        // Only log API calls on non-silent fetches to reduce log spam
+        if (!silent) {
+          logApiCall('clearinghouseState', `user: ${userAddress}`);
+          logApiCall('spotClearinghouseState', `user: ${userAddress}`);
+          logApiCall('frontendOpenOrders', `user: ${userAddress}`);
+          logApiCall('userFills', `user: ${userAddress}`);
+          logApiCall('userFunding', `user: ${userAddress}`);
+          logApiCall('delegations', `user: ${userAddress}`);
+          logApiCall('delegatorSummary', `user: ${userAddress}`);
+          logApiCall('delegatorRewards', `user: ${userAddress}`);
+        }
+
+        // Lazy load HIP-3 dexes: on silent fetches, only fetch from dexes with known positions/orders
+        const hip3DexesToFetch = silent ? activeHip3DexesRef.current : HIP3_DEXES;
 
         // Fetch default perp state and HIP-3 dex states
         const perpStatePromises = [
-          infoClient
-            .clearinghouseState({ user: userAddress as `0x${string}` })
+          withRetry(
+            () => infoClient.clearinghouseState({ user: userAddress as `0x${string}` }),
+            { maxAttempts: 3, baseDelayMs: 1000, shouldRetry: isRetryableError }
+          )
             .then(state => ({ state, dex: '' }))
             .catch((err) => {
               if (!silent) logApiError('clearinghouseState (default)', err);
               return { state: null, dex: '' };
             }),
-          ...HIP3_DEXES.map(dex =>
-            infoClient
-              .clearinghouseState({ user: userAddress as `0x${string}`, dex })
+          ...hip3DexesToFetch.map(dex =>
+            withRetry(
+              () => infoClient.clearinghouseState({ user: userAddress as `0x${string}`, dex }),
+              { maxAttempts: 3, baseDelayMs: 1000, shouldRetry: isRetryableError }
+            )
               .then(state => ({ state, dex }))
               .catch((err) => {
                 if (!silent) console.error(`[HIP-3] Failed to fetch clearinghouseState for ${dex}:`, err);
@@ -126,16 +151,20 @@ export function WalletProvider({
 
         // Fetch default orders and HIP-3 dex orders
         const openOrdersPromises = [
-          infoClient
-            .frontendOpenOrders({ user: userAddress as `0x${string}` })
+          withRetry(
+            () => infoClient.frontendOpenOrders({ user: userAddress as `0x${string}` }),
+            { maxAttempts: 3, baseDelayMs: 1000, shouldRetry: isRetryableError }
+          )
             .then(orders => ({ orders, dex: '' }))
             .catch((err) => {
               if (!silent) logApiError('frontendOpenOrders (default)', err);
               return { orders: [], dex: '' };
             }),
-          ...HIP3_DEXES.map(dex =>
-            infoClient
-              .frontendOpenOrders({ user: userAddress as `0x${string}`, dex })
+          ...hip3DexesToFetch.map(dex =>
+            withRetry(
+              () => infoClient.frontendOpenOrders({ user: userAddress as `0x${string}`, dex }),
+              { maxAttempts: 3, baseDelayMs: 1000, shouldRetry: isRetryableError }
+            )
               .then(orders => ({ orders, dex }))
               .catch((err) => {
                 if (!silent) console.error(`[HIP-3] Failed to fetch frontendOpenOrders for ${dex}:`, err);
@@ -147,46 +176,52 @@ export function WalletProvider({
         const [perpStatesResults, spotState, openOrdersResults, userFills, userFundings, stakingDelegations, stakingSummary, stakingRewards] =
           await Promise.all([
             Promise.all(perpStatePromises),
-            infoClient
-              .spotClearinghouseState({ user: userAddress as `0x${string}` })
-              .catch((err) => {
-                if (!silent) logApiError('spotClearinghouseState', err);
-                return null;
-              }),
+            withRetry(
+              () => infoClient.spotClearinghouseState({ user: userAddress as `0x${string}` }),
+              { maxAttempts: 3, baseDelayMs: 1000, shouldRetry: isRetryableError }
+            ).catch((err) => {
+              if (!silent) logApiError('spotClearinghouseState', err);
+              return null;
+            }),
             Promise.all(openOrdersPromises),
-            infoClient
-              .userFills({ user: userAddress as `0x${string}` })
-              .catch((err) => {
-                if (!silent) logApiError('userFills', err);
-                return [];
-              }),
-            infoClient
-              .userFunding({ 
+            withRetry(
+              () => infoClient.userFills({ user: userAddress as `0x${string}` }),
+              { maxAttempts: 3, baseDelayMs: 1000, shouldRetry: isRetryableError }
+            ).catch((err) => {
+              if (!silent) logApiError('userFills', err);
+              return [];
+            }),
+            withRetry(
+              () => infoClient.userFunding({
                 user: userAddress as `0x${string}`,
                 startTime: Date.now() - 30 * 24 * 60 * 60 * 1000, // Last 30 days
-              })
-              .catch((err) => {
-                if (!silent) logApiError('userFunding', err);
-                return [];
               }),
-            infoClient
-              .delegations({ user: userAddress as `0x${string}` })
-              .catch((err) => {
-                if (!silent) logApiError('delegations', err);
-                return [];
-              }),
-            infoClient
-              .delegatorSummary({ user: userAddress as `0x${string}` })
-              .catch((err) => {
-                if (!silent) logApiError('delegatorSummary', err);
-                return null;
-              }),
-            infoClient
-              .delegatorRewards({ user: userAddress as `0x${string}` })
-              .catch((err) => {
-                if (!silent) logApiError('delegatorRewards', err);
-                return [];
-              }),
+              { maxAttempts: 3, baseDelayMs: 1000, shouldRetry: isRetryableError }
+            ).catch((err) => {
+              if (!silent) logApiError('userFunding', err);
+              return [];
+            }),
+            withRetry(
+              () => infoClient.delegations({ user: userAddress as `0x${string}` }),
+              { maxAttempts: 3, baseDelayMs: 1000, shouldRetry: isRetryableError }
+            ).catch((err) => {
+              if (!silent) logApiError('delegations', err);
+              return [];
+            }),
+            withRetry(
+              () => infoClient.delegatorSummary({ user: userAddress as `0x${string}` }),
+              { maxAttempts: 3, baseDelayMs: 1000, shouldRetry: isRetryableError }
+            ).catch((err) => {
+              if (!silent) logApiError('delegatorSummary', err);
+              return null;
+            }),
+            withRetry(
+              () => infoClient.delegatorRewards({ user: userAddress as `0x${string}` }),
+              { maxAttempts: 3, baseDelayMs: 1000, shouldRetry: isRetryableError }
+            ).catch((err) => {
+              if (!silent) logApiError('delegatorRewards', err);
+              return [];
+            }),
           ]);
 
         // Combine all perp positions from all dexes
@@ -213,6 +248,23 @@ export function WalletProvider({
             }
           }
         });
+
+        // Update active HIP-3 dexes for lazy loading optimization
+        // Only dexes with positions or orders need to be polled during silent fetches
+        if (!silent) {
+          const dexesWithData = new Set<string>();
+          perpStatesResults.forEach(({ state, dex }) => {
+            if (dex && state?.assetPositions && state.assetPositions.length > 0) {
+              dexesWithData.add(dex);
+            }
+          });
+          openOrdersResults.forEach(({ orders, dex }) => {
+            if (dex && orders && orders.length > 0) {
+              dexesWithData.add(dex);
+            }
+          });
+          activeHip3DexesRef.current = Array.from(dexesWithData);
+        }
 
         // Get the default perp state for margin summary
         const defaultPerpState = perpStatesResults.find(r => r.dex === '')?.state;
@@ -300,10 +352,17 @@ export function WalletProvider({
           lastUpdated: Date.now(),
         };
 
-        setAccount({
-          data: accountData,
-          isLoading: false,
-          error: null,
+        // Only update state if data actually changed (prevents unnecessary re-renders)
+        setAccount((prev) => {
+          if (isAccountDataEqual(prev.data, accountData)) {
+            // Data unchanged - just update lastUpdated if needed, but keep same reference
+            return prev;
+          }
+          return {
+            data: accountData,
+            isLoading: false,
+            error: null,
+          };
         });
 
         if (!silent) {
@@ -399,7 +458,27 @@ export function WalletProvider({
   // App visibility state - used to pause polling when app is backgrounded
   const isAppActive = useAppVisibility();
 
-  // Auto-refresh account data every 5 seconds when connected AND app is active
+  // Screen-based polling pause control (for when user is on ChartScreen, etc.)
+  const isPollingPausedRef = useRef(false);
+
+  // Track which HIP-3 dexes have positions/orders - lazy load only active dexes during silent polling
+  const activeHip3DexesRef = useRef<string[]>([...HIP3_DEXES]);
+
+  const pausePolling = useCallback(() => {
+    if (!isPollingPausedRef.current) {
+      isPollingPausedRef.current = true;
+      console.log('[WalletContext] Polling paused (screen-based)');
+    }
+  }, []);
+
+  const resumePolling = useCallback(() => {
+    if (isPollingPausedRef.current) {
+      isPollingPausedRef.current = false;
+      console.log('[WalletContext] Polling resumed');
+    }
+  }, []);
+
+  // Auto-refresh account data every 10 seconds when connected AND app is active
   useEffect(() => {
     // Don't poll if not connected or app is in background
     if (!connectedAddress || !isAppActive) {
@@ -409,12 +488,16 @@ export function WalletProvider({
       return;
     }
 
-    logPollingStart('WalletContext', 5000);
+    logPollingStart('WalletContext', 10000);
 
     const intervalId = setInterval(() => {
+      // Skip if paused by screen (e.g., ChartScreen active)
+      if (isPollingPausedRef.current) {
+        return;
+      }
       logPollingCycle('WalletContext');
       fetchAccountData(connectedAddress, true); // silent refresh
-    }, 5000);
+    }, 10000);
 
     return () => {
       logPollingStop('WalletContext');
@@ -537,6 +620,8 @@ export function WalletProvider({
     disableSessionKey,
     refetchAccount,
     hasSessionKey: sessionKey !== null,
+    pausePolling,
+    resumePolling,
   };
 
   return (

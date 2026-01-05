@@ -8,10 +8,11 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useWallet } from '../../../contexts/WalletContext';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
-import { formatPrice, formatSize, getDisplayTicker } from '../../../lib/formatting';
+import { useSparklineDataOptional } from '../../../contexts/SparklineDataContext';
+import { formatPrice, formatSize, getDisplayTicker, getHip3DisplayName } from '../../../lib/formatting';
 import { getStarredTickers } from '../../../lib/starredTickers';
 import { playNavToChartHaptic } from '../../../lib/haptics';
-import { getPositionContextKey } from '../../../lib/markets';
+import { getPositionContextKey, parseMarketKey } from '../../../lib/markets';
 import {
   logScreenMount,
   logScreenUnmount,
@@ -62,8 +63,9 @@ function calculatePositionPnL(
 
 export default function HomeScreen(): React.JSX.Element {
   const { address } = useAccount();
-  const { account, exchangeClient, refetchAccount } = useWallet();
+  const { account, exchangeClient, refetchAccount, resumePolling } = useWallet();
   const { state: wsState, selectCoin, setMarketType, infoClient } = useWebSocket();
+  const sparklineContext = useSparklineDataOptional();
   const navigation = useNavigation<any>();
   const [closingPosition, setClosingPosition] = useState<string | null>(null);
   const [marketFilter, setMarketFilter] = useState<MarketFilter>('Account');
@@ -130,10 +132,16 @@ export default function HomeScreen(): React.JSX.Element {
     loadPreferences();
   }, []);
 
+  // Track if screen is focused (for skipping updates when not visible)
+  const isFocusedRef = useRef(true);
+
   // Load starred tickers and hide small balances preference when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
+      isFocusedRef.current = true;
       logScreenFocus('HomeScreen');
+      resumePolling(); // Resume wallet polling when HomeScreen gains focus
+
       const loadStarredTickersAndPreferences = async () => {
         try {
           const perpStarred = await getStarredTickers('perp');
@@ -155,11 +163,12 @@ export default function HomeScreen(): React.JSX.Element {
         }
       };
       loadStarredTickersAndPreferences();
-      
+
       return () => {
+        isFocusedRef.current = false;
         logScreenBlur('HomeScreen');
       };
-    }, [])
+    }, [resumePolling])
   );
 
   // Fetch historical spot prices for 24h PnL calculation
@@ -227,7 +236,7 @@ export default function HomeScreen(): React.JSX.Element {
 
         // Add small delay between requests to avoid rate limiting
         if (i < balancesToFetch.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 200)); // Increased from 100ms to reduce rate limiting
         }
       }
 
@@ -585,10 +594,102 @@ export default function HomeScreen(): React.JSX.Element {
       .sort((a, b) => b.usdValue - a.usdValue);
   }, [account.data?.spotBalances, wsState.prices, wsState.assetContexts, wsState.spotMarkets, hideSmallBalances]);
 
+  // Stable coin keys for sparkline prefetching (prevents re-runs on price changes)
+  const perpCoinKeys = useMemo(() =>
+    sortedPerpPositions.map(item => {
+      const position = item.position;
+      return position.dex ? `${position.dex}:${position.coin}` : position.coin;
+    }).sort().join(','),
+    [sortedPerpPositions]
+  );
+
+  const spotCoinKeys = useMemo(() =>
+    sortedSpotBalances
+      .filter(item => item.balance.coin !== 'USDC')
+      .map(item => item.balance.coin)
+      .sort().join(','),
+    [sortedSpotBalances]
+  );
+
+  // Hydrate sparklines from SQLite cache for instant display
+  useEffect(() => {
+    if (!sparklineContext?.isCacheReady) return;
+
+    const itemsToHydrate: Array<{ coin: string; marketType: 'perp' | 'spot' }> = [];
+
+    // Add perp positions
+    sortedPerpPositions.forEach(item => {
+      const position = item.position;
+      const coin = position.dex ? `${position.dex}:${position.coin}` : position.coin;
+      itemsToHydrate.push({ coin, marketType: 'perp' });
+    });
+
+    // Add spot balances
+    sortedSpotBalances
+      .filter(item => item.balance.coin !== 'USDC')
+      .forEach(item => {
+        const spotMarket = wsState.spotMarkets.find(
+          m => m.name.split('/')[0] === item.balance.coin
+        );
+        if (spotMarket) {
+          itemsToHydrate.push({ coin: spotMarket.name, marketType: 'spot' });
+        }
+      });
+
+    // Add starred tickers
+    starredPerpTickers.forEach(ticker => {
+      itemsToHydrate.push({ coin: ticker, marketType: 'perp' });
+    });
+    starredSpotTickers.forEach(ticker => {
+      itemsToHydrate.push({ coin: ticker, marketType: 'spot' });
+    });
+
+    // Hydrate from SQLite cache (async, non-blocking)
+    if (itemsToHydrate.length > 0) {
+      sparklineContext.hydrateFromCache(itemsToHydrate);
+    }
+  }, [sparklineContext?.isCacheReady, sortedPerpPositions, sortedSpotBalances, starredPerpTickers, starredSpotTickers, wsState.spotMarkets]);
+
+  // Prefetch sparklines for positions and balances (debounced)
+  useEffect(() => {
+    if (!sparklineContext) return;
+
+    // Debounce to prevent rapid-fire API calls on price updates
+    const timeoutId = setTimeout(() => {
+      // Prefetch perp position sparklines
+      const perpCoins = perpCoinKeys.split(',').filter(Boolean);
+      if (perpCoins.length > 0) {
+        sparklineContext.prefetchSparklines(perpCoins, 'perp');
+      }
+
+      // Prefetch spot balance sparklines
+      const spotCoins = spotCoinKeys.split(',').filter(Boolean).map(coin => {
+        const spotMarket = wsState.spotMarkets.find(
+          m => m.name.split('/')[0] === coin
+        );
+        return spotMarket?.name || coin;
+      });
+      if (spotCoins.length > 0) {
+        sparklineContext.prefetchSparklines(spotCoins, 'spot');
+      }
+
+      // Prefetch starred ticker sparklines
+      if (starredPerpTickers.length > 0) {
+        sparklineContext.prefetchSparklines(starredPerpTickers, 'perp');
+      }
+      if (starredSpotTickers.length > 0) {
+        sparklineContext.prefetchSparklines(starredSpotTickers, 'spot');
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [sparklineContext, perpCoinKeys, spotCoinKeys, starredPerpTickers, starredSpotTickers, wsState.spotMarkets]);
+
   // Prepare starred tickers with data
   const starredTickersData = useMemo(() => {
     const perpData: Array<{
       name: string;
+      displayName: string;
       price: number;
       priceChange: number;
       volume: number;
@@ -606,22 +707,30 @@ export default function HomeScreen(): React.JSX.Element {
     }> = [];
 
     // Process perp starred tickers
+    // Supports both "BTC" (regular) and "xyz:NVDA" (HIP-3) formats
     if (
       (marketFilter === 'Perp' || marketFilter === 'Account') &&
       starredPerpTickers.length > 0
     ) {
       starredPerpTickers.forEach((ticker) => {
+        // Parse ticker to handle both "BTC" and "xyz:NVDA" formats
+        const { coin, dex } = parseMarketKey(ticker);
+
+        // Use ticker directly as context key (already in correct format)
         const ctx = wsState.assetContexts[ticker];
         const price = ctx?.markPx || 0;
         const prevPrice = ctx?.prevDayPx || price;
         const priceChange = prevPrice > 0 ? (price - prevPrice) / prevPrice : 0;
         const volume = ctx?.dayNtlVlm || 0;
-        const market = wsState.perpMarkets.find((m) => m.name === ticker);
+
+        // Find market using parsed coin and dex
+        const market = wsState.perpMarkets.find((m) => m.name === coin && m.dex === (dex || ''));
         const leverage = market?.maxLeverage || 1;
 
         if (price > 0 && volume > 0) {
           perpData.push({
             name: ticker,
+            displayName: getHip3DisplayName(coin, dex || ''),
             price,
             priceChange,
             volume,
@@ -893,9 +1002,9 @@ export default function HomeScreen(): React.JSX.Element {
     );
   };
 
-  // Log rendering of components
+  // Log rendering of components (only when screen is focused to reduce noise)
   useEffect(() => {
-    if (account.data) {
+    if (account.data && isFocusedRef.current) {
       if (marketFilter === 'Perp' || marketFilter === 'Account') {
         logRender('PerpPositionsContainer', `${sortedPerpPositions.length} positions`);
       }
@@ -973,6 +1082,7 @@ export default function HomeScreen(): React.JSX.Element {
                       onNavigateToChart={handleNavigateToChart}
                       showCloseAll={marketFilter === 'Account'}
                       onCloseAll={handleCloseAll}
+                      getSparklineData={sparklineContext?.getSparklineData}
                     />
                   )}
 
@@ -983,6 +1093,7 @@ export default function HomeScreen(): React.JSX.Element {
                       spotMarkets={wsState.spotMarkets}
                       onNavigateToChart={handleNavigateToChart}
                       showLabel={marketFilter === 'Account'}
+                      getSparklineData={sparklineContext?.getSparklineData}
                     />
                   )}
 
@@ -1002,6 +1113,7 @@ export default function HomeScreen(): React.JSX.Element {
                     spotData={starredTickersData.spotData}
                     marketFilter={marketFilter}
                     onNavigateToChart={handleNavigateToChart}
+                    getSparklineData={sparklineContext?.getSparklineData}
                   />
 
                   {/* Empty State */}

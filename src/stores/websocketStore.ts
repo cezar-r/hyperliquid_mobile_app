@@ -82,6 +82,12 @@ const initialState: WebSocketStoreState = {
   recentTrades: [],
 };
 
+// Trade debouncing - batch multiple trade updates into single store update
+let pendingTrades: Trade[] = [];
+let tradeFlushTimeout: ReturnType<typeof setTimeout> | null = null;
+const TRADE_DEBOUNCE_MS = 150;
+const MAX_TRADES = 30;
+
 export const useWebSocketStore = create<WebSocketStore>()(
   subscribeWithSelector((set, get) => ({
     ...initialState,
@@ -128,11 +134,33 @@ export const useWebSocketStore = create<WebSocketStore>()(
     setOrderbook: (orderbook) => set({ orderbook }),
 
     // Trades actions
-    setRecentTrades: (trades) => set({ recentTrades: trades }),
-    addTrades: (newTrades) => set((state) => {
-      const combined = [...newTrades, ...state.recentTrades].slice(0, 50);
-      return { recentTrades: combined };
-    }),
+    setRecentTrades: (trades) => {
+      // Clear pending trades when setting trades directly (e.g., on unsubscribe)
+      pendingTrades = [];
+      if (tradeFlushTimeout) {
+        clearTimeout(tradeFlushTimeout);
+        tradeFlushTimeout = null;
+      }
+      set({ recentTrades: trades });
+    },
+    addTrades: (newTrades) => {
+      // Accumulate trades in buffer
+      pendingTrades = [...newTrades, ...pendingTrades];
+
+      // Debounce the store update
+      if (!tradeFlushTimeout) {
+        tradeFlushTimeout = setTimeout(() => {
+          const tradesToFlush = pendingTrades;
+          pendingTrades = [];
+          tradeFlushTimeout = null;
+
+          set((state) => {
+            const combined = [...tradesToFlush, ...state.recentTrades].slice(0, MAX_TRADES);
+            return { recentTrades: combined };
+          });
+        }, TRADE_DEBOUNCE_MS);
+      }
+    },
 
     // Bulk initialization - single state update for all initial data
     initializeMarkets: (data) => set({

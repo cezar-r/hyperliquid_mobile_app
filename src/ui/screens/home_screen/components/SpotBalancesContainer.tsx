@@ -2,7 +2,8 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { styles } from '../styles/SpotBalancesContainer.styles';
 import SpotBalanceCell from './SpotBalanceCell';
-import type { SpotBalance } from '../../../../types';
+import type { SpotBalance, MarketType } from '../../../../types';
+import type { SparklineData } from '../../../shared/components';
 import { getDisplayTicker } from '../../../../lib/formatting';
 
 interface SpotBalancesContainerProps {
@@ -20,13 +21,15 @@ interface SpotBalancesContainerProps {
   spotMarkets: Array<{ name: string; index: number; szDecimals?: number }>;
   onNavigateToChart: (coin: string, market: 'perp' | 'spot') => void;
   showLabel: boolean;
+  getSparklineData?: (coin: string, marketType: MarketType) => SparklineData | null;
 }
 
-export default function SpotBalancesContainer({
+function SpotBalancesContainer({
   sortedBalances,
   spotMarkets,
   onNavigateToChart,
   showLabel,
+  getSparklineData,
 }: SpotBalancesContainerProps): React.JSX.Element | null {
   if (sortedBalances.length === 0) {
     return null;
@@ -43,6 +46,10 @@ export default function SpotBalancesContainer({
         const displayName = spotMarket
           ? getDisplayTicker(spotMarket.name)
           : item.balance.coin;
+        const marketName = spotMarket?.name || item.balance.coin;
+        const sparklineData = item.balance.coin !== 'USDC'
+          ? getSparklineData?.(marketName, 'spot') ?? null
+          : null;
 
         return (
           <SpotBalanceCell
@@ -54,11 +61,12 @@ export default function SpotBalancesContainer({
             pnl={item.pnl}
             assetContext={item.assetContext}
             displayName={displayName}
+            sparklineData={sparklineData}
             onPress={() => {
               // Don't navigate for USDC
               if (item.balance.coin === 'USDC') return;
               // Pass the full market name for spot (e.g., "UBTC/USDC")
-              onNavigateToChart(spotMarket?.name || item.balance.coin, 'spot');
+              onNavigateToChart(marketName, 'spot');
             }}
           />
         );
@@ -66,4 +74,7 @@ export default function SpotBalancesContainer({
     </View>
   );
 }
+
+// Wrap with React.memo to prevent unnecessary re-renders from parent
+export default React.memo(SpotBalancesContainer);
 
