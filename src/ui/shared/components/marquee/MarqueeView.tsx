@@ -36,15 +36,6 @@ function MarqueeView({
     setContentWidth(width);
   };
 
-  // Debug logging
-  useEffect(() => {
-    if (containerWidth > 0 && contentWidth > 0) {
-      console.log(
-        `MarqueeView: content=${contentWidth.toFixed(1)}, container=${containerWidth.toFixed(1)}, shouldScroll=${contentWidth > containerWidth}`
-      );
-    }
-  }, [containerWidth, contentWidth]);
-
   useEffect(() => {
     // Cancel any existing animation
     cancelAnimation(translateX);

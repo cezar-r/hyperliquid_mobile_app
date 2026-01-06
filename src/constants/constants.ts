@@ -57,30 +57,6 @@ export function calculateHip3AssetId(dex: string, indexInMeta: number): number {
 }
 
 /**
- * Whitelisted symbols for each HIP-3 dex.
- * Only these symbols will be displayed in the app.
- */
-export const HIP3_SYMBOLS: Record<string, string[]> = {
-  'xyz': [
-    'XYZ100',
-    'NVDA',
-    'TSLA',
-    'AAPL',      // Also in the allMids feed
-    'COIN',      // Also in the allMids feed
-    'GOLD',      // Also in the allMids feed
-    'HOOD',      // Also in the allMids feed
-    'INTC',      // Also in the allMids feed
-    'META',      // Also in the allMids feed
-    'MSFT',      // Also in the allMids feed
-    'ORCL',      // Also in the allMids feed
-    'PLTR',      // Also in the allMids feed
-  ],
-  'vntl': [
-    'SPACEX'     // Not yet in allMids feed
-  ]
-};
-
-/**
  * HIP-3 dex collateral token names.
  * Maps dex name to the collateral token symbol used for margin.
  *

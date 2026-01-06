@@ -5,7 +5,7 @@ import { sharedStyles } from '../styles/shared.styles';
 import { positionCellStyles } from '../styles/PositionCell.styles';
 import { getHip3DisplayName } from '../../../../lib/formatting';
 import { Sparkline } from '../../../shared/components';
-import type { SparklineData } from '../../../shared/components';
+import { useLiveSparklineData } from '../../../../hooks';
 import type { PerpPosition } from '../../../../types';
 
 interface PerpPositionCellProps {
@@ -17,7 +17,6 @@ interface PerpPositionCellProps {
     pnlPercent: number;
   };
   assetContext?: any;
-  sparklineData?: SparklineData | null;
   onPress: () => void;
 }
 
@@ -44,9 +43,15 @@ function PerpPositionCellComponent({
   marginUsed,
   pnl,
   assetContext,
-  sparklineData,
   onPress,
 }: PerpPositionCellProps): React.JSX.Element {
+  // Get sparkline coin key (HIP-3 positions use dex:coin format)
+  const sparklineCoin = position.dex ? `${position.dex}:${position.coin}` : position.coin;
+  // Price key for WebSocket lookup (same format)
+  const priceKey = sparklineCoin;
+  // Get live sparkline data (historical + current price)
+  const sparklineData = useLiveSparklineData(sparklineCoin, 'perp', priceKey);
+
   const positionSize = parseFloat(position.szi);
   const isLong = positionSize > 0;
   const leverage = position.leverage?.value || 1;
@@ -117,7 +122,7 @@ function PerpPositionCellComponent({
         <View style={positionCellStyles.sparklineOverlay} pointerEvents="none">
           <Sparkline
             data={sparklineData.points}
-            isPositive={sparklineData.isPositive}
+            isPositive={priceChangePct >= 0}
             fillContainer
           />
         </View>

@@ -2,8 +2,7 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { styles } from '../styles/SpotBalancesContainer.styles';
 import SpotBalanceCell from './SpotBalanceCell';
-import type { SpotBalance, MarketType } from '../../../../types';
-import type { SparklineData } from '../../../shared/components';
+import type { SpotBalance } from '../../../../types';
 import { getDisplayTicker } from '../../../../lib/formatting';
 
 interface SpotBalancesContainerProps {
@@ -21,7 +20,6 @@ interface SpotBalancesContainerProps {
   spotMarkets: Array<{ name: string; index: number; szDecimals?: number }>;
   onNavigateToChart: (coin: string, market: 'perp' | 'spot') => void;
   showLabel: boolean;
-  getSparklineData?: (coin: string, marketType: MarketType) => SparklineData | null;
 }
 
 function SpotBalancesContainer({
@@ -29,7 +27,6 @@ function SpotBalancesContainer({
   spotMarkets,
   onNavigateToChart,
   showLabel,
-  getSparklineData,
 }: SpotBalancesContainerProps): React.JSX.Element | null {
   if (sortedBalances.length === 0) {
     return null;
@@ -47,9 +44,6 @@ function SpotBalancesContainer({
           ? getDisplayTicker(spotMarket.name)
           : item.balance.coin;
         const marketName = spotMarket?.name || item.balance.coin;
-        const sparklineData = item.balance.coin !== 'USDC'
-          ? getSparklineData?.(marketName, 'spot') ?? null
-          : null;
 
         return (
           <SpotBalanceCell
@@ -61,7 +55,7 @@ function SpotBalancesContainer({
             pnl={item.pnl}
             assetContext={item.assetContext}
             displayName={displayName}
-            sparklineData={sparklineData}
+            sparklineMarketName={marketName}
             onPress={() => {
               // Don't navigate for USDC
               if (item.balance.coin === 'USDC') return;

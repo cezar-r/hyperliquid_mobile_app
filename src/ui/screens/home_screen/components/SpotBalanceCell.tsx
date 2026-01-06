@@ -4,7 +4,7 @@ import { Color } from '../../../shared/styles';
 import { sharedStyles } from '../styles/shared.styles';
 import { positionCellStyles } from '../styles/PositionCell.styles';
 import { Sparkline } from '../../../shared/components';
-import type { SparklineData } from '../../../shared/components';
+import { useLiveSparklineData } from '../../../../hooks';
 import type { SpotBalance } from '../../../../types';
 
 interface SpotBalanceCellProps {
@@ -18,7 +18,8 @@ interface SpotBalanceCellProps {
   };
   assetContext?: any;
   displayName: string;
-  sparklineData?: SparklineData | null;
+  /** Full market name for sparkline lookup (e.g., "HYPE/USDC") */
+  sparklineMarketName: string;
   onPress: () => void;
 }
 
@@ -47,9 +48,13 @@ function SpotBalanceCellComponent({
   pnl,
   assetContext,
   displayName,
-  sparklineData,
+  sparklineMarketName,
   onPress,
 }: SpotBalanceCellProps): React.JSX.Element {
+  // Get live sparkline data (historical + current price)
+  // sparklineMarketName is the full market name (e.g., "HYPE/USDC")
+  const sparklineData = useLiveSparklineData(sparklineMarketName, 'spot', sparklineMarketName);
+
   const parsedPrice = price ? parseFloat(price) : 0;
 
   // Calculate 24h change
@@ -102,7 +107,7 @@ function SpotBalanceCellComponent({
         <View style={positionCellStyles.sparklineOverlay} pointerEvents="none">
           <Sparkline
             data={sparklineData.points}
-            isPositive={sparklineData.isPositive}
+            isPositive={priceChangePct >= 0}
             fillContainer
           />
         </View>

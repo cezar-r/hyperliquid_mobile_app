@@ -7,7 +7,8 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { useSparklineDataOptional } from '../../../contexts/SparklineDataContext';
-import type { PerpMarket, SpotMarket } from '../../../types';
+import { useLiveSparklineData } from '../../../hooks';
+import type { MarketType, PerpMarket, SpotMarket } from '../../../types';
 import { getStarredTickers } from '../../../lib/starredTickers';
 import { getDisplayTicker, getHip3DisplayName } from '../../../lib/formatting';
 import { playToggleHaptic, playNavToChartHaptic } from '../../../lib/haptics';
@@ -53,6 +54,63 @@ function formatPercent(num: number | undefined | null): string {
 interface SearchScreenProps {
   onTickerSelect?: (marketName: string) => void;
 }
+
+/**
+ * LiveSearchMarketCell - Wrapper component that uses useLiveSparklineData hook
+ * This is necessary because hooks cannot be called inside FlatList renderItem callbacks.
+ * The wrapper ensures sparklines update with live price data.
+ */
+interface LiveSearchMarketCellProps {
+  marketKey: string;
+  marketType: MarketType;
+  displayName: string;
+  price: number;
+  priceChange: number;
+  priceChangeColor: string;
+  leverage?: number;
+  dex?: string;
+  metricValue?: string;
+  metricColor?: string;
+  showMetricBelow?: boolean;
+  onPress: () => void;
+}
+
+function LiveSearchMarketCell({
+  marketKey,
+  marketType,
+  displayName,
+  price,
+  priceChange,
+  priceChangeColor,
+  leverage,
+  dex,
+  metricValue,
+  metricColor,
+  showMetricBelow,
+  onPress,
+}: LiveSearchMarketCellProps): React.JSX.Element {
+  // Use the live sparkline hook to get data with real-time price updates
+  const sparklineData = useLiveSparklineData(marketKey, marketType, marketKey);
+
+  return (
+    <MarketCell
+      displayName={displayName}
+      price={price}
+      priceChange={priceChange}
+      priceChangeColor={priceChangeColor}
+      leverage={leverage}
+      dex={dex}
+      metricValue={metricValue}
+      metricColor={metricColor}
+      showMetricBelow={showMetricBelow}
+      sparklineData={sparklineData}
+      onPress={onPress}
+    />
+  );
+}
+
+// Memoize to prevent unnecessary re-renders when parent props haven't changed
+const MemoizedLiveSearchMarketCell = React.memo(LiveSearchMarketCell);
 
 export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {}): React.JSX.Element {
   const navigation = useNavigation<any>();
@@ -124,22 +182,30 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
     }
   }, [wsState.marketType, perpSort, spotSort, perpAscending, spotAscending]);
 
+  // Clear sparkline visibility queue when switching market types
+  // This ensures old perp items are dropped when switching to spot (and vice versa)
+  React.useEffect(() => {
+    sparklineContext?.clearVisibility();
+  }, [wsState.marketType, sparklineContext]);
+
   // Load starred tickers when screen comes into focus or market type changes
   useFocusEffect(
     useCallback(() => {
       logScreenFocus('SearchScreen');
-      
+
       const loadStarredTickers = async () => {
         const starred = await getStarredTickers(wsState.marketType);
         setStarredTickers(starred);
       };
 
       loadStarredTickers();
-      
+
       return () => {
         logScreenBlur('SearchScreen');
+        // Clear visibility queue when leaving screen to stop pending fetches
+        sparklineContext?.clearVisibility();
       };
-    }, [wsState.marketType])
+    }, [wsState.marketType, sparklineContext])
   );
 
   const currentMarkets = useMemo(
@@ -622,11 +688,11 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
       // For HIP-3 markets, use dex:coin format to preserve dex context
       const marketKey = dex ? `${dex}:${item.name}` : item.name;
 
-      // Get sparkline data if available
-      const sparklineData = sparklineContext?.getSparklineData(marketKey, wsState.marketType) ?? null;
-
+      // Use the memoized wrapper component with live sparkline data
       return (
-        <MarketCell
+        <MemoizedLiveSearchMarketCell
+          marketKey={marketKey}
+          marketType={wsState.marketType}
           displayName={displayName}
           price={price}
           priceChange={
@@ -636,11 +702,10 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
           }
           priceChangeColor={get24hChangeColor(item)}
           leverage={leverage}
-          dex={dex} // Pass dex for HIP-3 badge display
+          dex={dex}
           metricValue={showMetricUnderTicker ? getSortValue(item) : undefined}
           metricColor={getSortValueColor(item)}
           showMetricBelow={showMetricUnderTicker}
-          sparklineData={sparklineData}
           onPress={() => handleMarketSelect(marketKey)}
         />
       );
@@ -655,7 +720,6 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
       getSortValueColor,
       get24hChangeColor,
       get24hChangeValue,
-      sparklineContext,
     ]
   );
 
@@ -665,24 +729,33 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
     minimumViewTime: 150,
   }).current;
 
-  // Handle viewable items changed to prefetch sparklines
+  // Refs for viewability callback to avoid stale closure issues
+  // FlatList requires stable callback references, so we use refs to access current values
+  const sparklineContextRef = useRef(sparklineContext);
+  sparklineContextRef.current = sparklineContext;
+  const marketTypeRef = useRef(wsState.marketType);
+  marketTypeRef.current = wsState.marketType;
+
+  // Handle viewable items changed to fetch sparklines with visibility priority
+  // Uses setVisibleItems to cancel off-screen items and prioritize visible ones
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (!sparklineContext) return;
+      const ctx = sparklineContextRef.current;
+      const currentMarketType = marketTypeRef.current;
+      if (!ctx) return;
 
       const coins = viewableItems
         .filter(item => item.isViewable && item.item)
         .map(item => {
           const market = item.item as PerpMarket | SpotMarket;
-          const dex = wsState.marketType === 'perp' ? (market as PerpMarket).dex : undefined;
+          const dex = currentMarketType === 'perp' ? (market as PerpMarket).dex : undefined;
           return dex ? `${dex}:${market.name}` : market.name;
         });
 
-      if (coins.length > 0) {
-        sparklineContext.prefetchSparklines(coins, wsState.marketType);
-      }
+      // Use setVisibleItems to prioritize visible items and drop off-screen items
+      ctx.setVisibleItems(coins, currentMarketType);
     },
-    [sparklineContext, wsState.marketType]
+    [] // Empty deps - uses refs to access current values
   );
 
   // Ref for viewability callback (required for FlatList)
@@ -774,7 +847,6 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
                 marketType: wsState.marketType,
                 currentSort,
                 isAscending,
-                sparklineContext,
               }}
             />
           </Animated.View>

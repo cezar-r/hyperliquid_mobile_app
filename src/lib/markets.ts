@@ -5,7 +5,7 @@
 
 import * as hl from '@nktkas/hyperliquid';
 import type { PerpMarket, SpotMarket, MarketType } from '../types';
-import { HIP3_DEXES, HIP3_SYMBOLS, calculateHip3AssetId } from '../constants/constants';
+import { HIP3_DEXES, calculateHip3AssetId } from '../constants/constants';
 import { withRetry } from './retry';
 import { isRetryableError } from './apiErrors';
 
@@ -188,7 +188,14 @@ export function resolveSubscriptionCoin(
     return 'PURR/USDC';
   }
 
-  const spotMarket = spotMarkets.find((m) => m.name === displayCoin);
+  // Try exact match first (e.g., "CRV/USDC")
+  let spotMarket = spotMarkets.find((m) => m.name === displayCoin);
+
+  // If no exact match, try matching by base token (e.g., "CRV" matches "CRV/USDC")
+  if (!spotMarket) {
+    spotMarket = spotMarkets.find((m) => m.name.split('/')[0] === displayCoin);
+  }
+
   if (spotMarket) {
     return `@${spotMarket.index}`;
   }
@@ -252,7 +259,11 @@ export function resolveOrderAsset(
     return market.index;
   }
 
-  const spotMarket = spotMarkets.find((m) => m.name === coinOrPair);
+  // Try exact match first (e.g., "CRV/USDC"), then by base token (e.g., "CRV")
+  let spotMarket = spotMarkets.find((m) => m.name === coinOrPair);
+  if (!spotMarket) {
+    spotMarket = spotMarkets.find((m) => m.name.split('/')[0] === coinOrPair);
+  }
   return spotMarket ? 10000 + spotMarket.index : null;
 }
 
@@ -302,7 +313,13 @@ export function findSpotMarket(
   markets: SpotMarket[],
   coinName: string
 ): SpotMarket | undefined {
-  return markets.find((m) => m.name === coinName);
+  // Try exact match first (e.g., "CRV/USDC")
+  let market = markets.find((m) => m.name === coinName);
+  // If no exact match, try matching by base token (e.g., "CRV" matches "CRV/USDC")
+  if (!market) {
+    market = markets.find((m) => m.name.split('/')[0] === coinName);
+  }
+  return market;
 }
 
 export function getDefaultCoin(

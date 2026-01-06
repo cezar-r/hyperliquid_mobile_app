@@ -101,7 +101,7 @@ function MarketCellComponent({
         <View style={styles.sparklineOverlay} pointerEvents="none">
           <Sparkline
             data={sparklineData.points}
-            isPositive={sparklineData.isPositive}
+            isPositive={priceChange >= 0}
             fillContainer
           />
         </View>

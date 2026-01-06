@@ -4,7 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Color } from '../../../shared/styles';
 import { styles } from '../styles/StarredTickersContainer.styles';
 import { MarketCell } from '../../../shared/components';
-import type { SparklineData } from '../../../shared/components';
+import { useLiveSparklineData } from '../../../../hooks';
 import type { MarketType } from '../../../../types';
 
 // Helper to format large numbers (for volume display)
@@ -24,6 +24,47 @@ function formatLargeNumber(num: number | undefined | null): string {
 }
 
 type MarketFilter = 'Perp' | 'Spot' | 'Account';
+
+// Wrapper component to use live sparkline hook for each ticker
+interface LiveMarketCellProps {
+  name: string;
+  displayName: string;
+  price: number;
+  priceChange: number;
+  volume: number;
+  leverage?: number;
+  marketType: MarketType;
+  onPress: () => void;
+}
+
+function LiveMarketCell({
+  name,
+  displayName,
+  price,
+  priceChange,
+  volume,
+  leverage,
+  marketType,
+  onPress,
+}: LiveMarketCellProps): React.JSX.Element {
+  // Get live sparkline data (historical + current price)
+  const sparklineData = useLiveSparklineData(name, marketType, name);
+
+  return (
+    <MarketCell
+      displayName={displayName}
+      price={price}
+      priceChange={priceChange}
+      priceChangeColor={priceChange >= 0 ? Color.BRIGHT_ACCENT : Color.RED}
+      leverage={leverage}
+      metricValue={formatLargeNumber(volume)}
+      metricColor={Color.FG_3}
+      showMetricBelow={true}
+      sparklineData={sparklineData}
+      onPress={onPress}
+    />
+  );
+}
 
 interface StarredTickersContainerProps {
   perpData: Array<{
@@ -45,7 +86,6 @@ interface StarredTickersContainerProps {
   }>;
   marketFilter: MarketFilter;
   onNavigateToChart: (coin: string, market: 'perp' | 'spot') => void;
-  getSparklineData?: (coin: string, marketType: MarketType) => SparklineData | null;
 }
 
 function StarredTickersContainer({
@@ -53,7 +93,6 @@ function StarredTickersContainer({
   spotData,
   marketFilter,
   onNavigateToChart,
-  getSparklineData,
 }: StarredTickersContainerProps): React.JSX.Element | null {
   if (perpData.length === 0 && spotData.length === 0) {
     return null;
@@ -87,17 +126,15 @@ function StarredTickersContainer({
             </View>
           )}
           {perpData.map((item) => (
-            <MarketCell
+            <LiveMarketCell
               key={`starred-perp-${item.name}`}
+              name={item.name}
               displayName={item.displayName}
               price={item.price}
               priceChange={item.priceChange}
-              priceChangeColor={item.priceChange >= 0 ? Color.BRIGHT_ACCENT : Color.RED}
+              volume={item.volume}
               leverage={item.leverage}
-              metricValue={formatLargeNumber(item.volume)}
-              metricColor={Color.FG_3}
-              showMetricBelow={true}
-              sparklineData={getSparklineData?.(item.name, 'perp') ?? null}
+              marketType="perp"
               onPress={() => onNavigateToChart(item.name, 'perp')}
             />
           ))}
@@ -138,16 +175,14 @@ function StarredTickersContainer({
             </View>
           )}
           {spotData.map((item) => (
-            <MarketCell
+            <LiveMarketCell
               key={`starred-spot-${item.name}`}
+              name={item.name}
               displayName={item.displayName}
               price={item.price}
               priceChange={item.priceChange}
-              priceChangeColor={item.priceChange >= 0 ? Color.BRIGHT_ACCENT : Color.RED}
-              metricValue={formatLargeNumber(item.volume)}
-              metricColor={Color.FG_3}
-              showMetricBelow={true}
-              sparklineData={getSparklineData?.(item.name, 'spot') ?? null}
+              volume={item.volume}
+              marketType="spot"
               onPress={() => onNavigateToChart(item.name, 'spot')}
             />
           ))}

@@ -20,7 +20,7 @@ import {
   getDefaultCoin,
   createHIP3Market,
 } from '../lib/markets';
-import { HIP3_DEXES, HIP3_SYMBOLS } from '../constants/constants';
+import { HIP3_DEXES } from '../constants/constants';
 import {
   logWebSocketSubscription,
   logWebSocketUnsubscription,
@@ -371,7 +371,6 @@ export function WebSocketProvider({
 
                 const priceMap: Record<string, string> = {};
                 const newContexts: Record<string, AssetContext> = {};
-                const whitelist = HIP3_SYMBOLS[dex] || [];
                 let newMarketAdded = false;
 
                 if (data.mids && typeof data.mids === 'object') {
@@ -380,34 +379,33 @@ export function WebSocketProvider({
                       const parts = coin.split(':');
                       const symbol = parts.length > 1 ? parts[1] : coin;
 
-                      if (whitelist.includes(symbol)) {
-                        const key = `${dex}:${symbol}`;
-                        priceMap[key] = price;
+                      // Store ALL HIP-3 prices (no whitelist filter)
+                      const key = `${dex}:${symbol}`;
+                      priceMap[key] = price;
 
-                        const existingMarket = perpMarketsRef.current.find(
-                          m => m.name === symbol && m.dex === dex
-                        );
+                      const existingMarket = perpMarketsRef.current.find(
+                        m => m.name === symbol && m.dex === dex
+                      );
 
-                        if (existingMarket) {
-                          newContexts[key] = {
-                            ...getWebSocketState().assetContexts[key],
-                            markPx: parseFloat(price),
-                          } as AssetContext;
-                        } else {
-                          const newMarket = createHIP3Market(dex, symbol);
-                          store.addPerpMarket(newMarket);
-                          perpMarketsRef.current = [...perpMarketsRef.current, newMarket];
-                          newMarketAdded = true;
-                          console.log(`[HIP-3] Created placeholder market ${key} from allMids`);
+                      if (existingMarket) {
+                        newContexts[key] = {
+                          ...getWebSocketState().assetContexts[key],
+                          markPx: parseFloat(price),
+                        } as AssetContext;
+                      } else {
+                        const newMarket = createHIP3Market(dex, symbol);
+                        store.addPerpMarket(newMarket);
+                        perpMarketsRef.current = [...perpMarketsRef.current, newMarket];
+                        newMarketAdded = true;
+                        console.log(`[HIP-3] Created placeholder market ${key} from allMids`);
 
-                          newContexts[key] = {
-                            markPx: parseFloat(price),
-                            dayNtlVlm: 0,
-                            prevDayPx: parseFloat(price),
-                            funding: 0,
-                            openInterest: 0,
-                          };
-                        }
+                        newContexts[key] = {
+                          markPx: parseFloat(price),
+                          dayNtlVlm: 0,
+                          prevDayPx: parseFloat(price),
+                          funding: 0,
+                          openInterest: 0,
+                        };
                       }
                     }
                   });
@@ -1093,7 +1091,6 @@ export function WebSocketProvider({
             const sub = await client.allMids({ dex }, (data: any) => {
               const priceMap: Record<string, string> = {};
               const newContexts: Record<string, AssetContext> = {};
-              const whitelist = HIP3_SYMBOLS[dex] || [];
 
               if (data.mids && typeof data.mids === 'object') {
                 Object.entries(data.mids).forEach(([coin, price]) => {
@@ -1101,32 +1098,31 @@ export function WebSocketProvider({
                     const parts = coin.split(':');
                     const symbol = parts.length > 1 ? parts[1] : coin;
 
-                    if (whitelist.includes(symbol)) {
-                      const key = `${dex}:${symbol}`;
-                      priceMap[key] = price;
+                    // Store ALL HIP-3 prices (no whitelist filter)
+                    const key = `${dex}:${symbol}`;
+                    priceMap[key] = price;
 
-                      const existingMarket = perpMarketsRef.current.find(
-                        m => m.name === symbol && m.dex === dex
-                      );
+                    const existingMarket = perpMarketsRef.current.find(
+                      m => m.name === symbol && m.dex === dex
+                    );
 
-                      if (existingMarket) {
-                        newContexts[key] = {
-                          ...getWebSocketState().assetContexts[key],
-                          markPx: parseFloat(price),
-                        } as AssetContext;
-                      } else {
-                        const newMarket = createHIP3Market(dex, symbol);
-                        useWebSocketStore.getState().addPerpMarket(newMarket);
-                        perpMarketsRef.current = [...perpMarketsRef.current, newMarket];
+                    if (existingMarket) {
+                      newContexts[key] = {
+                        ...getWebSocketState().assetContexts[key],
+                        markPx: parseFloat(price),
+                      } as AssetContext;
+                    } else {
+                      const newMarket = createHIP3Market(dex, symbol);
+                      useWebSocketStore.getState().addPerpMarket(newMarket);
+                      perpMarketsRef.current = [...perpMarketsRef.current, newMarket];
 
-                        newContexts[key] = {
-                          markPx: parseFloat(price),
-                          dayNtlVlm: 0,
-                          prevDayPx: parseFloat(price),
-                          funding: 0,
-                          openInterest: 0,
-                        };
-                      }
+                      newContexts[key] = {
+                        markPx: parseFloat(price),
+                        dayNtlVlm: 0,
+                        prevDayPx: parseFloat(price),
+                        funding: 0,
+                        openInterest: 0,
+                      };
                     }
                   }
                 });

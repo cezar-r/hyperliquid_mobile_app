@@ -683,7 +683,8 @@ export default function HomeScreen(): React.JSX.Element {
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [sparklineContext, perpCoinKeys, spotCoinKeys, starredPerpTickers, starredSpotTickers, wsState.spotMarkets]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sparklineContext, perpCoinKeys, spotCoinKeys, starredPerpTickers, starredSpotTickers, wsState.spotMarkets, sparklineContext?.refreshTrigger]);
 
   // Prepare starred tickers with data
   const starredTickersData = useMemo(() => {
@@ -1082,7 +1083,6 @@ export default function HomeScreen(): React.JSX.Element {
                       onNavigateToChart={handleNavigateToChart}
                       showCloseAll={marketFilter === 'Account'}
                       onCloseAll={handleCloseAll}
-                      getSparklineData={sparklineContext?.getSparklineData}
                     />
                   )}
 
@@ -1093,7 +1093,6 @@ export default function HomeScreen(): React.JSX.Element {
                       spotMarkets={wsState.spotMarkets}
                       onNavigateToChart={handleNavigateToChart}
                       showLabel={marketFilter === 'Account'}
-                      getSparklineData={sparklineContext?.getSparklineData}
                     />
                   )}
 
@@ -1113,7 +1112,6 @@ export default function HomeScreen(): React.JSX.Element {
                     spotData={starredTickersData.spotData}
                     marketFilter={marketFilter}
                     onNavigateToChart={handleNavigateToChart}
-                    getSparklineData={sparklineContext?.getSparklineData}
                   />
 
                   {/* Empty State */}

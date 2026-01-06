@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Animated, Dimensions } from 'react-native';
+import { Animated, Dimensions, Image } from 'react-native';
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useNavigationState } from '@react-navigation/native';
 import {
@@ -199,8 +199,11 @@ export default function TabNavigator(): React.JSX.Element {
           component={ChartScreen}
           options={{
             headerShown: false,
-            tabBarIcon: ({ focused }) => (
-              <TabIcon iconType="Ionicons" iconName="search" focused={focused} />
+            tabBarIcon: () => (
+              <Image
+                source={require('../../../assets/blob_green.gif')}
+                style={{ width: ICON_SIZE + 5, height: ICON_SIZE + 5, marginTop: 10 }}
+              />
             ),
           }}
         />

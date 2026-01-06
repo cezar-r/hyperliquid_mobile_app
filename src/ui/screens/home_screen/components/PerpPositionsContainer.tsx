@@ -4,8 +4,7 @@ import { Color } from '../../../shared/styles';
 import { sharedStyles } from '../styles/shared.styles';
 import { styles } from '../styles/PerpPositionsContainer.styles';
 import PerpPositionCell from './PerpPositionCell';
-import type { PerpPosition, MarketType } from '../../../../types';
-import type { SparklineData } from '../../../shared/components';
+import type { PerpPosition } from '../../../../types';
 import { playTextButtonHaptic } from '../../../../lib/haptics';
 
 interface PerpPositionsContainerProps {
@@ -23,7 +22,6 @@ interface PerpPositionsContainerProps {
   onNavigateToChart: (coin: string, market: 'perp' | 'spot') => void;
   showCloseAll: boolean;
   onCloseAll?: () => void;
-  getSparklineData?: (coin: string, marketType: MarketType) => SparklineData | null;
 }
 
 // Helper to format numbers
@@ -43,7 +41,6 @@ function PerpPositionsContainer({
   onNavigateToChart,
   showCloseAll,
   onCloseAll,
-  getSparklineData,
 }: PerpPositionsContainerProps): React.JSX.Element {
   return (
     <View style={styles.container}>
@@ -87,7 +84,6 @@ function PerpPositionsContainer({
         const marketKey = item.position.dex
           ? `${item.position.dex}:${item.position.coin}`
           : item.position.coin;
-        const sparklineData = getSparklineData?.(marketKey, 'perp') ?? null;
         return (
           <PerpPositionCell
             key={`perp-${marketKey}`}
@@ -96,7 +92,6 @@ function PerpPositionsContainer({
             marginUsed={item.marginUsed}
             pnl={item.pnl}
             assetContext={item.assetContext}
-            sparklineData={sparklineData}
             onPress={() => onNavigateToChart(marketKey, 'perp')}
           />
         );
