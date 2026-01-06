@@ -95,16 +95,20 @@ export default function RootNavigator(): React.JSX.Element {
             component={SplashScreen}
             options={{ gestureEnabled: false }}
           />
-          <Stack.Screen name="Connect" component={ConnectScreen} />
+          <Stack.Screen
+            name="Connect"
+            component={ConnectScreen}
+            options={{ animation: 'fade' }}
+          />
           <Stack.Screen
             name="EnableSessionKey"
             component={EnableSessionKeyScreen}
-            options={{ gestureEnabled: false }}
+            options={{ gestureEnabled: false, animation: 'fade' }}
           />
           <Stack.Screen
             name="Authenticated"
             component={AuthenticatedScreens}
-            options={{ gestureEnabled: false, headerShown: false }}
+            options={{ gestureEnabled: false, headerShown: false, animation: 'fade' }}
           />
         </Stack.Navigator>
       </SparklineDataProvider>
