@@ -29,6 +29,7 @@ import {
   logWebSocketMode,
   logDataUpdate,
 } from '../lib/logger';
+import { useAppVisibility } from '../hooks/useAppVisibility';
 import { useWebSocketStore, getWebSocketState } from '../stores';
 import type {
   WebSocketState,
@@ -83,6 +84,10 @@ export function WebSocketProvider({
 }): React.JSX.Element {
   // Get store state for backward compatibility (state object)
   const storeState = useWebSocketStore();
+
+  // Track app visibility for background/foreground subscription management
+  const isAppActive = useAppVisibility();
+  const isInitializedRef = useRef(false);
 
   // Refs for WebSocket resources
   const wsTransportRef = useRef<hl.WebSocketTransport | null>(null);
@@ -479,6 +484,7 @@ export function WebSocketProvider({
         });
 
         console.log('[Phase 4] ✓ WebSocket initialized');
+        isInitializedRef.current = true;
       } catch (error: any) {
         console.error('[Phase 4] WebSocket initialization error:', error);
         if (mounted) {
@@ -1233,6 +1239,40 @@ export function WebSocketProvider({
     await unsubscribeSingleAssetCtx();
     await resubscribeGlobal();
   }, [unsubscribeSingleAssetCtx, resubscribeGlobal]);
+
+  // ============ BACKGROUND/FOREGROUND HANDLING ============
+  useEffect(() => {
+    // Don't do anything until initial subscriptions are complete
+    if (!isInitializedRef.current) return;
+
+    // Only handle global mode - chart mode has its own subscription management
+    if (subscriptionModeRef.current !== 'global') return;
+
+    if (!isAppActive) {
+      // === APP WENT TO BACKGROUND ===
+      console.log('[WebSocket] App backgrounded - pausing global subscriptions');
+
+      // 1. Clear pending queues to avoid processing stale data on return
+      pendingPricesRef.current = {};
+      pendingContextsRef.current = {};
+
+      // 2. Cancel any pending batch flush
+      if (flushTimeoutRef.current) {
+        clearTimeout(flushTimeoutRef.current);
+        flushTimeoutRef.current = null;
+      }
+
+      // 3. Unsubscribe from global subscriptions (allMids + asset contexts)
+      unsubscribeAllMids();
+      unsubscribeAllAssetCtx();
+    } else {
+      // === APP RETURNED TO FOREGROUND ===
+      console.log('[WebSocket] App foregrounded - resuming global subscriptions');
+
+      // Resubscribe to all global subscriptions
+      resubscribeGlobal();
+    }
+  }, [isAppActive, unsubscribeAllMids, unsubscribeAllAssetCtx, resubscribeGlobal]);
 
   // Re-subscribe the single asset context when coin or market type changes during Chart Mode
   useEffect(() => {
