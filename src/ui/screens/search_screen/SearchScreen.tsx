@@ -144,6 +144,9 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
   // HIP-3 filter state (only applies to perp)
   const [showHip3Only, setShowHip3Only] = useState(false);
 
+  // Minimum volume threshold from settings
+  const [minVolumeThreshold, setMinVolumeThreshold] = useState(1000);
+
   // For swipe animation
   const slideAnim = useRef(new Animated.Value(0)).current;
 
@@ -153,15 +156,19 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
   React.useEffect(() => {
     const loadFilterPreferences = async () => {
       try {
-        const [starFilter, hip3Filter] = await Promise.all([
+        const [starFilter, hip3Filter, volumeThreshold] = await Promise.all([
           AsyncStorage.getItem('search_star_filter'),
           AsyncStorage.getItem('search_hip3_filter'),
+          AsyncStorage.getItem('@min_volume_threshold'),
         ]);
         if (starFilter !== null) {
           setShowStarredOnly(starFilter === 'true');
         }
         if (hip3Filter !== null) {
           setShowHip3Only(hip3Filter === 'true');
+        }
+        if (volumeThreshold !== null) {
+          setMinVolumeThreshold(parseFloat(volumeThreshold));
         }
       } catch (error) {
         console.error('[SearchScreen] Failed to load filter preferences:', error);
@@ -282,14 +289,15 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
       });
     }
 
-    // Filter out spot tickers with 0 volume
-    if (wsState.marketType === 'spot') {
-      filtered = filtered.filter((m) => {
-        const ctx = wsState.assetContexts[m.name];
-        const volume = ctx?.dayNtlVlm || 0;
-        return volume > 0;
-      });
-    }
+    // Filter out tickers below minimum volume threshold (both perp and spot)
+    filtered = filtered.filter((m) => {
+      const contextKey = wsState.marketType === 'perp'
+        ? getMarketContextKey(m as PerpMarket)
+        : m.name;
+      const ctx = wsState.assetContexts[contextKey];
+      const volume = ctx?.dayNtlVlm || 0;
+      return volume >= minVolumeThreshold;
+    });
 
     // Filter by HIP-3 toggle (only applies to perp)
     if (wsState.marketType === 'perp') {
@@ -440,6 +448,7 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
     showStarredOnly,
     starredTickers,
     showHip3Only,
+    minVolumeThreshold,
   ]);
 
   // Log rendering (must come after getSortedAndFilteredMarkets is defined)
@@ -831,6 +840,7 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
             {/* Market List */}
             <FlatList
               style={styles.marketList}
+              contentContainerStyle={{ paddingBottom: 70 }}
               data={getSortedAndFilteredMarkets}
               keyExtractor={keyExtractor}
               renderItem={renderItem}

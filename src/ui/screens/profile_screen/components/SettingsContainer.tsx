@@ -4,12 +4,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import SettingsRow from './SettingsRow';
 import ClearCacheRow from './ClearCacheRow';
 import AutoApproveRow from './auto_approve_row/AutoApproveRow';
+import VolumeThresholdRow from './VolumeThresholdRow';
 
 const SHOW_TRADES_KEY = '@show_trades_on_chart';
 const SKIP_OPEN_ORDER_CONFIRMATIONS_KEY = '@skip_open_order_confirmations';
 const SKIP_CLOSE_POSITION_CONFIRMATIONS_KEY = '@skip_close_position_confirmations';
 const HIDE_SMALL_BALANCES_KEY = '@hide_small_balances';
 const SHOW_STAKING_BALANCES_KEY = '@show_staking_balances';
+const MIN_VOLUME_THRESHOLD_KEY = '@min_volume_threshold';
 
 export default function SettingsContainer(): React.JSX.Element {
   const [showTradesOnChart, setShowTradesOnChart] = useState(false);
@@ -17,6 +19,7 @@ export default function SettingsContainer(): React.JSX.Element {
   const [skipClosePositionConfirmations, setSkipClosePositionConfirmations] = useState(false);
   const [hideSmallBalances, setHideSmallBalances] = useState(false);
   const [showStakingBalances, setShowStakingBalances] = useState(true);
+  const [minVolumeThreshold, setMinVolumeThreshold] = useState(1000);
 
   // Load preferences on mount
   useEffect(() => {
@@ -45,6 +48,11 @@ export default function SettingsContainer(): React.JSX.Element {
         const showStakingValue = await AsyncStorage.getItem(SHOW_STAKING_BALANCES_KEY);
         if (showStakingValue !== null) {
           setShowStakingBalances(showStakingValue === 'true');
+        }
+
+        const volumeThresholdValue = await AsyncStorage.getItem(MIN_VOLUME_THRESHOLD_KEY);
+        if (volumeThresholdValue !== null) {
+          setMinVolumeThreshold(parseFloat(volumeThresholdValue));
         }
       } catch (error) {
         console.error('Failed to load preferences:', error);
@@ -99,6 +107,15 @@ export default function SettingsContainer(): React.JSX.Element {
     }
   };
 
+  const handleSetMinVolumeThreshold = async (value: number) => {
+    setMinVolumeThreshold(value);
+    try {
+      await AsyncStorage.setItem(MIN_VOLUME_THRESHOLD_KEY, value.toString());
+    } catch (error) {
+      console.error('Failed to save min volume threshold preference:', error);
+    }
+  };
+
   return (
     <View>
       <AutoApproveRow />
@@ -126,6 +143,10 @@ export default function SettingsContainer(): React.JSX.Element {
         label="Show Staking Balances"
         value={showStakingBalances}
         onToggle={handleToggleShowStakingBalances}
+      />
+      <VolumeThresholdRow
+        value={minVolumeThreshold}
+        onSave={handleSetMinVolumeThreshold}
       />
       <ClearCacheRow />
     </View>

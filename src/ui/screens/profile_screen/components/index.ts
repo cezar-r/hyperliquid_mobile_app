@@ -6,4 +6,5 @@ export { default as SettingsNavigationRow } from './SettingsNavigationRow';
 export { default as WalletInfoContainer } from './WalletInfoContainer';
 export { default as EnableTradingRow } from './auto_approve_row/AutoApproveRow';
 export { default as ClearCacheRow } from './ClearCacheRow';
+export { default as VolumeThresholdRow } from './VolumeThresholdRow';
 
