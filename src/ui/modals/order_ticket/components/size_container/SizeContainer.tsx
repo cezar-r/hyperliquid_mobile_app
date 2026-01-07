@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, TextInput } from 'react-native';
 import { CustomSlider } from '../../../../shared/components/custom_slider';
 import { styles } from './styles/SizeContainer.styles';
@@ -15,9 +15,11 @@ interface SizeContainerProps {
   tradeableLabel: string;
   side: 'buy' | 'sell';
   onSliderChange?: () => void;
+  onSliderStart?: () => void;
+  onSliderComplete?: () => void;
 }
 
-export const SizeContainer: React.FC<SizeContainerProps> = ({
+export const SizeContainer: React.FC<SizeContainerProps> = memo(({
   coin,
   size,
   onSizeChange,
@@ -27,6 +29,8 @@ export const SizeContainer: React.FC<SizeContainerProps> = ({
   tradeableLabel,
   side,
   onSliderChange,
+  onSliderStart,
+  onSliderComplete,
 }) => {
   return (
     <View style={styles.container}>
@@ -51,6 +55,8 @@ export const SizeContainer: React.FC<SizeContainerProps> = ({
           if (onSliderChange) onSliderChange();
           onSizePercentChange(value);
         }}
+        onSlidingStart={onSliderStart}
+        onSlidingComplete={onSliderComplete}
         minimumValue={0}
         maximumValue={100}
         step={5}
@@ -66,5 +72,5 @@ export const SizeContainer: React.FC<SizeContainerProps> = ({
       </View>
     </View>
   );
-};
+});
 

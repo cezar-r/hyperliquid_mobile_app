@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { View, Text, TextInput } from 'react-native';
 import { CustomSlider } from '../../../../shared/components/custom_slider';
 import { styles } from './styles/MarginContainer.styles';
@@ -12,16 +12,20 @@ interface MarginContainerProps {
   sizePercent: number;
   onSizePercentChange: (percent: number) => void;
   onSliderChange?: () => void;
+  onSliderStart?: () => void;
+  onSliderComplete?: () => void;
   collateral?: string; // Collateral token symbol (e.g., 'USDC', 'USDH')
 }
 
-export const MarginContainer: React.FC<MarginContainerProps> = ({
+export const MarginContainer: React.FC<MarginContainerProps> = memo(({
   marginRequired,
   onMarginChange,
   tradeableBalance,
   sizePercent,
   onSizePercentChange,
   onSliderChange,
+  onSliderStart,
+  onSliderComplete,
   collateral = 'USDC',
 }) => {
   // Local state to preserve raw input (including trailing decimal/zeros)
@@ -67,6 +71,8 @@ export const MarginContainer: React.FC<MarginContainerProps> = ({
           if (onSliderChange) onSliderChange();
           onSizePercentChange(value);
         }}
+        onSlidingStart={onSliderStart}
+        onSlidingComplete={onSliderComplete}
         minimumValue={0}
         maximumValue={100}
         step={5}
@@ -82,5 +88,5 @@ export const MarginContainer: React.FC<MarginContainerProps> = ({
       </View>
     </View>
   );
-};
+});
 

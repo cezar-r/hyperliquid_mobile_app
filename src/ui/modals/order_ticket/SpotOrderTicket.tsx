@@ -3,8 +3,8 @@
  * Interface for placing spot limit and market orders
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { View, Modal, ScrollView, Alert } from 'react-native';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { View, Modal, ScrollView, Alert, unstable_batchedUpdates } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWallet } from '../../../contexts/WalletContext';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
@@ -101,6 +101,9 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
+
+  // Track slider activity to gate orderbook price updates during drag
+  const isSliderActiveRef = useRef(false);
 
   // Set default side when modal opens
   useEffect(() => {
@@ -255,27 +258,39 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
     };
   }, [price, size]);
 
-  // Handle slider change
-  const handleSizePercentChange = (percent: number) => {
-    setSizePercent(percent);
-    
-    if (side === 'buy') {
-      const p = parseFloat(price || currentPrice || '0');
-      if (p > 0) {
-        const usdToSpend = usdcBalance * (percent / 100);
-        const tokenAmount = usdToSpend / p;
+  // Handle slider change - batched to reduce re-renders
+  const handleSizePercentChange = useCallback((percent: number) => {
+    unstable_batchedUpdates(() => {
+      setSizePercent(percent);
+      if (side === 'buy') {
+        const p = parseFloat(price || currentPrice || '0');
+        if (p > 0) {
+          const usdToSpend = usdcBalance * (percent / 100);
+          const tokenAmount = usdToSpend / p;
+          setSize(tokenAmount.toFixed(assetInfo.szDecimals));
+        }
+      } else {
+        const tokenAmount = tokenBalance * (percent / 100);
         setSize(tokenAmount.toFixed(assetInfo.szDecimals));
       }
-    } else {
-      const tokenAmount = tokenBalance * (percent / 100);
-      setSize(tokenAmount.toFixed(assetInfo.szDecimals));
-    }
-  };
+    });
+  }, [side, price, currentPrice, usdcBalance, tokenBalance, assetInfo.szDecimals]);
 
-  const handleSizeChange = (value: string) => {
-    setSize(value);
-    setSizePercent(0);
-  };
+  const handleSizeChange = useCallback((value: string) => {
+    unstable_batchedUpdates(() => {
+      setSize(value);
+      setSizePercent(0);
+    });
+  }, []);
+
+  // Slider activity handlers to gate orderbook updates during drag
+  const handleSliderStart = useCallback(() => {
+    isSliderActiveRef.current = true;
+  }, []);
+
+  const handleSliderComplete = useCallback(() => {
+    isSliderActiveRef.current = false;
+  }, []);
 
   const handleSubmit = async () => {
     setError(null);
@@ -378,8 +393,9 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
   };
 
   // Update market order price when side, currentPrice, or orderbook changes
+  // Gate updates during slider interaction to prevent jank
   useEffect(() => {
-    if (orderType === 'market') {
+    if (orderType === 'market' && !isSliderActiveRef.current) {
       const displayPrice = getDisplayPrice();
       if (displayPrice) {
         setPrice(displayPrice);
@@ -475,6 +491,8 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
               tradeableLabel={tradeableLabel}
               side={side}
               onSliderChange={playSliderChangeHaptic}
+              onSliderStart={handleSliderStart}
+              onSliderComplete={handleSliderComplete}
             />
 
             {/* Advanced Options */}

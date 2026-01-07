@@ -16,8 +16,12 @@ interface CustomSliderProps {
   step?: number;
   showDots?: boolean;
   dotPositions?: number[];
+  onSlidingStart?: () => void;
   onSlidingComplete?: (value: number) => void;
 }
+
+// Throttle interval for JS callbacks (ms) - visual updates remain smooth
+const THROTTLE_MS = 50;
 
 export const CustomSlider: React.FC<CustomSliderProps> = ({
   value,
@@ -27,15 +31,19 @@ export const CustomSlider: React.FC<CustomSliderProps> = ({
   step = 1,
   showDots = true,
   dotPositions = [0, 25, 50, 75, 100],
+  onSlidingStart,
   onSlidingComplete,
 }) => {
   const trackWidth = useSharedValue(0);
   const translateX = useSharedValue(0);
+  const lastUpdateTime = useSharedValue(0);
 
   // Store latest callbacks in refs to avoid stale closures
   const onValueChangeRef = useRef(onValueChange);
+  const onSlidingStartRef = useRef(onSlidingStart);
   const onSlidingCompleteRef = useRef(onSlidingComplete);
   onValueChangeRef.current = onValueChange;
+  onSlidingStartRef.current = onSlidingStart;
   onSlidingCompleteRef.current = onSlidingComplete;
 
   // Convert value to position
@@ -74,7 +82,13 @@ export const CustomSlider: React.FC<CustomSliderProps> = ({
     }
   }, [positionToValue]);
 
-  // Pan gesture with directional detection
+  const callSlidingStart = useCallback(() => {
+    if (onSlidingStartRef.current) {
+      onSlidingStartRef.current();
+    }
+  }, []);
+
+  // Pan gesture with directional detection and throttled JS callbacks
   const panGesture = Gesture.Pan()
     .activeOffsetX([-5, 5])   // Only activate after 5px horizontal movement
     .failOffsetY([-10, 10])   // Fail (allow scroll) if vertical movement exceeds 10px first
@@ -84,6 +98,8 @@ export const CustomSlider: React.FC<CustomSliderProps> = ({
       const tw = trackWidth.value;
       const newPosition = Math.max(0, Math.min(tw, x));
       translateX.value = newPosition;
+      lastUpdateTime.value = Date.now();
+      runOnJS(callSlidingStart)();
       runOnJS(updateValue)(newPosition, tw);
     })
     .onUpdate((event) => {
@@ -91,11 +107,19 @@ export const CustomSlider: React.FC<CustomSliderProps> = ({
       const x = event.x;
       const tw = trackWidth.value;
       const newPosition = Math.max(0, Math.min(tw, x));
+      // Always update visual position (stays on UI thread - smooth)
       translateX.value = newPosition;
-      runOnJS(updateValue)(newPosition, tw);
+      // Throttle JS callbacks to reduce re-renders
+      const now = Date.now();
+      if (now - lastUpdateTime.value >= THROTTLE_MS) {
+        lastUpdateTime.value = now;
+        runOnJS(updateValue)(newPosition, tw);
+      }
     })
     .onEnd(() => {
       'worklet';
+      // Always fire final update to ensure state is accurate
+      runOnJS(updateValue)(translateX.value, trackWidth.value);
       runOnJS(handleComplete)(translateX.value, trackWidth.value);
     });
 

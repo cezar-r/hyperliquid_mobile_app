@@ -3,8 +3,8 @@
  * Interface for placing perp limit and market orders
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { View, Modal, ScrollView, Alert } from 'react-native';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { View, Modal, ScrollView, Alert, unstable_batchedUpdates } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWallet } from '../../../contexts/WalletContext';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
@@ -144,6 +144,9 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
+
+  // Track slider activity to gate orderbook price updates during drag
+  const isSliderActiveRef = useRef(false);
 
   // Get asset info for the coin
   const assetInfo = useMemo(() => {
@@ -614,36 +617,47 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
     return { tpPercent, slPercent, tpValid, slValid };
   }, [price, takeProfitPrice, stopLossPrice, side]);
   
-  // Handle margin slider change
-  const handleSizePercentChange = (percent: number) => {
-    setSizePercent(percent);
-    
-    if (!tradeableBalance) {
-      setMarginRequired(0);
-      return;
-    }
-    
-    const margin = tradeableBalance * (percent / 100);
-    setMarginRequired(margin);
-  };
-  
-  // Handle manual margin change
-  const handleMarginChange = (value: string) => {
-    const margin = parseFloat(value) || 0;
-    setMarginRequired(margin);
+  // Handle margin slider change - batched to reduce re-renders
+  const handleSizePercentChange = useCallback((percent: number) => {
+    unstable_batchedUpdates(() => {
+      setSizePercent(percent);
+      if (!tradeableBalance) {
+        setMarginRequired(0);
+        return;
+      }
+      const margin = tradeableBalance * (percent / 100);
+      setMarginRequired(margin);
+    });
+  }, [tradeableBalance]);
 
-    // Calculate and sync slider position
-    if (tradeableBalance && tradeableBalance > 0) {
-      const percent = (margin / tradeableBalance) * 100;
-      setSizePercent(Math.min(100, percent));
-    } else {
-      setSizePercent(0);
-    }
-  };
+  // Handle manual margin change - batched to reduce re-renders
+  const handleMarginChange = useCallback((value: string) => {
+    unstable_batchedUpdates(() => {
+      const margin = parseFloat(value) || 0;
+      setMarginRequired(margin);
+      // Calculate and sync slider position
+      if (tradeableBalance && tradeableBalance > 0) {
+        const percent = (margin / tradeableBalance) * 100;
+        setSizePercent(Math.min(100, percent));
+      } else {
+        setSizePercent(0);
+      }
+    });
+  }, [tradeableBalance]);
+
+  // Slider activity handlers to gate orderbook updates during drag
+  const handleSliderStart = useCallback(() => {
+    isSliderActiveRef.current = true;
+  }, []);
+
+  const handleSliderComplete = useCallback(() => {
+    isSliderActiveRef.current = false;
+  }, []);
   
   // Update market order price when side, currentPrice, or orderbook changes
+  // Gate updates during slider interaction to prevent jank
   useEffect(() => {
-    if (orderType === 'market') {
+    if (orderType === 'market' && !isSliderActiveRef.current) {
       const displayPrice = getDisplayPrice();
       if (displayPrice) {
         setPrice(displayPrice);
@@ -723,6 +737,8 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
               sizePercent={sizePercent}
               onSizePercentChange={handleSizePercentChange}
               onSliderChange={playSliderChangeHaptic}
+              onSliderStart={handleSliderStart}
+              onSliderComplete={handleSliderComplete}
               collateral={getHip3Collateral(assetInfo.dex)}
             />
 
@@ -732,6 +748,8 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
               onLeverageChange={setLeverage}
               maxLeverage={assetInfo.maxLeverage}
               onSliderChange={playSliderChangeHaptic}
+              onSliderStart={handleSliderStart}
+              onSliderComplete={handleSliderComplete}
             />
 
             {/* Margin Type */}
