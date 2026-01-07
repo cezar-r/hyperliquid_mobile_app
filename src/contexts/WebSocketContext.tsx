@@ -1277,34 +1277,48 @@ export function WebSocketProvider({
     // Don't do anything until initial subscriptions are complete
     if (!isInitializedRef.current) return;
 
-    // Only handle global mode - chart mode has its own subscription management
-    if (subscriptionModeRef.current !== 'global') return;
-
     if (!isAppActive) {
       // === APP WENT TO BACKGROUND ===
-      console.log('[WebSocket] App backgrounded - pausing global subscriptions');
+      const mode = subscriptionModeRef.current;
+      console.log(`[WebSocket] App backgrounded - pausing ${mode} subscriptions`);
 
-      // 1. Clear pending queues to avoid processing stale data on return
+      // Clear pending queues to avoid processing stale data on return
       pendingPricesRef.current = {};
       pendingContextsRef.current = {};
 
-      // 2. Cancel any pending batch flush
+      // Cancel any pending batch flush
       if (flushTimeoutRef.current) {
         clearTimeout(flushTimeoutRef.current);
         flushTimeoutRef.current = null;
       }
 
-      // 3. Unsubscribe from global subscriptions (allMids + asset contexts)
-      unsubscribeAllMids();
-      unsubscribeAllAssetCtx();
+      // Clear any pending orderbook to avoid processing stale data
+      useWebSocketStore.getState().clearPendingOrderbook();
+
+      if (mode === 'global') {
+        // Unsubscribe from global subscriptions (allMids + asset contexts)
+        unsubscribeAllMids();
+        unsubscribeAllAssetCtx();
+      } else if (mode === 'chart') {
+        // Unsubscribe from chart-specific subscriptions to prevent message flooding
+        unsubscribeFromCandles();
+        unsubscribeFromTrades();
+        unsubscribeFromOrderbook();
+        unsubscribeSingleAssetCtx();
+      }
     } else {
       // === APP RETURNED TO FOREGROUND ===
-      console.log('[WebSocket] App foregrounded - resuming global subscriptions');
+      const mode = subscriptionModeRef.current;
+      console.log(`[WebSocket] App foregrounded - resuming ${mode} subscriptions`);
 
-      // Resubscribe to all global subscriptions
-      resubscribeGlobal();
+      if (mode === 'global') {
+        // Resubscribe to all global subscriptions
+        resubscribeGlobal();
+      }
+      // Note: Chart mode subscriptions will be re-established by ChartScreen's useEffects
+      // when isFocused is true, so we don't need to manually resubscribe here
     }
-  }, [isAppActive, unsubscribeAllMids, unsubscribeAllAssetCtx, resubscribeGlobal]);
+  }, [isAppActive, unsubscribeAllMids, unsubscribeAllAssetCtx, resubscribeGlobal, unsubscribeFromCandles, unsubscribeFromTrades, unsubscribeFromOrderbook, unsubscribeSingleAssetCtx]);
 
   // Re-subscribe the single asset context when coin or market type changes during Chart Mode
   useEffect(() => {

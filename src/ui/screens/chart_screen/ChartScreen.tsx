@@ -15,6 +15,7 @@ import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { useWebSocketStore } from '../../../stores/websocketStore';
 import { useWallet } from '../../../contexts/WalletContext';
 import { useSparklineData } from '../../../contexts/SparklineDataContext';
+import { useAppVisibility, useAppStateTransition } from '../../../hooks/useAppVisibility';
 import { resolveSubscriptionCoin, getMarketContextKey, parseMarketKey, findPerpMarketByKey, getAssetIdForMarket } from '../../../lib/markets';
 import { generateTickSizeOptions, calculateMantissa, calculateNSigFigs } from '../../../lib/tickSize';
 import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker, getHip3DisplayName, convertUTCToLocalChartTime } from '../../../lib/formatting';
@@ -106,6 +107,7 @@ export default function ChartScreen(): React.JSX.Element {
   const navigation = useNavigation();
   const route = useRoute();
   const isFocused = useIsFocused();
+  const isAppActive = useAppVisibility();
   const { state, infoClient, enterChartMode, exitChartMode, subscribeToCandles, unsubscribeFromCandles, subscribeToOrderbook, unsubscribeFromOrderbook, subscribeToTrades, unsubscribeFromTrades, selectCoin, setMarketType } =
     useWebSocket();
   const { account, exchangeClient, refetchAccount, pausePolling, resumePolling, getExchangeClientForDex } = useWallet();
@@ -125,6 +127,10 @@ export default function ChartScreen(): React.JSX.Element {
   // Ref to track current ticker for stale data filtering
   const currentTickerRef = useRef<string | null>(null);
   const currentIntervalRef = useRef<CandleInterval | null>(null);
+
+  // Refs for app resume optimization - skip/defer HTTP fetch if data is fresh
+  const isResumingRef = useRef(false);
+  const lastFetchTimeRef = useRef<number>(0);
 
   // Screen lifecycle logging and cache initialization
   useEffect(() => {
@@ -222,6 +228,7 @@ export default function ChartScreen(): React.JSX.Element {
   const previousPrice = useRef<number | null>(null);
   const priceDirection = useRef<'up' | 'down' | null>(null);
   const colorAnimation = useRef(new Animated.Value(0)).current;
+  const lastAnimationTimeRef = useRef<number>(0); // Throttle animations to prevent storm on resume
 
   // Defer rendering until navigation is complete
   useEffect(() => {
@@ -231,6 +238,15 @@ export default function ChartScreen(): React.JSX.Element {
 
     return () => task.cancel();
   }, []);
+
+  // Track when app resumes from background for optimized data fetching
+  useAppStateTransition(
+    useCallback(() => {
+      // Mark that we're resuming - the candle subscription effect will check this
+      isResumingRef.current = true;
+    }, []),
+    undefined
+  );
 
   // Engage Chart Mode subscriptions only while this screen is focused
   // Also pause sparkline fetching and wallet polling to prioritize chart data
@@ -273,22 +289,64 @@ export default function ChartScreen(): React.JSX.Element {
     return state.assetContexts[contextKey] || null;
   }, [state.assetContexts, contextKey]);
 
-  const currentPriceForTick = (contextKey && state.prices[contextKey]) 
+  const currentPriceForTick = (contextKey && state.prices[contextKey])
     ? parseFloat(state.prices[contextKey])
     : (assetCtx?.markPx || 0);
 
-  // Calculate tick size options based on current price and szDecimals
+  // Debounced price for tick size calculation - only update on significant changes
+  // This prevents orderbook re-subscription on every price tick
+  const [debouncedPriceForTick, setDebouncedPriceForTick] = useState(0);
+  const tickPriceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!currentPriceForTick || currentPriceForTick === 0) return;
+
+    // Calculate price change percentage
+    const priceChange = debouncedPriceForTick > 0
+      ? Math.abs(currentPriceForTick - debouncedPriceForTick) / debouncedPriceForTick
+      : 1; // Treat first price as 100% change
+
+    // Update immediately if: first price, or price changed by more than 1%
+    if (debouncedPriceForTick === 0 || priceChange > 0.01) {
+      setDebouncedPriceForTick(currentPriceForTick);
+      if (tickPriceTimeoutRef.current) {
+        clearTimeout(tickPriceTimeoutRef.current);
+        tickPriceTimeoutRef.current = null;
+      }
+    } else {
+      // Small change - debounce for 5 seconds to batch minor fluctuations
+      if (!tickPriceTimeoutRef.current) {
+        tickPriceTimeoutRef.current = setTimeout(() => {
+          setDebouncedPriceForTick(currentPriceForTick);
+          tickPriceTimeoutRef.current = null;
+        }, 5000);
+      }
+    }
+
+    return () => {
+      if (tickPriceTimeoutRef.current) {
+        clearTimeout(tickPriceTimeoutRef.current);
+      }
+    };
+  }, [currentPriceForTick, debouncedPriceForTick]);
+
+  // Reset debounced price when coin changes
+  useEffect(() => {
+    setDebouncedPriceForTick(0);
+  }, [selectedCoin]);
+
+  // Calculate tick size options based on debounced price and szDecimals
   const tickSizeOptions = useMemo(() => {
-    if (!currentPriceForTick || currentPriceForTick === 0) {
+    if (!debouncedPriceForTick || debouncedPriceForTick === 0) {
       return [];
     }
-    
+
     if (marketType === 'perp' && perpMarket) {
-      return generateTickSizeOptions(currentPriceForTick, perpMarket.szDecimals, false);
+      return generateTickSizeOptions(debouncedPriceForTick, perpMarket.szDecimals, false);
     }
-    
-    return generateTickSizeOptions(currentPriceForTick, 2, true);
-  }, [marketType, perpMarket, selectedCoin, currentPriceForTick]);
+
+    return generateTickSizeOptions(debouncedPriceForTick, 2, true);
+  }, [marketType, perpMarket, selectedCoin, debouncedPriceForTick]);
 
   // Reset tick size when coin changes
   useEffect(() => {
@@ -376,17 +434,18 @@ export default function ChartScreen(): React.JSX.Element {
   }, [tickSizeOptions, tickSize]);
 
   // Calculate mantissa and nSigFigs from selected tick size
+  // Use debounced price to prevent orderbook re-subscription on every price tick
   const { mantissa, nSigFigs } = useMemo(() => {
     if (tickSize === null) {
       return { mantissa: undefined, nSigFigs: undefined };
     }
     const calculatedMantissa = calculateMantissa(tickSize);
-    const calculatedNSigFigs = calculateNSigFigs(tickSize, tickSizeOptions, currentPriceForTick);
+    const calculatedNSigFigs = calculateNSigFigs(tickSize, tickSizeOptions, debouncedPriceForTick);
     return {
       mantissa: calculatedMantissa,
       nSigFigs: calculatedNSigFigs,
     };
-  }, [tickSize, tickSizeOptions, currentPriceForTick]);
+  }, [tickSize, tickSizeOptions, debouncedPriceForTick]);
 
   const fetchHistoricalCandles = useCallback(
     async (coin: string, candleInterval: CandleInterval) => {
@@ -512,16 +571,51 @@ export default function ChartScreen(): React.JSX.Element {
     currentIntervalRef.current = interval;
   }, [selectedCoin, interval]);
 
-  // Candle and trades subscription - only when focused
+  // Candle and trades subscription - only when focused and app is active
   // Note: mantissa/nSigFigs removed from deps to prevent re-fetching on price updates
   useEffect(() => {
-    if (!selectedCoin || !intervalLoaded || !interval || !isFocused) return;
+    if (!selectedCoin || !intervalLoaded || !interval || !isFocused || !isAppActive) return;
 
     // Store the ticker and interval for this subscription
     const subscribedTicker = selectedCoin;
     const subscribedInterval = interval;
 
-    fetchHistoricalCandles(selectedCoin, interval);
+    // Check if this is a resume from background
+    const isResuming = isResumingRef.current;
+    isResumingRef.current = false; // Reset for next time
+
+    if (isResuming && candles.length > 0) {
+      // Calculate interval duration in ms for cache freshness check
+      const intervalMs: Record<CandleInterval, number> = {
+        '1m': 60_000,
+        '5m': 300_000,
+        '15m': 900_000,
+        '1h': 3_600_000,
+        '4h': 14_400_000,
+        '1d': 86_400_000,
+      };
+      const timeSinceLastFetch = Date.now() - lastFetchTimeRef.current;
+      const cacheFreshness = intervalMs[interval] || 60_000;
+
+      if (timeSinceLastFetch < cacheFreshness) {
+        // Cache is fresh - skip HTTP fetch, just resubscribe to WebSocket
+        console.log(`[ChartScreen] Resume: Cache fresh (${Math.round(timeSinceLastFetch / 1000)}s old), skipping HTTP fetch`);
+      } else {
+        // Cache is stale - defer HTTP fetch to avoid blocking UI
+        console.log(`[ChartScreen] Resume: Cache stale (${Math.round(timeSinceLastFetch / 1000)}s old), deferring fetch`);
+        InteractionManager.runAfterInteractions(() => {
+          // Verify we're still on the same ticker/interval before fetching
+          if (currentTickerRef.current === subscribedTicker && currentIntervalRef.current === subscribedInterval) {
+            fetchHistoricalCandles(subscribedTicker, subscribedInterval);
+            lastFetchTimeRef.current = Date.now();
+          }
+        });
+      }
+    } else {
+      // Initial load or no cached data - fetch immediately
+      fetchHistoricalCandles(selectedCoin, interval);
+      lastFetchTimeRef.current = Date.now();
+    }
 
     const handleLiveCandle = (candle: Candle): void => {
       // Silently ignore stale candles from previous subscriptions
@@ -587,6 +681,7 @@ export default function ChartScreen(): React.JSX.Element {
     interval,
     intervalLoaded,
     isFocused,
+    isAppActive,
     subscribeToCandles,
     unsubscribeFromCandles,
     subscribeToTrades,
@@ -596,8 +691,10 @@ export default function ChartScreen(): React.JSX.Element {
 
   // Orderbook subscription - separate useEffect so mantissa/nSigFigs changes
   // don't trigger candle re-fetch, only orderbook re-subscription
+  // Only subscribe when orderbook panel is visible OR order ticket is open, and app is active
   useEffect(() => {
-    if (!selectedCoin || !isFocused) return;
+    const needsOrderbook = panel === 'orderbook' || showOrderTicket;
+    if (!selectedCoin || !isFocused || !isAppActive || !needsOrderbook) return;
 
     subscribeToOrderbook(selectedCoin, { mantissa, nSigFigs });
 
@@ -607,6 +704,9 @@ export default function ChartScreen(): React.JSX.Element {
   }, [
     selectedCoin,
     isFocused,
+    isAppActive,
+    panel,
+    showOrderTicket,
     mantissa,
     nSigFigs,
     subscribeToOrderbook,
@@ -759,28 +859,37 @@ export default function ChartScreen(): React.JSX.Element {
     return (contextKey && state.prices[contextKey]) || assetCtx?.markPx;
   }, [contextKey, state.prices, assetCtx?.markPx]);
 
-  // Animate price color on change
+  // Animate price color on change - throttled to prevent animation storm on resume
   useEffect(() => {
-    if (currentPrice != null) {
-      const currentPriceNum = typeof currentPrice === 'string' ? parseFloat(currentPrice) : currentPrice;
-      
-      if (previousPrice.current !== null && previousPrice.current !== currentPriceNum) {
-        if (currentPriceNum > previousPrice.current) {
-          priceDirection.current = 'up';
-        } else if (currentPriceNum < previousPrice.current) {
-          priceDirection.current = 'down';
-        }
+    if (currentPrice == null) return;
 
-        colorAnimation.setValue(0);
-        Animated.timing(colorAnimation, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: false,
-        }).start();
-      }
-      
+    const currentPriceNum = typeof currentPrice === 'string' ? parseFloat(currentPrice) : currentPrice;
+
+    // Skip if same price or no previous price
+    if (previousPrice.current === null || previousPrice.current === currentPriceNum) {
       previousPrice.current = currentPriceNum;
+      return;
     }
+
+    // Always update direction even if we skip animation
+    priceDirection.current = currentPriceNum > previousPrice.current ? 'up' : 'down';
+    previousPrice.current = currentPriceNum;
+
+    // Throttle animations - max 1 per 300ms to avoid storm on resume
+    const now = Date.now();
+    if (now - lastAnimationTimeRef.current < 300) {
+      return;
+    }
+    lastAnimationTimeRef.current = now;
+
+    // Stop any existing animation and start new one
+    colorAnimation.stopAnimation();
+    colorAnimation.setValue(0);
+    Animated.timing(colorAnimation, {
+      toValue: 1,
+      duration: 600, // Reduced from 1000ms for snappier feel
+      useNativeDriver: false,
+    }).start();
   }, [currentPrice, colorAnimation]);
 
   // Calculate 24h change
@@ -815,28 +924,33 @@ export default function ChartScreen(): React.JSX.Element {
   // Interpolate price color
   const animatedPriceColor = colorAnimation.interpolate({
     inputRange: [0, 1],
-    outputRange: priceDirection.current === 'up' 
+    outputRange: priceDirection.current === 'up'
       ? [Color.BRIGHT_ACCENT, Color.FG_1]
       : priceDirection.current === 'down'
       ? [Color.RED, Color.FG_1]
       : [Color.FG_1, Color.FG_1],
   });
 
-  // Update chart markers and price lines
-  useEffect(() => {
-    if (!chartRef.current || !selectedCoin || candles.length === 0) return;
+  // Memoize candle time range - only recalculate when first/last candle changes
+  // This avoids O(n) Math.min/max on every candle update
+  const candleTimeRange = useMemo(() => {
+    if (candles.length === 0) return { minTime: 0, maxTime: 0 };
+    // Use first and last candle since they're sorted by timestamp
+    return {
+      minTime: candles[0].timestamp,
+      maxTime: candles[candles.length - 1].timestamp,
+    };
+  }, [candles.length > 0 ? candles[0]?.timestamp : 0, candles.length > 0 ? candles[candles.length - 1]?.timestamp : 0]);
+
+  // Memoize chart markers - only recalculate when fills or time range changes
+  const chartMarkers = useMemo((): ChartMarker[] => {
+    if (!showTradesOnChart || !userFills || userFills.length === 0) return [];
+    const { minTime, maxTime } = candleTimeRange;
+    if (minTime === 0) return [];
 
     const markers: ChartMarker[] = [];
-    if (showTradesOnChart && userFills && userFills.length > 0) {
-      const minTime = Math.min(...candles.map(c => c.timestamp));
-      const maxTime = Math.max(...candles.map(c => c.timestamp));
-
-      const visibleFills = userFills.filter((fill: any) => {
-        const fillTime = fill.time;
-        return fillTime >= minTime && fillTime <= maxTime;
-      });
-
-      visibleFills.forEach((fill: any) => {
+    for (const fill of userFills) {
+      if (fill.time >= minTime && fill.time <= maxTime) {
         const isBuy = fill.side === 'B' || fill.side === 'buy';
         markers.push({
           time: convertUTCToLocalChartTime(fill.time),
@@ -847,17 +961,21 @@ export default function ChartScreen(): React.JSX.Element {
           size: 2,
           textColor: Color.FG_1,
         });
-      });
+      }
     }
+    return markers;
+  }, [showTradesOnChart, userFills, candleTimeRange]);
 
+  // Memoize price lines - only recalculate when position/orders change
+  const chartPriceLines = useMemo((): ChartPriceLine[] => {
     const priceLines: ChartPriceLine[] = [];
 
     // Add liquidation price line for perp positions
-    if (marketType === 'perp' && perpPosition && perpPosition.liquidationPx) {
-      const liqPrice = typeof perpPosition.liquidationPx === 'string' 
-        ? parseFloat(perpPosition.liquidationPx) 
+    if (marketType === 'perp' && perpPosition?.liquidationPx) {
+      const liqPrice = typeof perpPosition.liquidationPx === 'string'
+        ? parseFloat(perpPosition.liquidationPx)
         : perpPosition.liquidationPx;
-      
+
       if (!isNaN(liqPrice) && liqPrice > 0) {
         priceLines.push({
           price: liqPrice,
@@ -870,11 +988,11 @@ export default function ChartScreen(): React.JSX.Element {
     }
 
     // Add entry price line for perp positions
-    if (marketType === 'perp' && perpPosition && perpPosition.entryPx) {
-      const entryPrice = typeof perpPosition.entryPx === 'string' 
-        ? parseFloat(perpPosition.entryPx) 
+    if (marketType === 'perp' && perpPosition?.entryPx) {
+      const entryPrice = typeof perpPosition.entryPx === 'string'
+        ? parseFloat(perpPosition.entryPx)
         : perpPosition.entryPx;
-      
+
       if (!isNaN(entryPrice) && entryPrice > 0) {
         priceLines.push({
           price: entryPrice,
@@ -895,12 +1013,12 @@ export default function ChartScreen(): React.JSX.Element {
       return false;
     });
 
-    currentTickerOrders.forEach((order: any) => {
-      const limitPrice = typeof order.limitPx === 'string' 
-        ? parseFloat(order.limitPx) 
+    for (const order of currentTickerOrders) {
+      const limitPrice = typeof order.limitPx === 'string'
+        ? parseFloat(order.limitPx)
         : order.limitPx;
 
-      if (isNaN(limitPrice)) return;
+      if (isNaN(limitPrice)) continue;
 
       const orderType = order.orderType?.toLowerCase() || '';
       const isTpOrder = orderType.includes('tp') || orderType.includes('take');
@@ -927,12 +1045,12 @@ export default function ChartScreen(): React.JSX.Element {
         lineStyle: 'dashed',
         title,
       });
-    });
+    }
 
     // Add TP/SL lines from position if they exist
     if (marketType === 'perp' && perpPosition) {
       if (perpPosition.tpPrice && perpPosition.tpPrice > 0) {
-        const alreadyHasTp = priceLines.some(line => 
+        const alreadyHasTp = priceLines.some(line =>
           Math.abs(line.price - perpPosition.tpPrice!) < 0.01 && line.title.startsWith('TP')
         );
         if (!alreadyHasTp) {
@@ -946,7 +1064,7 @@ export default function ChartScreen(): React.JSX.Element {
         }
       }
       if (perpPosition.slPrice && perpPosition.slPrice > 0) {
-        const alreadyHasSl = priceLines.some(line => 
+        const alreadyHasSl = priceLines.some(line =>
           Math.abs(line.price - perpPosition.slPrice!) < 0.01 && line.title.startsWith('SL')
         );
         if (!alreadyHasSl) {
@@ -961,18 +1079,15 @@ export default function ChartScreen(): React.JSX.Element {
       }
     }
 
-    chartRef.current.setMarkers(markers);
-    chartRef.current.setPriceLines(priceLines);
-  }, [
-    selectedCoin,
-    candles,
-    userFills,
-    perpPosition,
-    account.data?.openOrders,
-    marketType,
-    state.spotMarkets,
-    showTradesOnChart,
-  ]);
+    return priceLines;
+  }, [marketType, perpPosition, account.data?.openOrders, selectedCoin, state.spotMarkets]);
+
+  // Apply chart markers and price lines - minimal effect that just updates the ref
+  useEffect(() => {
+    if (!chartRef.current || candles.length === 0) return;
+    chartRef.current.setMarkers(chartMarkers);
+    chartRef.current.setPriceLines(chartPriceLines);
+  }, [chartMarkers, chartPriceLines, candles.length > 0]);
 
   // Limit recent trades row to 10 to reduce animation/render cost
 

@@ -53,6 +53,7 @@ export interface WebSocketStoreActions {
 
   // Orderbook actions
   setOrderbook: (orderbook: Orderbook | null) => void;
+  clearPendingOrderbook: () => void;
 
   // Trades actions
   setRecentTrades: (trades: Trade[]) => void;
@@ -93,6 +94,11 @@ let pendingTrades: Trade[] = [];
 let tradeFlushTimeout: ReturnType<typeof setTimeout> | null = null;
 const TRADE_DEBOUNCE_MS = 150;
 const MAX_TRADES = 30;
+
+// Orderbook debouncing - prevent flooding on background return
+let pendingOrderbook: Orderbook | null = null;
+let orderbookFlushTimeout: ReturnType<typeof setTimeout> | null = null;
+const ORDERBOOK_DEBOUNCE_MS = 100; // Faster than trades (150ms) for responsiveness
 
 export const useWebSocketStore = create<WebSocketStore>()(
   subscribeWithSelector((set, get) => ({
@@ -194,8 +200,26 @@ export const useWebSocketStore = create<WebSocketStore>()(
       };
     }),
 
-    // Orderbook actions
-    setOrderbook: (orderbook) => set({ orderbook }),
+    // Orderbook actions - debounced to prevent flooding on background return
+    setOrderbook: (orderbook) => {
+      pendingOrderbook = orderbook;
+      if (!orderbookFlushTimeout) {
+        orderbookFlushTimeout = setTimeout(() => {
+          if (pendingOrderbook) {
+            set({ orderbook: pendingOrderbook });
+            pendingOrderbook = null;
+          }
+          orderbookFlushTimeout = null;
+        }, ORDERBOOK_DEBOUNCE_MS);
+      }
+    },
+    clearPendingOrderbook: () => {
+      pendingOrderbook = null;
+      if (orderbookFlushTimeout) {
+        clearTimeout(orderbookFlushTimeout);
+        orderbookFlushTimeout = null;
+      }
+    },
 
     // Trades actions
     setRecentTrades: (trades) => {
