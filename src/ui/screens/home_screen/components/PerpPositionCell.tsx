@@ -5,6 +5,7 @@ import { sharedStyles } from '../styles/shared.styles';
 import { positionCellStyles } from '../styles/PositionCell.styles';
 import { getHip3DisplayName } from '../../../../lib/formatting';
 import { Sparkline } from '../../../shared/components';
+import { MarqueeView } from '../../../shared/components/marquee';
 import { useLiveSparklineData } from '../../../../hooks';
 import type { PerpPosition } from '../../../../types';
 
@@ -55,9 +56,6 @@ function PerpPositionCellComponent({
   const positionSize = parseFloat(position.szi);
   const isLong = positionSize > 0;
   const leverage = position.leverage?.value || 1;
-  const leverageType = position.leverage?.type
-    ? position.leverage.type.charAt(0).toUpperCase() + position.leverage.type.slice(1)
-    : 'Cross';
   const parsedPrice = price ? parseFloat(price) : 0;
 
   // Calculate 24h change
@@ -73,26 +71,23 @@ function PerpPositionCellComponent({
       <TouchableOpacity style={sharedStyles.positionCell} onPress={onPress}>
         <View style={sharedStyles.leftSide}>
           <View style={sharedStyles.tickerContainer}>
-            <Text style={sharedStyles.ticker}>{displayName}</Text>
-            <Text
-              style={[
-                sharedStyles.leverage,
-                { color: isLong ? Color.BRIGHT_ACCENT : Color.RED },
-              ]}
-            >
-              {leverage}x
-            </Text>
-            <Text style={sharedStyles.leverageTypeBadge}>{leverageType}</Text>
+            <MarqueeView>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={sharedStyles.ticker}>{displayName}</Text>
+                <Text
+                  style={[
+                    sharedStyles.leverage,
+                    { color: isLong ? Color.BRIGHT_ACCENT : Color.RED },
+                  ]}
+                >
+                  {leverage}x
+                </Text>
+              </View>
+            </MarqueeView>
           </View>
           <View style={sharedStyles.priceContainer}>
-            <Text style={sharedStyles.size}>${formatNumber(parsedPrice)}</Text>
-            <Text
-              style={[
-                sharedStyles.priceChange,
-                { color: priceChangePct >= 0 ? Color.BRIGHT_ACCENT : Color.RED },
-              ]}
-            >
-              {formatPercent(priceChangePct)}
+            <Text style={sharedStyles.size}>
+              {formatNumber(Math.abs(positionSize))} {position.coin}
             </Text>
           </View>
         </View>

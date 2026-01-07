@@ -69,6 +69,7 @@ interface WalletContextValue {
   hasSessionKey: boolean;
   pausePolling: () => void;
   resumePolling: () => void;
+  getExchangeClientForDex: (dex: string) => hl.ExchangeClient | null;
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
@@ -96,6 +97,9 @@ export function WalletProvider({
     isLoading: false,
     error: null,
   });
+
+  // Cache for dex-specific exchange clients (HIP-3)
+  const dexClientsRef = useRef<Record<string, hl.ExchangeClient>>({});
 
   const fetchAccountData = useCallback(
     async (userAddress: string, silent: boolean = false) => {
@@ -241,7 +245,14 @@ export function WalletProvider({
         let allOpenOrders: any[] = [];
         openOrdersResults.forEach(({ orders, dex }) => {
           if (orders && orders.length > 0) {
-            const dexOrders = orders.map((order: any) => ({ ...order, dex }));
+            const dexOrders = orders.map((order: any) => {
+              let coin = order.coin;
+              // Strip dex prefix if present (API returns "xyz:NVDA" format for HIP-3)
+              if (dex && coin.startsWith(`${dex}:`)) {
+                coin = coin.slice(dex.length + 1);
+              }
+              return { ...order, coin, dex };
+            });
             allOpenOrders.push(...dexOrders);
             if (!silent && dex) {
               console.log(`[HIP-3] ${dex} orders:`, JSON.stringify(dexOrders, null, 2));
@@ -269,6 +280,21 @@ export function WalletProvider({
         // Get the default perp state for margin summary
         const defaultPerpState = perpStatesResults.find(r => r.dex === '')?.state;
 
+        // Aggregate margin summary from all dexes (default + HIP-3)
+        let totalAccountValue = 0;
+        let totalMarginUsed = 0;
+        let totalNtlPos = 0;
+        let totalRawUsd = 0;
+
+        perpStatesResults.forEach(({ state }) => {
+          if (state?.marginSummary) {
+            totalAccountValue += parseFloat(state.marginSummary.accountValue || '0');
+            totalMarginUsed += parseFloat(state.marginSummary.totalMarginUsed || '0');
+            totalNtlPos += parseFloat(state.marginSummary.totalNtlPos || '0');
+            totalRawUsd += parseFloat(state.marginSummary.totalRawUsd || '0');
+          }
+        });
+
         if (!silent) {
           logApiResponse('clearinghouseState', allPerpPositions.length, 'total positions (all dexes)');
           logApiResponse('spotClearinghouseState', spotState?.balances?.length || 0, 'balances');
@@ -285,26 +311,31 @@ export function WalletProvider({
           // API returns { type: "oneWay", position: {...} }
           const pos = item.position || item;
           const dex = item.dex || '';
-          
+
+          // HIP-3 API returns coin with dex prefix (e.g., 'xyz:NVDA')
+          // Strip the prefix since we track dex separately
+          const coinParts = pos.coin.split(':');
+          const coinSymbol = coinParts.length > 1 ? coinParts[1] : pos.coin;
+
           // Find TP/SL orders for this position (matching both coin and dex)
-          const tpslOrders = allOpenOrders.filter((order: any) => 
-            order.coin === pos.coin && 
+          const tpslOrders = allOpenOrders.filter((order: any) =>
+            order.coin === coinSymbol &&
             order.dex === dex &&
             (order.orderType?.includes('Take Profit') || order.orderType?.includes('Stop'))
           );
-          
-          const tpOrder = tpslOrders.find((o: any) => 
+
+          const tpOrder = tpslOrders.find((o: any) =>
             o.orderType?.includes('Take Profit')
           );
-          const slOrder = tpslOrders.find((o: any) => 
+          const slOrder = tpslOrders.find((o: any) =>
             o.orderType?.includes('Stop')
           );
-          
+
           const tpPrice = tpOrder?.triggerPx ? parseFloat(tpOrder.triggerPx) : null;
           const slPrice = slOrder?.triggerPx ? parseFloat(slOrder.triggerPx) : null;
-          
+
           return {
-            coin: pos.coin,
+            coin: coinSymbol,
             szi: pos.szi,
             entryPx: pos.entryPx,
             positionValue: pos.positionValue,
@@ -333,18 +364,32 @@ export function WalletProvider({
             fundingRate: item.delta.fundingRate,
           }));
 
+        // Map userFills - parse coin to extract dex for HIP-3 fills
+        // API returns coin with dex prefix for HIP-3 (e.g., 'vntl:SPACEX')
+        const mappedUserFills = (userFills || []).map((fill: any) => {
+          const coinParts = fill.coin.split(':');
+          const coinSymbol = coinParts.length > 1 ? coinParts[1] : fill.coin;
+          const dex = coinParts.length > 1 ? coinParts[0] : '';
+
+          return {
+            ...fill,
+            coin: coinSymbol,
+            dex,
+          };
+        });
+
         const accountData: AccountData = {
           perpPositions,
           perpMarginSummary: {
-            accountValue: defaultPerpState?.marginSummary?.accountValue,
-            totalMarginUsed: defaultPerpState?.marginSummary?.totalMarginUsed,
-            totalNtlPos: defaultPerpState?.marginSummary?.totalNtlPos,
-            totalRawUsd: defaultPerpState?.marginSummary?.totalRawUsd,
-            withdrawable: defaultPerpState?.withdrawable,
+            accountValue: totalAccountValue.toString(),
+            totalMarginUsed: totalMarginUsed.toString(),
+            totalNtlPos: totalNtlPos.toString(),
+            totalRawUsd: totalRawUsd.toString(),
+            withdrawable: defaultPerpState?.withdrawable,  // Keep from default only
           },
           spotBalances: spotState?.balances || [],
           openOrders: allOpenOrders, // Use combined orders from all dexes
-          userFills: userFills || [],
+          userFills: mappedUserFills,
           userFundings: mappedUserFundings,
           stakingDelegations: stakingDelegations || [],
           stakingSummary: stakingSummary || null,
@@ -447,6 +492,8 @@ export function WalletProvider({
       isLoading: false,
       error: null,
     });
+    // Clear cached dex clients
+    dexClientsRef.current = {};
   }, []);
 
   const refetchAccount = useCallback(async () => {
@@ -576,6 +623,8 @@ export function WalletProvider({
 
       setExchangeClient(sessionExchangeClient);
       setSessionKey(newSessionKey);
+      // Clear cached dex clients since they use the old wallet
+      dexClientsRef.current = {};
 
       console.log('[SessionKey] Session key enabled successfully');
 
@@ -600,6 +649,8 @@ export function WalletProvider({
 
       setExchangeClient(mainExchangeClient);
       setSessionKey(null);
+      // Clear cached dex clients since they use the old wallet
+      dexClientsRef.current = {};
 
       console.log('[SessionKey] Session key disabled successfully');
     } catch (error) {
@@ -607,6 +658,41 @@ export function WalletProvider({
       throw error;
     }
   }, [mainExchangeClient]);
+
+  // Get or create a dex-specific exchange client for HIP-3 trading
+  const getExchangeClientForDex = useCallback((dex: string): hl.ExchangeClient | null => {
+    // For default dex or empty, use the regular exchange client
+    if (!dex || dex === '') {
+      return exchangeClient;
+    }
+
+    // Check if we already have a cached client for this dex
+    if (dexClientsRef.current[dex]) {
+      return dexClientsRef.current[dex];
+    }
+
+    // Need to create a new client for this dex
+    // Use the same wallet that the current exchangeClient uses
+    if (!exchangeClient) {
+      console.warn(`[HIP-3] Cannot create dex client for ${dex}: no exchange client`);
+      return null;
+    }
+
+    // Get the wallet from the current setup
+    // If session key is active, use that; otherwise use the main client's wallet
+    const wallet = (exchangeClient as any)._wallet || (exchangeClient as any).wallet;
+    if (!wallet) {
+      console.warn(`[HIP-3] Cannot create dex client for ${dex}: no wallet found`);
+      return exchangeClient; // Fall back to default client
+    }
+
+    console.log(`[HIP-3] Creating dex-specific client for: ${dex}`);
+    const transport = createHttpTransport();
+    const dexClient = createExchangeClient(wallet, transport, dex);
+    dexClientsRef.current[dex] = dexClient;
+
+    return dexClient;
+  }, [exchangeClient]);
 
   const value: WalletContextValue = {
     infoClient,
@@ -622,6 +708,7 @@ export function WalletProvider({
     hasSessionKey: sessionKey !== null,
     pausePolling,
     resumePolling,
+    getExchangeClientForDex,
   };
 
   return (

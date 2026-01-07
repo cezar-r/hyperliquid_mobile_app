@@ -9,12 +9,13 @@ interface OpenOrder {
   side: string;
   limitPx: string;
   sz: string;
+  dex?: string;
 }
 
 interface OpenOrdersContainerProps {
   orders: OpenOrder[];
   getDisplayName: (coin: string) => string;
-  onCancelOrder: (coin: string, oid: number) => void;
+  onCancelOrder: (coin: string, oid: number, dex?: string) => void;
   cancelingOrder: number | null;
 }
 
@@ -59,7 +60,7 @@ export default function OpenOrdersContainer({
                   style={styles.cancelOrderButton}
                   onPress={() => {
                     playTextButtonHaptic();
-                    onCancelOrder(order.coin, order.oid);
+                    onCancelOrder(order.coin, order.oid, order.dex);
                   }}
                   disabled={cancelingOrder === order.oid}
                 >

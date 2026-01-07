@@ -12,7 +12,7 @@ import { useSparklineDataOptional } from '../../../contexts/SparklineDataContext
 import { formatPrice, formatSize, getDisplayTicker, getHip3DisplayName } from '../../../lib/formatting';
 import { getStarredTickers } from '../../../lib/starredTickers';
 import { playNavToChartHaptic } from '../../../lib/haptics';
-import { getPositionContextKey, parseMarketKey } from '../../../lib/markets';
+import { getPositionContextKey, parseMarketKey, getAssetIdForMarket } from '../../../lib/markets';
 import {
   logScreenMount,
   logScreenUnmount,
@@ -63,7 +63,7 @@ function calculatePositionPnL(
 
 export default function HomeScreen(): React.JSX.Element {
   const { address } = useAccount();
-  const { account, exchangeClient, refetchAccount, resumePolling } = useWallet();
+  const { account, exchangeClient, refetchAccount, resumePolling, getExchangeClientForDex } = useWallet();
   const { state: wsState, selectCoin, setMarketType, infoClient } = useWebSocket();
   const sparklineContext = useSparklineDataOptional();
   const navigation = useNavigation<any>();
@@ -318,14 +318,20 @@ export default function HomeScreen(): React.JSX.Element {
       if (balance.coin === 'USDC') {
         spotValue += total;
       } else {
-        const price = wsState.prices[balance.coin];
-        if (price) {
-          spotValue += total * parseFloat(price);
+        // Find the spot market to get full market name for price lookup
+        const spotMarket = wsState.spotMarkets.find(
+          (m) => m.name.split('/')[0] === balance.coin
+        );
+        if (spotMarket) {
+          const price = wsState.prices[spotMarket.name];
+          if (price) {
+            spotValue += total * parseFloat(price);
+          }
         }
       }
     });
     return spotValue;
-  }, [account.data?.spotBalances, wsState.prices]);
+  }, [account.data?.spotBalances, wsState.prices, wsState.spotMarkets]);
 
   // Calculate staking value
   const stakingValue = useMemo(() => {
@@ -800,21 +806,22 @@ export default function HomeScreen(): React.JSX.Element {
   };
 
   // Handle close position
-  const handleClosePosition = async (coin: string, size: number) => {
+  const handleClosePosition = async (coin: string, size: number, dex?: string) => {
     if (!exchangeClient) {
       Alert.alert('Error', 'Wallet not connected');
       return;
     }
 
-    const market = wsState.perpMarkets.find((m) => m.name === coin);
+    const market = wsState.perpMarkets.find((m) => m.name === coin && m.dex === (dex || ''));
     if (!market) {
       Alert.alert('Error', `Asset ${coin} not found in markets`);
       return;
     }
 
-    const assetIndex = market.index;
+    const assetIndex = getAssetIdForMarket(market);
     const szDecimals = market.szDecimals || 4;
-    const currentPrice = parseFloat(wsState.prices[coin] || '0');
+    const priceKey = dex ? `${dex}:${coin}` : coin;
+    const currentPrice = parseFloat(wsState.prices[priceKey] || '0');
 
     if (!currentPrice) {
       Alert.alert('Error', `No price available for ${coin}`);
@@ -868,8 +875,14 @@ export default function HomeScreen(): React.JSX.Element {
                 grouping: 'na' as const,
               };
 
-              console.log('[HomeScreen] Closing position:', coin);
-              const result = await exchangeClient.order(orderPayload);
+              // Get dex-specific client for HIP-3 markets
+              const client = getExchangeClientForDex(dex || '');
+              if (!client) {
+                throw new Error('Failed to get exchange client');
+              }
+
+              console.log('[HomeScreen] Closing position:', coin, 'dex:', dex || 'default');
+              const result = await client.order(orderPayload);
               console.log('[HomeScreen] ✓ Close order placed:', result);
               Alert.alert('Success', 'Position closing order submitted!');
 
@@ -916,18 +929,20 @@ export default function HomeScreen(): React.JSX.Element {
               // Close each position one by one
               for (const item of sortedPerpPositions) {
                 const coin = item.position.coin;
+                const dex = item.position.dex;
                 const size = parseFloat(item.position.szi);
-                const market = wsState.perpMarkets.find((m) => m.name === coin);
+                const market = wsState.perpMarkets.find((m) => m.name === coin && m.dex === (dex || ''));
 
                 if (!market) {
-                  console.error('[HomeScreen] Market not found for:', coin);
+                  console.error('[HomeScreen] Market not found for:', coin, 'dex:', dex);
                   failCount++;
                   continue;
                 }
 
-                const assetIndex = market.index;
+                const assetIndex = getAssetIdForMarket(market);
                 const szDecimals = market.szDecimals || 4;
-                const currentPrice = parseFloat(wsState.prices[coin] || '0');
+                const priceKey = dex ? `${dex}:${coin}` : coin;
+                const currentPrice = parseFloat(wsState.prices[priceKey] || '0');
 
                 if (!currentPrice) {
                   console.error('[HomeScreen] No price for:', coin);
@@ -943,6 +958,14 @@ export default function HomeScreen(): React.JSX.Element {
                 }
 
                 try {
+                  // Get dex-specific client for HIP-3 markets
+                  const client = getExchangeClientForDex(dex || '');
+                  if (!client) {
+                    console.error('[HomeScreen] Failed to get exchange client for:', coin, 'dex:', dex);
+                    failCount++;
+                    continue;
+                  }
+
                   // Use proper formatting functions like ChartScreen
                   const formattedPrice = formatPrice(executionPrice, szDecimals, true);
                   const formattedSize = formatSize(Math.abs(size), szDecimals, currentPrice);
@@ -963,8 +986,8 @@ export default function HomeScreen(): React.JSX.Element {
                     grouping: 'na' as const,
                   };
 
-                  console.log(`[HomeScreen] Closing position ${coin}...`);
-                  await exchangeClient.order(orderPayload);
+                  console.log(`[HomeScreen] Closing position ${coin} (dex: ${dex || 'default'})...`);
+                  await client.order(orderPayload);
                   successCount++;
                 } catch (err: any) {
                   console.error(`[HomeScreen] Failed to close ${coin}:`, err.message);

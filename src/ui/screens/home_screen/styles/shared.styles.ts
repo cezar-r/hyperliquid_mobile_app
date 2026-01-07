@@ -18,7 +18,9 @@ export const sharedStyles = StyleSheet.create({
   },
   
   leftSide: {
+    flex: 1,
     justifyContent: 'space-between',
+    maxWidth: '38%',
   },
   
   rightSide: {

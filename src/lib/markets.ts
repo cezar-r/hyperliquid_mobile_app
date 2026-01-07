@@ -56,6 +56,12 @@ export async function fetchPerpMarkets(
       };
     });
 
+    // Debug: log ZEC market data at fetch time
+    const zecMarket = markets.find((m: PerpMarket) => m.name === 'ZEC');
+    if (zecMarket) {
+      console.log(`[Markets] ZEC market for dex "${dex}":`, zecMarket);
+    }
+
     const contexts: Record<string, any> = {};
     markets.forEach((market: PerpMarket) => {
       const ctx = assetCtxs[market.index];
@@ -100,7 +106,13 @@ export async function fetchAllDexMarkets(
       default: results[0].markets.length,
       ...Object.fromEntries(HIP3_DEXES.map((dex, idx) => [dex, results[idx + 1].markets.length]))
     });
-    
+
+    // Debug: log all ZEC markets after combining
+    const zecMarkets = allMarkets.filter((m: PerpMarket) => m.name === 'ZEC');
+    if (zecMarkets.length > 0) {
+      console.log('[HIP-3] All ZEC markets after combining:', zecMarkets);
+    }
+
     return { markets: allMarkets, contexts: allContexts };
   } catch (error) {
     console.error('[HIP-3] Failed to fetch markets:', error);
@@ -284,7 +296,10 @@ export function getAssetIdForMarket(market: PerpMarket): number {
  */
 export function parseMarketKey(marketKey: string): { coin: string; dex: string | undefined } {
   if (marketKey.includes(':')) {
-    const [dex, coin] = marketKey.split(':');
+    const parts = marketKey.split(':');
+    // Handle potential multiple colons - take first as dex, rest as coin
+    const dex = parts[0];
+    const coin = parts.slice(1).join(':');
     return { coin, dex };
   }
   return { coin: marketKey, dex: undefined };

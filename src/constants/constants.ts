@@ -20,7 +20,7 @@ export const SPOT_TICKER_MAP = {
  * For example, xyz has stocks like NVDA, TSLA, etc. that don't exist in the default universe.
  * These markets appear in both the HIP-3 meta API and allMids WebSocket feed.
  */
-export const HIP3_DEXES = ['xyz', 'vntl'] as const;
+export const HIP3_DEXES = ['xyz', 'flx', 'vntl', 'hyna'] as const;
 export type Dex = '' | typeof HIP3_DEXES[number];
 
 /**
@@ -35,8 +35,10 @@ export type Dex = '' | typeof HIP3_DEXES[number];
  * If a new HIP-3 dex is added, its index needs to be looked up.
  */
 export const HIP3_DEX_INDICES: Record<string, number> = {
-  'xyz': 1,   // First HIP-3 dex
-  'vntl': 2,  // Second HIP-3 dex
+  'xyz': 1,
+  'flx': 2,
+  'vntl': 3,
+  'hyna': 4,
 };
 
 /**
@@ -65,5 +67,7 @@ export function calculateHip3AssetId(dex: string, indexInMeta: number): number {
  */
 export const HIP3_COLLATERAL: Record<string, string> = {
   'xyz': 'USDC',
+  'flx': 'USDH',
   'vntl': 'USDH',
+  'hyna': 'USDE',
 };

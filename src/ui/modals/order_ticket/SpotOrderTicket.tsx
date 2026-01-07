@@ -169,43 +169,57 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
     }
   }, [orderType]);
 
-  // Auto-fill price for market orders using orderbook
-  const getMarketPrice = () => {
+  // Get display price for market orders (no slippage - shows actual market price)
+  const getDisplayPrice = () => {
     if (orderbook && orderbook.levels) {
       const asks = orderbook.levels[1];
       const bids = orderbook.levels[0];
-      
+
+      if (side === 'buy' && asks.length > 0) {
+        const lowestAsk = parseFloat(asks[0].px);
+        return formatPrice(lowestAsk, assetInfo.szDecimals, false);
+      } else if (side === 'sell' && bids.length > 0) {
+        const highestBid = parseFloat(bids[0].px);
+        return formatPrice(highestBid, assetInfo.szDecimals, false);
+      }
+    }
+    // Fallback to mid price
+    return currentPrice ? formatPrice(parseFloat(currentPrice), assetInfo.szDecimals, false) : '';
+  };
+
+  // Get execution price for market orders with 2% slippage
+  const getMarketPriceWithSlippage = () => {
+    if (orderbook && orderbook.levels) {
+      const asks = orderbook.levels[1];
+      const bids = orderbook.levels[0];
+
       if (side === 'buy' && asks.length > 0) {
         const lowestAsk = parseFloat(asks[0].px);
         const priceWithSlippage = lowestAsk * 1.02; // 2% slippage for IOC
         const marketPrice = formatPrice(priceWithSlippage, assetInfo.szDecimals, false);
-        console.log('[SpotOrderTicket] Buy market price from orderbook:', marketPrice);
+        console.log('[SpotOrderTicket] Buy execution price:', marketPrice, '(lowest ask:', lowestAsk, ')');
         return marketPrice;
       } else if (side === 'sell' && bids.length > 0) {
         const highestBid = parseFloat(bids[0].px);
         const priceWithSlippage = highestBid * 0.98; // 2% slippage for IOC
         const marketPrice = formatPrice(priceWithSlippage, assetInfo.szDecimals, false);
-        console.log('[SpotOrderTicket] Sell market price from orderbook:', marketPrice);
+        console.log('[SpotOrderTicket] Sell execution price:', marketPrice, '(highest bid:', highestBid, ')');
         return marketPrice;
       }
     }
-    
+
     if (!currentPrice) {
       return '';
     }
 
     const midPrice = parseFloat(currentPrice);
-    
+
     if (side === 'buy') {
       const priceWithSlippage = midPrice * 1.01;
-      const marketPrice = formatPrice(priceWithSlippage, assetInfo.szDecimals, false);
-      console.log('[SpotOrderTicket] Buy market price (fallback):', marketPrice);
-      return marketPrice;
+      return formatPrice(priceWithSlippage, assetInfo.szDecimals, false);
     } else {
       const priceWithSlippage = midPrice * 0.99;
-      const marketPrice = formatPrice(priceWithSlippage, assetInfo.szDecimals, false);
-      console.log('[SpotOrderTicket] Sell market price (fallback):', marketPrice);
-      return marketPrice;
+      return formatPrice(priceWithSlippage, assetInfo.szDecimals, false);
     }
   };
 
@@ -214,7 +228,7 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
     setOrderType(type);
     if (type === 'market') {
       setTif('Ioc');
-      setPrice(getMarketPrice());
+      setPrice(getDisplayPrice());
     } else {
       setTif('Gtc');
       setPrice(currentPrice || '');
@@ -293,8 +307,10 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
       return;
     }
 
-    const priceValue = parseFloat(price);
     const sizeValue = parseFloat(size);
+    // For market orders, use price with slippage for execution
+    const executionPrice = orderType === 'market' ? getMarketPriceWithSlippage() : price;
+    const priceValue = parseFloat(executionPrice);
 
     if (!priceValue || !sizeValue) {
       setError('Price and size required');
@@ -364,9 +380,9 @@ export const SpotOrderTicket: React.FC<SpotOrderTicketProps> = ({ visible, onClo
   // Update market order price when side, currentPrice, or orderbook changes
   useEffect(() => {
     if (orderType === 'market') {
-      const marketPrice = getMarketPrice();
-      if (marketPrice) {
-        setPrice(marketPrice);
+      const displayPrice = getDisplayPrice();
+      if (displayPrice) {
+        setPrice(displayPrice);
       }
     }
   }, [orderType, side, currentPrice, orderbook]);

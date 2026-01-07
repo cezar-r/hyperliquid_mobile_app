@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput } from 'react-native';
 import { CustomSlider } from '../../../../shared/components/custom_slider';
 import { styles } from './styles/MarginContainer.styles';
@@ -24,6 +24,26 @@ export const MarginContainer: React.FC<MarginContainerProps> = ({
   onSliderChange,
   collateral = 'USDC',
 }) => {
+  // Local state to preserve raw input (including trailing decimal/zeros)
+  const [inputValue, setInputValue] = useState('');
+
+  // Sync with external marginRequired when it changes (e.g., from slider)
+  useEffect(() => {
+    const currentNumeric = parseFloat(inputValue) || 0;
+    // Only update if the numeric value differs (avoids overwriting user's raw input)
+    if (currentNumeric !== marginRequired) {
+      setInputValue(marginRequired ? marginRequired.toString() : '');
+    }
+  }, [marginRequired]);
+
+  const handleTextChange = (text: string) => {
+    // Allow empty, digits, and single decimal point
+    if (text === '' || /^\d*\.?\d*$/.test(text)) {
+      setInputValue(text);
+      onMarginChange(text);
+    }
+  };
+
   // Use $ for USDC, otherwise show collateral symbol
   const collateralDisplay = collateral === 'USDC' ? '$' : `${collateral} `;
   return (
@@ -34,8 +54,8 @@ export const MarginContainer: React.FC<MarginContainerProps> = ({
       </View>
       <TextInput
         style={styles.input}
-        value={marginRequired ? marginRequired.toString() : ''}
-        onChangeText={onMarginChange}
+        value={inputValue}
+        onChangeText={handleTextChange}
         placeholder="0.00"
         placeholderTextColor={Color.FG_3}
         keyboardType="decimal-pad"

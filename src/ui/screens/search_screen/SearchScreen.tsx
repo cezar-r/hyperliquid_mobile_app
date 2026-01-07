@@ -533,7 +533,12 @@ export default function SearchScreen({ onTickerSelect }: SearchScreenProps = {})
     setSearchQuery('');
   }, []);
 
-  const keyExtractor = useCallback((item: PerpMarket | SpotMarket) => item.name, []);
+  const keyExtractor = useCallback((item: PerpMarket | SpotMarket) => {
+    if ('dex' in item) {
+      return getMarketContextKey(item as PerpMarket);
+    }
+    return item.name;
+  }, []);
 
   const getSortValue = useCallback(
     (item: PerpMarket | SpotMarket) => {

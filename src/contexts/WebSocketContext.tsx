@@ -19,6 +19,8 @@ import {
   resolveSubscriptionCoin,
   getDefaultCoin,
   createHIP3Market,
+  findPerpMarketByKey,
+  parseMarketKey,
 } from '../lib/markets';
 import { HIP3_DEXES } from '../constants/constants';
 import {
@@ -668,18 +670,21 @@ export function WebSocketProvider({
       if (!client) return;
 
       const market = marketTypeRef.current === 'perp'
-        ? perpMarketsRef.current.find(m => m.name === coin)
+        ? findPerpMarketByKey(perpMarketsRef.current, coin)
         : null;
       const dex = market?.dex;
 
+      // Parse coin to get base coin name for subscription
+      const { coin: baseCoin } = parseMarketKey(coin);
+
       let subscriptionCoin = resolveSubscriptionCoin(
         marketTypeRef.current,
-        coin,
+        baseCoin,
         spotMarketsRef.current
       );
 
       if (dex) {
-        subscriptionCoin = `${dex}:${coin}`;
+        subscriptionCoin = `${dex}:${baseCoin}`;
       }
 
       // Skip if already subscribed (deduplication)
@@ -714,7 +719,10 @@ export function WebSocketProvider({
         }));
 
         // Filter out stale trades from previous subscriptions
-        const validTrades = newTrades.filter(t => t.coin === activeTradesCoinRef.current);
+        // API returns trades with full dex:coin format for HIP-3 markets
+        const activeRef = activeTradesCoinRef.current;
+        if (!activeRef) return;
+        const validTrades = newTrades.filter(t => t.coin === activeRef);
 
         if (validTrades.length === 0) {
           return;

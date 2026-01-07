@@ -15,7 +15,7 @@ import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { useWebSocketStore } from '../../../stores/websocketStore';
 import { useWallet } from '../../../contexts/WalletContext';
 import { useSparklineData } from '../../../contexts/SparklineDataContext';
-import { resolveSubscriptionCoin, getMarketContextKey, parseMarketKey, findPerpMarketByKey } from '../../../lib/markets';
+import { resolveSubscriptionCoin, getMarketContextKey, parseMarketKey, findPerpMarketByKey, getAssetIdForMarket } from '../../../lib/markets';
 import { generateTickSizeOptions, calculateMantissa, calculateNSigFigs } from '../../../lib/tickSize';
 import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder, getDisplayTicker, getHip3DisplayName, convertUTCToLocalChartTime } from '../../../lib/formatting';
 import { isTickerStarred, toggleStarredTicker } from '../../../lib/starredTickers';
@@ -108,7 +108,7 @@ export default function ChartScreen(): React.JSX.Element {
   const isFocused = useIsFocused();
   const { state, infoClient, enterChartMode, exitChartMode, subscribeToCandles, unsubscribeFromCandles, subscribeToOrderbook, unsubscribeFromOrderbook, subscribeToTrades, unsubscribeFromTrades, selectCoin, setMarketType } =
     useWebSocket();
-  const { account, exchangeClient, refetchAccount, pausePolling, resumePolling } = useWallet();
+  const { account, exchangeClient, refetchAccount, pausePolling, resumePolling, getExchangeClientForDex } = useWallet();
   const { pauseFetching: pauseSparklineFetching, resumeFetching: resumeSparklineFetching } = useSparklineData();
   const { selectedCoin, marketType, spotMarkets } = state;
 
@@ -745,7 +745,14 @@ export default function ChartScreen(): React.JSX.Element {
     return p.coin === parsedCoin && (!p.dex || p.dex === '');
   });
   const spotBalances = account.data?.spotBalances || [];
-  const userFills = (account.data?.userFills || []).filter((f: any) => f.coin === parsedCoin);
+  const userFills = (account.data?.userFills || []).filter((f: any) => {
+    if (parsedDex) {
+      // For HIP-3 markets, match both coin and dex
+      return f.coin === parsedCoin && f.dex === parsedDex;
+    }
+    // For default dex, match coin and ensure no dex or empty dex
+    return f.coin === parsedCoin && (!f.dex || f.dex === '');
+  });
 
   // Get real-time price from WebSocket
   const currentPrice = useMemo(() => {
@@ -970,15 +977,17 @@ export default function ChartScreen(): React.JSX.Element {
   // Limit recent trades row to 10 to reduce animation/render cost
 
   // Handle cancel order
-  const handleCancelOrder = async (coin: string, oid: number) => {
+  const handleCancelOrder = async (coin: string, oid: number, dex?: string) => {
     if (!exchangeClient || !selectedCoin) return;
-    
-    const perpMarket = state.perpMarkets.find(m => m.name === coin);
+
+    // Match market by name AND dex for HIP-3 orders
+    const orderDex = dex || '';
+    const perpMarket = state.perpMarkets.find(m => m.name === coin && m.dex === orderDex);
     const spotMarket = state.spotMarkets.find(m => m.name === coin || m.apiName === coin);
-    
+
     let assetIndex: number;
     if (marketType === 'perp' && perpMarket) {
-      assetIndex = perpMarket.index;
+      assetIndex = getAssetIdForMarket(perpMarket);
     } else if (marketType === 'spot' && spotMarket) {
       assetIndex = 10000 + spotMarket.index;
     } else {
@@ -1001,6 +1010,14 @@ export default function ChartScreen(): React.JSX.Element {
             setCancelingOrder(oid);
 
             try {
+              // Get dex-specific client for HIP-3 orders
+              const client = getExchangeClientForDex(orderDex);
+              if (!client) {
+                Alert.alert('Error', 'Failed to get exchange client');
+                setCancelingOrder(null);
+                return;
+              }
+
               const cancelPayload = {
                 cancels: [{
                   a: assetIndex,
@@ -1008,12 +1025,12 @@ export default function ChartScreen(): React.JSX.Element {
                 }],
               };
 
-              console.log('[ChartScreen] Canceling order:', { coin, oid, assetIndex, marketType });
-              const result = await exchangeClient.cancel(cancelPayload);
+              console.log('[ChartScreen] Canceling order:', { coin, oid, assetIndex, marketType, dex: orderDex });
+              const result = await client.cancel(cancelPayload);
 
               console.log('[ChartScreen] ✓ Order canceled:', result);
               Alert.alert('Success', 'Order canceled successfully!');
-              
+
               setTimeout(() => refetchAccount(), 1000);
             } catch (err: any) {
               console.error('[ChartScreen] Failed to cancel order:', err);
@@ -1167,24 +1184,26 @@ export default function ChartScreen(): React.JSX.Element {
     return coin;
   };
 
+  // Parse selectedCoin for HIP-3 format (e.g., "xyz:NVDA" -> { coin: "NVDA", dex: "xyz" })
+  const { coin: selectedCoinName, dex: selectedDex } = parseMarketKey(selectedCoin || '');
+
   const currentTickerOrders = openOrders.filter((order: any) => {
+    const orderDex = order.dex || '';
+
+    // For perp markets: match coin AND dex
+    if (marketType === 'perp') {
+      return order.coin === selectedCoinName && orderDex === (selectedDex || '');
+    }
+
+    // For spot markets: existing logic
     if (order.coin === selectedCoin) return true;
     const spotMarket = state.spotMarkets.find(m => m.name === selectedCoin);
     if (spotMarket && order.coin === spotMarket.apiName) return true;
     return false;
   });
 
-  // Prepare recent trades
-  const perpCoins = new Set(state.perpMarkets.map(m => m.name));
+  // Prepare recent trades display
   const spotCoins = new Set(state.spotMarkets.map(m => m.name.split('/')[0]));
-  
-  const filteredTrades = userFills.filter(fill => {
-    if (marketType === 'perp') {
-      return perpCoins.has(fill.coin);
-    } else {
-      return spotCoins.has(fill.coin);
-    }
-  });
 
   const getDisplayCoin = (coin: string) => {
     const isSpot = spotCoins.has(coin);
@@ -1289,7 +1308,7 @@ export default function ChartScreen(): React.JSX.Element {
 
         {/* Recent Trades */}
         <RecentTradesContainer
-          trades={filteredTrades.slice(0, 10)}
+          trades={userFills.slice(0, 10)}
           displayLimit={10}
           onShowMore={() => {}}
           getDisplayCoin={getDisplayCoin}

@@ -17,6 +17,7 @@ import {
 import { useWallet } from '../../../contexts/WalletContext';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { formatPrice, formatSize } from '../../../lib/formatting';
+import { getAssetIdForMarket } from '../../../lib/markets';
 import { styles } from './styles/TPSLEditModal.styles';
 import { Color } from '../../shared/styles/colors';
 import type { PerpPosition } from '../../../types';
@@ -39,10 +40,10 @@ export default function TPSLEditModal({
   position,
   currentPrice,
 }: TPSLEditModalProps): React.JSX.Element {
-  const { exchangeClient, refetchAccount } = useWallet();
+  const { exchangeClient, refetchAccount, getExchangeClientForDex } = useWallet();
   const { state: wsState } = useWebSocket();
   const { perpMarkets } = wsState;
-  
+
   // State
   const [step, setStep] = useState<TPSLStep>('form');
   const [tpPrice, setTpPrice] = useState('');
@@ -51,10 +52,11 @@ export default function TPSLEditModal({
   const [slideAnim] = useState(new Animated.Value(1000));
   const tpInputRef = useRef<TextInput>(null);
 
-  // Get market info
-  const market = perpMarkets.find(m => m.name === position.coin);
+  // Get market info - must match both name AND dex for correct asset index
+  const market = perpMarkets.find(m => m.name === position.coin && m.dex === (position.dex || ''));
   const szDecimals = market?.szDecimals ?? 4;
-  const assetIndex = market?.index ?? 0;
+  // Use correct asset ID (handles HIP-3 formula)
+  const assetIndex = market ? getAssetIdForMarket(market) : 0;
 
   // Calculate position direction
   const positionSize = parseFloat(position.szi);
@@ -153,6 +155,14 @@ export default function TPSLEditModal({
       return;
     }
 
+    // Get dex-specific client for HIP-3 markets
+    const client = getExchangeClientForDex(position.dex || '');
+    if (!client) {
+      setError('Failed to get exchange client for this market');
+      setStep('error');
+      return;
+    }
+
     setStep('processing');
     setError(null);
 
@@ -163,7 +173,7 @@ export default function TPSLEditModal({
       if (position.slOrderId) cancels.push({ a: assetIndex, o: position.slOrderId });
 
       if (cancels.length > 0) {
-        await exchangeClient.cancel({ cancels });
+        await client.cancel({ cancels });
         console.log('[TPSLEditModal] ✓ Existing TP/SL orders canceled');
       }
 
@@ -172,8 +182,8 @@ export default function TPSLEditModal({
         const tpPriceNum = parseFloat(tpPrice);
         const formattedTPPrice = formatPrice(tpPriceNum, szDecimals);
         const formattedSize = formatSize(Math.abs(positionSize), szDecimals, currentPrice);
-        
-        await exchangeClient.order({
+
+        await client.order({
           orders: [{
             a: assetIndex,
             b: !isLong, // Opposite side to close position
@@ -198,8 +208,8 @@ export default function TPSLEditModal({
         const slPriceNum = parseFloat(slPrice);
         const formattedSLPrice = formatPrice(slPriceNum, szDecimals);
         const formattedSize = formatSize(Math.abs(positionSize), szDecimals, currentPrice);
-        
-        await exchangeClient.order({
+
+        await client.order({
           orders: [{
             a: assetIndex,
             b: !isLong, // Opposite side to close position

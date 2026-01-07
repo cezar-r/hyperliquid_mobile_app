@@ -9,12 +9,13 @@ interface OpenOrder {
   side: string;
   limitPx: string;
   sz: string;
+  dex?: string;
 }
 
 interface PortfolioOpenOrdersContainerProps {
   orders: OpenOrder[];
   getDisplayName: (coin: string) => string;
-  getOrderMarketType: (coin: string) => 'perp' | 'spot' | null;
+  getOrderMarketType: (coin: string, dex?: string) => 'perp' | 'spot' | null;
   onCancelAll: () => void;
   onCancelOrder: (order: OpenOrder, orderMarketType: 'perp' | 'spot' | null) => void;
 }
@@ -42,7 +43,7 @@ export default function PortfolioOpenOrdersContainer({
         </TouchableOpacity>
       </View>
       {orders.slice(0, 10).map((order, idx) => {
-        const orderMarketType = getOrderMarketType(order.coin);
+        const orderMarketType = getOrderMarketType(order.coin, order.dex);
         const displayName = getDisplayName(order.coin);
 
         return (

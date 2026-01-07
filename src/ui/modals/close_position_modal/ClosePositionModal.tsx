@@ -16,7 +16,9 @@ import {
 } from 'react-native';
 import { useWallet } from '../../../contexts/WalletContext';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
+import { useWebSocketStore } from '../../../stores/websocketStore';
 import { formatPrice as formatPriceForOrder, formatSize as formatSizeForOrder } from '../../../lib/formatting';
+import { getAssetIdForMarket } from '../../../lib/markets';
 import { getSkipClosePositionConfirmations } from '../../../lib/confirmations';
 import { styles } from './styles/ClosePositionModal.styles';
 import { Color } from '../../shared/styles/colors';
@@ -50,9 +52,10 @@ export default function ClosePositionModal({
   currentPrice,
   coin,
 }: ClosePositionModalProps): React.JSX.Element {
-  const { exchangeClient, refetchAccount } = useWallet();
+  const { exchangeClient, refetchAccount, getExchangeClientForDex } = useWallet();
   const { state: wsState } = useWebSocket();
   const { perpMarkets } = wsState;
+  const orderbook = useWebSocketStore(state => state.orderbook);
   
   // State
   const [step, setStep] = useState<CloseStep>('form');
@@ -62,10 +65,18 @@ export default function ClosePositionModal({
   const [slideAnim] = useState(new Animated.Value(1000));
   const percentageInputRef = useRef<TextInput>(null);
 
-  // Get market info
-  const market = perpMarkets.find(m => m.name === coin);
+  // Get market info - must match both name AND dex for correct asset index
+  const market = perpMarkets.find(m => m.name === coin && m.dex === (position.dex || ''));
   const szDecimals = market?.szDecimals ?? 4;
-  const assetIndex = market?.index ?? 0;
+  const assetIndex = market ? getAssetIdForMarket(market) : 0;
+
+  // Debug: log market lookup details
+  console.log('[ClosePositionModal] Market lookup:', {
+    coin,
+    positionDex: position.dex,
+    foundMarket: market ? { name: market.name, index: market.index, szDecimals: market.szDecimals, dex: market.dex } : null,
+    allMatchingMarkets: perpMarkets.filter(m => m.name === coin).map(m => ({ name: m.name, index: m.index, szDecimals: m.szDecimals, dex: m.dex })),
+  });
 
   // Calculate position details
   const positionSize = parseFloat(position.szi);
@@ -166,26 +177,51 @@ export default function ClosePositionModal({
       return;
     }
 
+    // Get dex-specific client for HIP-3 markets
+    const client = getExchangeClientForDex(position.dex || '');
+    if (!client) {
+      setError('Failed to get exchange client for this market');
+      setStep('error');
+      return;
+    }
+
     setStep('pending');
     setError(null);
 
     try {
-      // Calculate execution price with 0.1% slippage
+      // Calculate execution price using orderbook best bid/ask with 10% slippage
       let executionPrice: number;
       if (isLong) {
-        // Closing long: SELL at lower price
-        executionPrice = currentPrice * 0.999;
+        // Closing long: SELL - use highest bid with 10% slippage down
+        if (orderbook && orderbook.levels && orderbook.levels[0]?.length > 0) {
+          const highestBid = parseFloat(orderbook.levels[0][0].px);
+          executionPrice = highestBid * 0.90;
+          console.log('[ClosePositionModal] Using orderbook highest bid:', highestBid, '-> execution price:', executionPrice);
+        } else {
+          // Fallback to mid price with 10% slippage
+          executionPrice = currentPrice * 0.90;
+          console.log('[ClosePositionModal] Orderbook unavailable, using mid price with 10% slippage:', executionPrice);
+        }
       } else {
-        // Closing short: BUY at higher price
-        executionPrice = currentPrice * 1.001;
+        // Closing short: BUY - use lowest ask with 10% slippage up
+        if (orderbook && orderbook.levels && orderbook.levels[1]?.length > 0) {
+          const lowestAsk = parseFloat(orderbook.levels[1][0].px);
+          executionPrice = lowestAsk * 1.10;
+          console.log('[ClosePositionModal] Using orderbook lowest ask:', lowestAsk, '-> execution price:', executionPrice);
+        } else {
+          // Fallback to mid price with 10% slippage
+          executionPrice = currentPrice * 1.10;
+          console.log('[ClosePositionModal] Orderbook unavailable, using mid price with 10% slippage:', executionPrice);
+        }
       }
 
       // Format price and size for order
       const formattedPrice = formatPriceForOrder(executionPrice, szDecimals, true);
       const formattedSize = formatSizeForOrder(tokenAmount, szDecimals, currentPrice);
-      
+
       console.log('[ClosePositionModal] ========== CLOSING POSITION ==========');
       console.log('[ClosePositionModal] Coin:', coin);
+      console.log('[ClosePositionModal] Dex:', position.dex || 'default');
       console.log('[ClosePositionModal] Percentage:', percentage + '%');
       console.log('[ClosePositionModal] Token Amount:', tokenAmount);
       console.log('[ClosePositionModal] USD Value:', usdValue);
@@ -215,7 +251,7 @@ export default function ClosePositionModal({
 
       console.log('[ClosePositionModal] Order Payload:', JSON.stringify(orderPayload, null, 2));
 
-      const result = await exchangeClient.order(orderPayload);
+      const result = await client.order(orderPayload);
 
       console.log('[ClosePositionModal] ✓ Close order placed:', result);
       setStep('success');
@@ -311,29 +347,43 @@ export default function ClosePositionModal({
 
   // Render confirm step
   const renderConfirmStep = () => {
-    const executionPrice = isLong ? currentPrice * 0.999 : currentPrice * 1.001;
-    
+    // Calculate execution price for display using the same logic as executeClose
+    let executionPrice: number;
+    if (isLong) {
+      if (orderbook && orderbook.levels && orderbook.levels[0]?.length > 0) {
+        executionPrice = parseFloat(orderbook.levels[0][0].px) * 0.90;
+      } else {
+        executionPrice = currentPrice * 0.90;
+      }
+    } else {
+      if (orderbook && orderbook.levels && orderbook.levels[1]?.length > 0) {
+        executionPrice = parseFloat(orderbook.levels[1][0].px) * 1.10;
+      } else {
+        executionPrice = currentPrice * 1.10;
+      }
+    }
+
     return (
       <ScrollView style={styles.scrollView}>
         <ConfirmStep
           title="Confirm Close Position"
           details={[
-            { 
-              label: 'Position', 
-              value: `${Math.abs(positionSize).toFixed(szDecimals)} → ${remainingSize.toFixed(szDecimals)} ${coin}` 
+            {
+              label: 'Position',
+              value: `${Math.abs(positionSize).toFixed(szDecimals)} → ${remainingSize.toFixed(szDecimals)} ${coin}`
             },
-            { 
-              label: 'Closing', 
-              value: `${tokenAmount.toFixed(szDecimals)} ${coin} ($${formatNumber(usdValue, 2)})` 
+            {
+              label: 'Closing',
+              value: `${tokenAmount.toFixed(szDecimals)} ${coin} ($${formatNumber(usdValue, 2)})`
             },
             { label: 'Percentage', value: `${percentage}%` },
-            { 
-              label: 'Side', 
-              value: isLong ? 'SELL (close long)' : 'BUY (close short)' 
+            {
+              label: 'Side',
+              value: isLong ? 'SELL (close long)' : 'BUY (close short)'
             },
-            { 
-              label: 'Execution Price', 
-              value: `$${formatNumber(executionPrice, 2)} (${isLong ? '-0.1%' : '+0.1%'} slippage)` 
+            {
+              label: 'Execution Price',
+              value: `$${formatNumber(executionPrice, 2)} (${isLong ? '-10%' : '+10%'} slippage)`
             },
             { label: 'Order Type', value: 'Reduce-Only IOC Limit', isLast: true },
           ]}

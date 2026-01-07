@@ -21,7 +21,7 @@ import {
   formatSize as formatSizeForOrder,
   resolveSpotTicker,
 } from '../../../lib/formatting';
-import { resolveSubscriptionCoin } from '../../../lib/markets';
+import { resolveSubscriptionCoin, getPositionContextKey, getAssetIdForMarket } from '../../../lib/markets';
 import { playNavToChartHaptic } from '../../../lib/haptics';
 import {
   logScreenMount,
@@ -91,7 +91,7 @@ function getTimeFilterCutoff(filter: TimeFilter): number | null {
 
 export default function PortfolioScreen(): React.JSX.Element {
   const { address } = useAccount();
-  const { account, exchangeClient, refetchAccount } = useWallet();
+  const { account, exchangeClient, refetchAccount, getExchangeClientForDex } = useWallet();
   const { state: wsState, selectCoin, setMarketType, infoClient } = useWebSocket();
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
@@ -509,14 +509,20 @@ export default function PortfolioScreen(): React.JSX.Element {
       if (balance.coin === 'USDC') {
         spotValue += total;
       } else {
-        const price = wsState.prices[balance.coin];
-        if (price) {
-          spotValue += total * parseFloat(price);
+        // Find the spot market to get full market name for price lookup
+        const spotMarket = wsState.spotMarkets.find(
+          (m) => m.name.split('/')[0] === balance.coin
+        );
+        if (spotMarket) {
+          const price = wsState.prices[spotMarket.name];
+          if (price) {
+            spotValue += total * parseFloat(price);
+          }
         }
       }
     });
     return spotValue;
-  }, [account.data?.spotBalances, wsState.prices]);
+  }, [account.data?.spotBalances, wsState.prices, wsState.spotMarkets]);
 
   // Calculate staking value
   const stakingValue = useMemo(() => {
@@ -746,7 +752,9 @@ export default function PortfolioScreen(): React.JSX.Element {
 
     return account.data.perpPositions
       .map((position) => {
-        const price = wsState.prices[position.coin];
+        // Get context key (HIP-3 positions use dex:coin format)
+        const contextKey = getPositionContextKey(position.coin, position.dex);
+        const price = wsState.prices[contextKey];
         const marginUsed = position.marginUsed
           ? parseFloat(position.marginUsed)
           : parseFloat(position.positionValue || '0') / (position.leverage?.value || 1);
@@ -756,7 +764,7 @@ export default function PortfolioScreen(): React.JSX.Element {
           price,
           marginUsed,
           pnl: price ? calculatePositionPnL(position, price) : { pnl: 0, pnlPercent: 0 },
-          assetContext: wsState.assetContexts[position.coin],
+          assetContext: wsState.assetContexts[contextKey],
         };
       })
       .filter((item) => {
@@ -847,8 +855,9 @@ export default function PortfolioScreen(): React.JSX.Element {
     }
 
     // Get filtered orders
-    const getOrderMarketType = (coin: string): 'perp' | 'spot' | null => {
-      const perpMarket = wsState.perpMarkets.find((m) => m.name === coin);
+    const getOrderMarketType = (coin: string, dex?: string): 'perp' | 'spot' | null => {
+      const orderDex = dex || '';
+      const perpMarket = wsState.perpMarkets.find((m) => m.name === coin && m.dex === orderDex);
       if (perpMarket) return 'perp';
 
       const spotMarket = wsState.spotMarkets.find((m) => m.name === coin || m.apiName === coin);
@@ -858,7 +867,7 @@ export default function PortfolioScreen(): React.JSX.Element {
     };
 
     const filteredOrders = account.data.openOrders.filter((order: any) => {
-      const orderMarketType = getOrderMarketType(order.coin);
+      const orderMarketType = getOrderMarketType(order.coin, order.dex);
 
       if (marketFilter === 'Perp') {
         return orderMarketType === 'perp';
@@ -891,40 +900,66 @@ export default function PortfolioScreen(): React.JSX.Element {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Build cancels array with asset index and order ID for each order
-              const cancels = filteredOrders.map((order: any) => {
-                const perpMarket = wsState.perpMarkets.find((m) => m.name === order.coin);
+              // Group orders by dex
+              const ordersByDex: Record<string, Array<{ a: number; o: number }>> = {};
+
+              filteredOrders.forEach((order: any) => {
+                const dex = order.dex || '';
+                const perpMarket = wsState.perpMarkets.find(
+                  (m) => m.name === order.coin && m.dex === dex
+                );
                 const spotMarket = wsState.spotMarkets.find(
                   (m) => m.name === order.coin || m.apiName === order.coin
                 );
 
                 let assetIndex: number;
                 if (perpMarket) {
-                  assetIndex = perpMarket.index;
+                  assetIndex = getAssetIdForMarket(perpMarket);
                 } else if (spotMarket) {
                   assetIndex = 10000 + spotMarket.index;
                 } else {
                   console.error('[PortfolioScreen] Market not found for order:', order.coin);
-                  assetIndex = 0; // Fallback
+                  return; // Skip this order
                 }
 
-                return {
-                  a: assetIndex,
-                  o: order.oid,
-                };
+                if (!ordersByDex[dex]) {
+                  ordersByDex[dex] = [];
+                }
+                ordersByDex[dex].push({ a: assetIndex, o: order.oid });
               });
 
-              console.log('[PortfolioScreen] Canceling all orders:', cancels.length);
-              console.log('[PortfolioScreen] Cancel payload:', JSON.stringify({ cancels }, null, 2));
+              let successCount = 0;
+              let failCount = 0;
 
-              await exchangeClient.cancel({ cancels });
+              // Cancel orders for each dex separately
+              for (const [dex, cancels] of Object.entries(ordersByDex)) {
+                const client = getExchangeClientForDex(dex);
+                if (!client) {
+                  console.error('[PortfolioScreen] Failed to get client for dex:', dex);
+                  failCount += cancels.length;
+                  continue;
+                }
 
-              Alert.alert(
-                'Success',
-                `${filteredOrders.length} order${
-                  filteredOrders.length !== 1 ? 's' : ''
-                } canceled successfully!`
-              );
+                try {
+                  console.log(`[PortfolioScreen] Canceling ${cancels.length} orders for dex: ${dex || 'default'}`);
+                  await client.cancel({ cancels });
+                  successCount += cancels.length;
+                } catch (err: any) {
+                  console.error(`[PortfolioScreen] Failed to cancel orders for dex ${dex}:`, err);
+                  failCount += cancels.length;
+                }
+              }
+
+              if (successCount > 0) {
+                Alert.alert(
+                  'Success',
+                  `${successCount} order${successCount !== 1 ? 's' : ''} canceled successfully!${
+                    failCount > 0 ? `\n${failCount} failed` : ''
+                  }`
+                );
+              } else {
+                Alert.alert('Error', 'Failed to cancel any orders');
+              }
 
               // Refetch account data
               setTimeout(() => refetchAccount(), 1000);
@@ -968,18 +1003,20 @@ export default function PortfolioScreen(): React.JSX.Element {
               // Close each position one by one
               for (const item of sortedPerpPositions) {
                 const coin = item.position.coin;
+                const dex = item.position.dex;
                 const size = parseFloat(item.position.szi);
-                const market = wsState.perpMarkets.find((m) => m.name === coin);
+                const market = wsState.perpMarkets.find((m) => m.name === coin && m.dex === (dex || ''));
 
                 if (!market) {
-                  console.error('[PortfolioScreen] Market not found for:', coin);
+                  console.error('[PortfolioScreen] Market not found for:', coin, 'dex:', dex);
                   failCount++;
                   continue;
                 }
 
-                const assetIndex = market.index;
+                const assetIndex = getAssetIdForMarket(market);
                 const szDecimals = market.szDecimals || 4;
-                const currentPrice = parseFloat(wsState.prices[coin] || '0');
+                const priceKey = dex ? `${dex}:${coin}` : coin;
+                const currentPrice = parseFloat(wsState.prices[priceKey] || '0');
 
                 if (!currentPrice) {
                   console.error('[PortfolioScreen] No price for:', coin);
@@ -995,6 +1032,14 @@ export default function PortfolioScreen(): React.JSX.Element {
                 }
 
                 try {
+                  // Get dex-specific client for HIP-3 markets
+                  const client = getExchangeClientForDex(dex || '');
+                  if (!client) {
+                    console.error('[PortfolioScreen] Failed to get exchange client for:', coin, 'dex:', dex);
+                    failCount++;
+                    continue;
+                  }
+
                   // Use proper formatting functions like ChartScreen
                   const formattedPrice = formatPriceForOrder(executionPrice, szDecimals, true);
                   const formattedSize = formatSizeForOrder(
@@ -1019,8 +1064,8 @@ export default function PortfolioScreen(): React.JSX.Element {
                     grouping: 'na' as const,
                   };
 
-                  console.log(`[PortfolioScreen] Closing position ${coin}...`);
-                  await exchangeClient.order(orderPayload);
+                  console.log(`[PortfolioScreen] Closing position ${coin} (dex: ${dex || 'default'})...`);
+                  await client.order(orderPayload);
                   successCount++;
                 } catch (err: any) {
                   console.error(`[PortfolioScreen] Failed to close ${coin}:`, err.message);
@@ -1066,8 +1111,9 @@ export default function PortfolioScreen(): React.JSX.Element {
       return;
     }
 
-    // Get market info
-    const perpMarket = wsState.perpMarkets.find((m) => m.name === order.coin);
+    // Get market info - match by name AND dex for HIP-3 orders
+    const dex = order.dex || '';
+    const perpMarket = wsState.perpMarkets.find((m) => m.name === order.coin && m.dex === dex);
     const spotMarket = wsState.spotMarkets.find(
       (m) => m.name === order.coin || m.apiName === order.coin
     );
@@ -1082,7 +1128,7 @@ export default function PortfolioScreen(): React.JSX.Element {
 
     let assetIndex: number;
     if (orderMarketType === 'perp' && perpMarket) {
-      assetIndex = perpMarket.index;
+      assetIndex = getAssetIdForMarket(perpMarket);
     } else if (orderMarketType === 'spot' && spotMarket) {
       assetIndex = 10000 + spotMarket.index;
     } else {
@@ -1100,7 +1146,14 @@ export default function PortfolioScreen(): React.JSX.Element {
           style: 'destructive',
           onPress: async () => {
             try {
-              await exchangeClient.cancel({
+              // Get dex-specific client for HIP-3 orders
+              const client = getExchangeClientForDex(dex);
+              if (!client) {
+                Alert.alert('Error', 'Failed to get exchange client');
+                return;
+              }
+
+              await client.cancel({
                 cancels: [{ a: assetIndex, o: order.oid }],
               });
               Alert.alert('Success', 'Order canceled');
@@ -1121,8 +1174,9 @@ export default function PortfolioScreen(): React.JSX.Element {
     return coin;
   };
 
-  const getOrderMarketType = (coin: string): 'perp' | 'spot' | null => {
-    const perpMarket = wsState.perpMarkets.find((m) => m.name === coin);
+  const getOrderMarketType = (coin: string, dex?: string): 'perp' | 'spot' | null => {
+    const orderDex = dex || '';
+    const perpMarket = wsState.perpMarkets.find((m) => m.name === coin && m.dex === orderDex);
     if (perpMarket) return 'perp';
 
     const spotMarket = wsState.spotMarkets.find((m) => m.name === coin || m.apiName === coin);
@@ -1136,7 +1190,7 @@ export default function PortfolioScreen(): React.JSX.Element {
     if (!account.data?.openOrders) return [];
 
     return account.data.openOrders.filter((order: any) => {
-      const orderMarketType = getOrderMarketType(order.coin);
+      const orderMarketType = getOrderMarketType(order.coin, order.dex);
 
       if (marketFilter === 'Perp') {
         return orderMarketType === 'perp';

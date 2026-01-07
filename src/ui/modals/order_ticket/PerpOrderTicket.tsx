@@ -8,6 +8,7 @@ import { View, Modal, ScrollView, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWallet } from '../../../contexts/WalletContext';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
+import { useWebSocketStore } from '../../../stores/websocketStore';
 import { formatPrice, formatSize, formatWithCommas, getHip3Collateral } from '../../../lib/formatting';
 import { getSkipOpenOrderConfirmations } from '../../../lib/confirmations';
 import { playOrderTicketSelectionChangeHaptic, playSliderChangeHaptic, playOrderSubmitHaptic } from '../../../lib/haptics';
@@ -40,9 +41,10 @@ interface PerpOrderTicketProps {
 }
 
 export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClose, defaultSide }) => {
-  const { exchangeClient, account, refetchAccount } = useWallet();
+  const { exchangeClient, account, refetchAccount, getExchangeClientForDex } = useWallet();
   const { state: wsState } = useWebSocket();
   const { selectedCoin, prices, perpMarkets } = wsState;
+  const orderbook = useWebSocketStore(state => state.orderbook);
 
   // Parse selectedCoin to handle HIP-3 dex:coin format
   const { coin: parsedCoin, dex: parsedDex } = useMemo(() => {
@@ -261,32 +263,67 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
     }
   }, [coin, assetInfo.maxLeverage]);
 
-  // Auto-fill price for market orders
-  const getMarketPrice = () => {
+  // Get display price for market orders (no slippage - shows actual market price)
+  const getDisplayPrice = () => {
+    if (orderbook && orderbook.levels) {
+      const asks = orderbook.levels[1];
+      const bids = orderbook.levels[0];
+
+      if (side === 'buy' && asks.length > 0) {
+        const lowestAsk = parseFloat(asks[0].px);
+        return formatPrice(lowestAsk, assetInfo.szDecimals, false);
+      } else if (side === 'sell' && bids.length > 0) {
+        const highestBid = parseFloat(bids[0].px);
+        return formatPrice(highestBid, assetInfo.szDecimals, false);
+      }
+    }
+    // Fallback to mid price
+    return currentPrice ? formatPrice(parseFloat(currentPrice), assetInfo.szDecimals, false) : '';
+  };
+
+  // Get execution price for market orders with 10% slippage
+  const getMarketPriceWithSlippage = () => {
+    if (orderbook && orderbook.levels) {
+      const asks = orderbook.levels[1];
+      const bids = orderbook.levels[0];
+
+      if (side === 'buy' && asks.length > 0) {
+        const lowestAsk = parseFloat(asks[0].px);
+        const priceWithSlippage = lowestAsk * 1.10; // 10% slippage for illiquid markets
+        const marketPrice = formatPrice(priceWithSlippage, assetInfo.szDecimals, false);
+        console.log('[PerpOrderTicket] Buy execution price:', marketPrice, '(lowest ask:', lowestAsk, ')');
+        return marketPrice;
+      } else if (side === 'sell' && bids.length > 0) {
+        const highestBid = parseFloat(bids[0].px);
+        const priceWithSlippage = highestBid * 0.90; // 10% slippage for illiquid markets
+        const marketPrice = formatPrice(priceWithSlippage, assetInfo.szDecimals, false);
+        console.log('[PerpOrderTicket] Sell execution price:', marketPrice, '(highest bid:', highestBid, ')');
+        return marketPrice;
+      }
+    }
+
+    // Fallback to mid price with 10% slippage if orderbook not available
     if (!currentPrice) {
       return '';
     }
 
     const midPrice = parseFloat(currentPrice);
-    
     if (side === 'buy') {
-      const marketPrice = (midPrice * 1.001).toString();
-      console.log('[PerpOrderTicket] Buy market price:', marketPrice);
-      return marketPrice;
+      const priceWithSlippage = midPrice * 1.10;
+      return formatPrice(priceWithSlippage, assetInfo.szDecimals, false);
     } else {
-      const marketPrice = (midPrice * 0.999).toString();
-      console.log('[PerpOrderTicket] Sell market price:', marketPrice);
-      return marketPrice;
+      const priceWithSlippage = midPrice * 0.90;
+      return formatPrice(priceWithSlippage, assetInfo.szDecimals, false);
     }
   };
 
   const handleOrderTypeChange = (type: OrderType) => {
     playOrderTicketSelectionChangeHaptic();
     setOrderType(type);
-    
+
     if (type === 'market') {
       setTif('Ioc');
-      setPrice(getMarketPrice());
+      setPrice(getDisplayPrice());
     } else {
       setTif('Gtc');
       setPrice(currentPrice || '');
@@ -370,9 +407,15 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
         console.log('[PerpOrderTicket] HIP-3 market detected, forcing isolated margin');
       }
 
+      // Get dex-specific client for HIP-3 markets (required for non-USDC collateral dexes like vntl)
+      const client = getExchangeClientForDex(assetInfo.dex);
+      if (!client) {
+        throw new Error('Failed to get exchange client for this market');
+      }
+
       console.log('[PerpOrderTicket] Updating leverage - Asset:', assetInfo.index, 'Leverage:', leverage, 'Is Cross:', effectiveMarginType === 'cross', 'Dex:', assetInfo.dex || 'default');
 
-      await exchangeClient.updateLeverage({
+      await client.updateLeverage({
         asset: assetInfo.index,
         isCross: effectiveMarginType === 'cross',
         leverage,
@@ -380,10 +423,12 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
       console.log('[PerpOrderTicket] ✓ Leverage updated');
 
       const sizeValue = orderStats.size;
-      const priceValue = parseFloat(price);
-      
+      // For market orders, use price with slippage for execution
+      const executionPrice = orderType === 'market' ? getMarketPriceWithSlippage() : price;
+      const priceValue = parseFloat(executionPrice);
+
       console.log('[PerpOrderTicket] Formatting - Raw Size:', sizeValue, 'Raw Price:', priceValue, 'szDecimals:', assetInfo.szDecimals);
-      
+
       const formattedSize = formatSize(sizeValue, assetInfo.szDecimals, priceValue);
       const formattedPrice = formatPrice(priceValue, assetInfo.szDecimals);
       
@@ -420,7 +465,7 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
       logApiCall('order (perp)', `${side} ${orderType} - ${coin} (dex: ${assetInfo.dex || 'default'})`);
       logUserAction('PerpOrderTicket', 'Submit order', `${side} ${orderType} ${coin}`);
 
-      const result = await exchangeClient.order(orderPayload);
+      const result = await client.order(orderPayload);
       console.log('[PerpOrderTicket] ✓ Order placed:', result);
       
       // Place TP/SL orders if specified
@@ -449,7 +494,7 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
             grouping: 'positionTpsl' as const,
           };
           
-          await exchangeClient.order(tpOrderPayload);
+          await client.order(tpOrderPayload);
           console.log('[PerpOrderTicket] ✓ TP order placed');
         }
         
@@ -475,13 +520,13 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
             grouping: 'positionTpsl' as const,
           };
           
-          await exchangeClient.order(slOrderPayload);
+          await client.order(slOrderPayload);
           console.log('[PerpOrderTicket] ✓ SL order placed');
         }
       }
       
       // Clear form
-      setPrice(orderType === 'market' ? getMarketPrice() : currentPrice || '');
+      setPrice(orderType === 'market' ? getDisplayPrice() : currentPrice || '');
       setMarginRequired(0);
       setSizePercent(0);
       setTakeProfitPrice('');
@@ -586,18 +631,25 @@ export const PerpOrderTicket: React.FC<PerpOrderTicketProps> = ({ visible, onClo
   const handleMarginChange = (value: string) => {
     const margin = parseFloat(value) || 0;
     setMarginRequired(margin);
-    setSizePercent(0);
+
+    // Calculate and sync slider position
+    if (tradeableBalance && tradeableBalance > 0) {
+      const percent = (margin / tradeableBalance) * 100;
+      setSizePercent(Math.min(100, percent));
+    } else {
+      setSizePercent(0);
+    }
   };
   
-  // Update market order price when side or currentPrice changes
+  // Update market order price when side, currentPrice, or orderbook changes
   useEffect(() => {
     if (orderType === 'market') {
-      const marketPrice = getMarketPrice();
-      if (marketPrice) {
-        setPrice(marketPrice);
+      const displayPrice = getDisplayPrice();
+      if (displayPrice) {
+        setPrice(displayPrice);
       }
     }
-  }, [orderType, side, currentPrice]);
+  }, [orderType, side, currentPrice, orderbook]);
 
   if (!coin || orderType === null) {
     return <View />;
