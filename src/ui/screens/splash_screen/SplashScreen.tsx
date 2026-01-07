@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { LoadingBlob } from '../../shared/components';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAccount } from '@reown/appkit-react-native';
-import { loadSessionKey } from '../../../lib/sessionKey';
+import { loadSessionKeyWithWallet, clearSessionKey, getAutoApprovePreference } from '../../../lib/sessionKey';
 import { useWallet } from '../../../contexts/WalletContext';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
 import { styles } from './styles/SplashScreen.styles';
@@ -46,20 +46,38 @@ export default function SplashScreen(): React.JSX.Element {
         return;
       }
 
-      // CONNECTED - check for session key
+      // CONNECTED - check for session key and auto-approve preference
       try {
-        const sessionKey = await loadSessionKey();
-        
-        if (!sessionKey) {
-          // Connected but no session key - go to EnableSessionKey
-          console.log('[SplashScreen] Connected but no session key, navigating to EnableSessionKey');
+        const sessionData = await loadSessionKeyWithWallet();
+        const autoApprovePreference = await getAutoApprovePreference();
+
+        // Case 1: Valid session key for current wallet - proceed normally
+        const isValidForCurrentWallet = sessionData &&
+          sessionData.walletAddress.toLowerCase() === address.toLowerCase();
+
+        if (isValidForCurrentWallet) {
+          console.log('[SplashScreen] Valid session key for current wallet');
+        } else if (autoApprovePreference) {
+          // Case 2: Preference set but key invalid/missing/different wallet - auto-trigger
+          console.log('[SplashScreen] Auto-approve preference set, triggering approval flow');
+          // Clear old session key if exists (for different wallet)
+          if (sessionData) {
+            console.log('[SplashScreen] Clearing session key for different wallet');
+            await clearSessionKey();
+          }
+          hasNavigated.current = true;
+          navigation.replace('EnableSessionKey', { autoTrigger: true });
+          return;
+        } else {
+          // Case 3: No preference - show EnableSessionKey normally
+          console.log('[SplashScreen] No session key and no preference, navigating to EnableSessionKey');
           hasNavigated.current = true;
           navigation.replace('EnableSessionKey');
           return;
         }
 
-        // HAS SESSION KEY - wait for account and market data before going to home
-        console.log('[SplashScreen] Has session key, waiting for account and market data...');
+        // HAS VALID SESSION KEY - wait for account and market data before going to home
+        console.log('[SplashScreen] Has valid session key, waiting for account and market data...');
         
         // Wait for both account and market data to load (up to 5 seconds)
         const maxWaitForData = 5000;

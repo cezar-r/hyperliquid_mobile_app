@@ -1,19 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import { useAccount } from '@reown/appkit-react-native';
 import { useWallet } from '../../../contexts/WalletContext';
 import { styles } from './styles/EnableSessionKeyScreen.styles';
 
 type NavigationProp = NativeStackNavigationProp<any>;
+type RouteParams = { autoTrigger?: boolean };
 
 export default function EnableSessionKeyScreen(): React.JSX.Element {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProp<{ EnableSessionKey: RouteParams }, 'EnableSessionKey'>>();
   const { enableSessionKey } = useWallet();
   const { address } = useAccount();
   const [isEnabling, setIsEnabling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const autoTriggered = useRef(false);
+
+  const autoTrigger = route.params?.autoTrigger ?? false;
 
   const handleEnable = async () => {
     if (!address) {
@@ -40,6 +46,32 @@ export default function EnableSessionKeyScreen(): React.JSX.Element {
     console.log('[EnableSessionKey] User skipped session key setup');
     navigation.replace('Authenticated', { screen: 'Tabs' });
   };
+
+  // Auto-trigger enable flow if requested (from reconnection with preference set)
+  useEffect(() => {
+    if (autoTrigger && address && !isEnabling && !autoTriggered.current) {
+      console.log('[EnableSessionKey] Auto-triggering session key approval');
+      autoTriggered.current = true;
+      handleEnable();
+    }
+  }, [autoTrigger, address]);
+
+  // If auto-triggering, show a simpler loading UI
+  if (autoTrigger && isEnabling && !error) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <Text style={styles.title}>Re-enabling Auto-Approve...</Text>
+          <Text style={styles.description}>
+            Please approve the signature request in your wallet.
+          </Text>
+          <View style={{ marginTop: 32 }}>
+            <ActivityIndicator size="large" color="#00E676" />
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

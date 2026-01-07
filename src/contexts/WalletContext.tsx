@@ -14,6 +14,7 @@ import {
   loadSessionKey,
   clearSessionKey,
   createSessionAccount,
+  setAutoApprovePreference,
 } from '../lib/sessionKey';
 import type { SessionKey } from '../lib/sessionKey';
 import {
@@ -607,7 +608,8 @@ export function WalletProvider({
 
       console.log('[SessionKey] Agent approved:', result);
 
-      await saveSessionKey(newSessionKey);
+      await saveSessionKey(newSessionKey, address);
+      await setAutoApprovePreference(true);
 
       const sessionAccount = createSessionAccount(newSessionKey.privateKey);
       const sessionWalletClient = {
@@ -646,6 +648,7 @@ export function WalletProvider({
       console.log('[SessionKey] Disabling session key...');
 
       await clearSessionKey();
+      await setAutoApprovePreference(false);
 
       setExchangeClient(mainExchangeClient);
       setSessionKey(null);
