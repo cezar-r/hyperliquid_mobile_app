@@ -124,22 +124,26 @@ export function WebSocketProvider({
   // ============ BATCHING LOGIC ============
   const pendingPricesRef = useRef<Record<string, string>>({});
   const pendingContextsRef = useRef<Record<string, AssetContext>>({});
+  const pendingPriceTimestampRef = useRef<number>(0);
+  const pendingContextTimestampRef = useRef<number>(0);
   const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Throttle batch updates to reduce re-renders (500ms instead of RAF at 60fps)
-  const BATCH_FLUSH_INTERVAL_MS = 500;
+  // Throttle batch updates to reduce re-renders (250ms for faster visual updates)
+  const BATCH_FLUSH_INTERVAL_MS = 250;
 
   const flushUpdates = useCallback(() => {
     const store = useWebSocketStore.getState();
 
     if (Object.keys(pendingPricesRef.current).length > 0) {
-      store.setBatchPrices(pendingPricesRef.current);
+      store.setBatchPrices(pendingPricesRef.current, pendingPriceTimestampRef.current);
       pendingPricesRef.current = {};
+      pendingPriceTimestampRef.current = 0;
     }
 
     if (Object.keys(pendingContextsRef.current).length > 0) {
-      store.setBatchAssetContexts(pendingContextsRef.current);
+      store.setBatchAssetContexts(pendingContextsRef.current, pendingContextTimestampRef.current);
       pendingContextsRef.current = {};
+      pendingContextTimestampRef.current = 0;
     }
 
     flushTimeoutRef.current = null;
@@ -209,8 +213,10 @@ export function WebSocketProvider({
 
                   const contextKey = market.dex ? `${market.dex}:${market.name}` : market.name;
 
-                  // Queue for batched update
+                  // Queue for batched update with current timestamp
+                  const timestamp = Date.now();
                   pendingContextsRef.current[contextKey] = ctx;
+                  pendingContextTimestampRef.current = timestamp;
                   scheduleBatchFlush();
                 }
               );
@@ -247,8 +253,10 @@ export function WebSocketProvider({
                     circulatingSupply: parseFloat(data.ctx.circulatingSupply),
                   };
 
-                  // Queue for batched update
+                  // Queue for batched update with current timestamp
+                  const timestamp = Date.now();
                   pendingContextsRef.current[market.name] = ctx;
+                  pendingContextTimestampRef.current = timestamp;
                   scheduleBatchFlush();
                 }
               );
@@ -361,8 +369,10 @@ export function WebSocketProvider({
 
           logWebSocketData('allMids (default)', Object.keys(data.mids || {}).length);
 
-          // Queue for batched update
+          // Queue for batched update with current timestamp
+          const timestamp = Date.now();
           Object.assign(pendingPricesRef.current, priceMap);
+          pendingPriceTimestampRef.current = timestamp;
           scheduleBatchFlush();
         });
 
@@ -420,9 +430,12 @@ export function WebSocketProvider({
 
                 logWebSocketData(`allMids (${dex})`, Object.keys(data.mids || {}).length);
 
-                // Queue for batched update
+                // Queue for batched update with current timestamp
+                const timestamp = Date.now();
                 Object.assign(pendingPricesRef.current, priceMap);
                 Object.assign(pendingContextsRef.current, newContexts);
+                pendingPriceTimestampRef.current = timestamp;
+                pendingContextTimestampRef.current = timestamp;
                 scheduleBatchFlush();
               });
               return sub;
@@ -1035,9 +1048,10 @@ export function WebSocketProvider({
           const contextKey = dex ? `${dex}:${coin}` : coin;
           const priceKey = dex ? `${dex}:${coin}` : coin;
 
+          const timestamp = Date.now();
           const store = useWebSocketStore.getState();
-          store.setAssetContext(contextKey, ctx);
-          store.setPrice(priceKey, ctx.markPx.toString());
+          store.setAssetContext(contextKey, ctx, timestamp);
+          store.setPrice(priceKey, ctx.markPx.toString(), timestamp);
         });
         singleAssetCtxSubRef.current = sub;
       } else {
@@ -1052,9 +1066,10 @@ export function WebSocketProvider({
             circulatingSupply: parseFloat(data.ctx.circulatingSupply),
           };
 
+          const timestamp = Date.now();
           const store = useWebSocketStore.getState();
-          store.setAssetContext(coin, ctx);
-          store.setPrice(coin, ctx.markPx.toString());
+          store.setAssetContext(coin, ctx, timestamp);
+          store.setPrice(coin, ctx.markPx.toString(), timestamp);
         });
         singleAssetCtxSubRef.current = sub;
       }
@@ -1089,7 +1104,9 @@ export function WebSocketProvider({
             }
           });
         }
+        const timestamp = Date.now();
         Object.assign(pendingPricesRef.current, priceMap);
+        pendingPriceTimestampRef.current = timestamp;
         scheduleBatchFlush();
       });
       allMidsSubIdRef.current = sub;
@@ -1141,8 +1158,11 @@ export function WebSocketProvider({
                   }
                 });
               }
+              const timestamp = Date.now();
               Object.assign(pendingPricesRef.current, priceMap);
               Object.assign(pendingContextsRef.current, newContexts);
+              pendingPriceTimestampRef.current = timestamp;
+              pendingContextTimestampRef.current = timestamp;
               scheduleBatchFlush();
             });
             return sub;
@@ -1180,7 +1200,9 @@ export function WebSocketProvider({
 
                 const contextKey = market.dex ? `${market.dex}:${market.name}` : market.name;
 
+                const timestamp = Date.now();
                 pendingContextsRef.current[contextKey] = ctx;
+                pendingContextTimestampRef.current = timestamp;
                 scheduleBatchFlush();
               }
             );
@@ -1210,7 +1232,9 @@ export function WebSocketProvider({
                   circulatingSupply: parseFloat(data.ctx.circulatingSupply),
                 };
 
+                const timestamp = Date.now();
                 pendingContextsRef.current[market.name] = ctx;
+                pendingContextTimestampRef.current = timestamp;
                 scheduleBatchFlush();
               }
             );

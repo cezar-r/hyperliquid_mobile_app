@@ -25,6 +25,10 @@ export interface WebSocketStoreState {
   assetContexts: Record<string, AssetContext>;
   orderbook: Orderbook | null;
   recentTrades: Trade[];
+
+  // Timestamps for freshness tracking (prevents stale API data from overwriting newer WebSocket data)
+  priceTimestamps: Record<string, number>;
+  contextTimestamps: Record<string, number>;
 }
 
 export interface WebSocketStoreActions {
@@ -40,12 +44,12 @@ export interface WebSocketStoreActions {
   addPerpMarket: (market: PerpMarket) => void;
 
   // Price actions (optimized for batching)
-  setPrice: (coin: string, price: string) => void;
-  setBatchPrices: (prices: Record<string, string>) => void;
+  setPrice: (coin: string, price: string, timestamp?: number) => void;
+  setBatchPrices: (prices: Record<string, string>, timestamp?: number) => void;
 
   // Asset context actions (optimized for batching)
-  setAssetContext: (coin: string, ctx: AssetContext) => void;
-  setBatchAssetContexts: (contexts: Record<string, AssetContext>) => void;
+  setAssetContext: (coin: string, ctx: AssetContext, timestamp?: number) => void;
+  setBatchAssetContexts: (contexts: Record<string, AssetContext>, timestamp?: number) => void;
 
   // Orderbook actions
   setOrderbook: (orderbook: Orderbook | null) => void;
@@ -80,6 +84,8 @@ const initialState: WebSocketStoreState = {
   assetContexts: {},
   orderbook: null,
   recentTrades: [],
+  priceTimestamps: {},
+  contextTimestamps: {},
 };
 
 // Trade debouncing - batch multiple trade updates into single store update
@@ -110,25 +116,83 @@ export const useWebSocketStore = create<WebSocketStore>()(
       return { perpMarkets: [...state.perpMarkets, market] };
     }),
 
-    // Price actions - optimized for single updates
-    setPrice: (coin, price) => set((state) => ({
-      prices: { ...state.prices, [coin]: price },
-    })),
+    // Price actions - optimized for single updates (with timestamp tracking)
+    setPrice: (coin, price, timestamp = Date.now()) => set((state) => {
+      // Only update if this data is newer than what we have
+      const existingTimestamp = state.priceTimestamps[coin] || 0;
+      if (timestamp < existingTimestamp) {
+        return state; // Skip stale data
+      }
+      return {
+        prices: { ...state.prices, [coin]: price },
+        priceTimestamps: { ...state.priceTimestamps, [coin]: timestamp },
+      };
+    }),
 
-    // Price actions - optimized for batch updates (reduces re-renders)
-    setBatchPrices: (newPrices) => set((state) => ({
-      prices: { ...state.prices, ...newPrices },
-    })),
+    // Price actions - optimized for batch updates (reduces re-renders, with timestamp tracking)
+    setBatchPrices: (newPrices, timestamp = Date.now()) => set((state) => {
+      const updatedPrices = { ...state.prices };
+      const updatedTimestamps = { ...state.priceTimestamps };
+      let hasChanges = false;
 
-    // Asset context actions - single update
-    setAssetContext: (coin, ctx) => set((state) => ({
-      assetContexts: { ...state.assetContexts, [coin]: ctx },
-    })),
+      for (const [key, value] of Object.entries(newPrices)) {
+        const existingTimestamp = updatedTimestamps[key] || 0;
+        // Only update if this data is newer
+        if (timestamp >= existingTimestamp) {
+          updatedPrices[key] = value;
+          updatedTimestamps[key] = timestamp;
+          hasChanges = true;
+        }
+      }
 
-    // Asset context actions - batch update (reduces re-renders)
-    setBatchAssetContexts: (contexts) => set((state) => ({
-      assetContexts: { ...state.assetContexts, ...contexts },
-    })),
+      if (!hasChanges) {
+        return state; // No updates needed
+      }
+
+      return {
+        prices: updatedPrices,
+        priceTimestamps: updatedTimestamps,
+      };
+    }),
+
+    // Asset context actions - single update (with timestamp tracking)
+    setAssetContext: (coin, ctx, timestamp = Date.now()) => set((state) => {
+      // Only update if this data is newer than what we have
+      const existingTimestamp = state.contextTimestamps[coin] || 0;
+      if (timestamp < existingTimestamp) {
+        return state; // Skip stale data
+      }
+      return {
+        assetContexts: { ...state.assetContexts, [coin]: ctx },
+        contextTimestamps: { ...state.contextTimestamps, [coin]: timestamp },
+      };
+    }),
+
+    // Asset context actions - batch update (reduces re-renders, with timestamp tracking)
+    setBatchAssetContexts: (contexts, timestamp = Date.now()) => set((state) => {
+      const updatedContexts = { ...state.assetContexts };
+      const updatedTimestamps = { ...state.contextTimestamps };
+      let hasChanges = false;
+
+      for (const [key, value] of Object.entries(contexts)) {
+        const existingTimestamp = updatedTimestamps[key] || 0;
+        // Only update if this data is newer
+        if (timestamp >= existingTimestamp) {
+          updatedContexts[key] = value;
+          updatedTimestamps[key] = timestamp;
+          hasChanges = true;
+        }
+      }
+
+      if (!hasChanges) {
+        return state; // No updates needed
+      }
+
+      return {
+        assetContexts: updatedContexts,
+        contextTimestamps: updatedTimestamps,
+      };
+    }),
 
     // Orderbook actions
     setOrderbook: (orderbook) => set({ orderbook }),
