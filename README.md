@@ -2,6 +2,9 @@
 
 A React Native mobile application for interacting with the Hyperliquid decentralized exchange.
 
+## About
+
+The Hyperliquid Mobile Companion is a non-custodial UI layer that connects directly to the Hyperliquid protocol. The app cannot custody, control, or redirect user funds. All transactions require user signature via their external wallet. Session keys are cryptographically restricted to trading operations only and cannot execute withdrawals or transfers. The app collects no personal data beyond publicly visible blockchain addresses.
 
 ---
 
