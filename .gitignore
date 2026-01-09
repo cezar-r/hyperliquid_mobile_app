@@ -45,3 +45,6 @@ yarn-error.*
 # IDE
 .cursor
 .vscode
+
+# Marketing (internal only)
+marketing/
